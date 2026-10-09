@@ -1,0 +1,70 @@
+name: firestar-manager
+# ========== 代码源（sources）==========
+sources:
+  my_repo:
+    type: codeup
+    name: firestar-manager
+    endpoint: https://codeup.aliyun.com/6923140d3b25a962b43a7ff4/firestar-manager.git
+    branch: main
+    triggerEvents:
+      - push
+    branchesFilter: ^main$
+    certificate:
+      type: serviceConnection
+      # 复用 be-media-man-system 同账号的 Codeup 代码源连接；若校验报"连接无效"再新建
+      serviceConnection: uhru5q7p3w6ougai
+
+stages:
+  build_stage:
+    name: 构建
+    jobs:
+      build_job:
+        name: Node 构建
+        runsOn:
+          group: public/cn-beijing
+          # ⚠️ 该容器为 Java 构建镜像、不含 Node。
+          #    请在云效 UI 改用带 Node 的构建容器（如 node:20 镜像），
+          #    或在本步骤内用 nvm 安装：source ~/.nvm/nvm.sh && nvm use 20
+          container: build-steps-public-registry.cn-beijing.cr.aliyuncs.com/build-steps/alinux3:latest
+        condition: |
+          "${ACTION}" == "deploy"
+        steps:
+          build_step:
+            step: Command
+            name: 安装依赖并构建
+            with:
+              run: |
+                npm install
+                npm run build
+          upload_step:
+            step: ArtifactUpload
+            name: 构建物上传(dist)
+            with:
+              uploadType: packages
+              serviceConnection: gup34idmcpxurce6
+              repo: flow_generic_repo
+              artifact: default
+              filePath:
+                - dist/
+              version: "${BUILD_NUMBER}"
+
+  # ========== 部署阶段：静态资源放到同台 ECS 的 nginx 目录 ==========
+  deploy_stage:
+    name: 部署
+    jobs:
+      deploy_job:
+        name: 主机组部署(静态资源)
+        component: VMDeploy
+        condition: |
+          "${ACTION}" == "deploy"
+        with:
+          artifact: $[stages.build_stage.build_job.upload_step.artifacts.default]
+          # 机器组：与后端同台 ECS（复用）；换服务器需新建机器组并替换 UUID
+          machineGroup: "VviPbuOfBVj3wWdY"
+          artifactDownloadPath: /home/admin/firestar-fe/package.tgz
+          executeUser: root
+          run: |
+            mkdir -p /usr/local/server/nginx/html/firestar
+            tar zxvf /home/admin/firestar-fe/package.tgz -C /usr/local/server/nginx/html/firestar --strip-components=1
+            # ⚠️ 需配套 nginx 站点配置（root /usr/local/server/nginx/html/firestar; try_files $uri $uri/ /index.html）后 reload
+            # nginx -s reload
