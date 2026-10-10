@@ -4,10 +4,10 @@ import { Connection, HomeFilled } from '@element-plus/icons-vue'
 import request from '../utils/request'
 
 const loading = ref<boolean>(false)
-const pong = ref<string>('')
 const cost = ref<number>(0)
 const healthError = ref<string>('')
 const checked = ref<boolean>(false)
+const report = ref<Record<string, any> | null>(null)
 
 const project = {
   name: '火星财务管理系统',
@@ -35,18 +35,32 @@ const statusText = computed(() => {
   return healthError.value ? '连接失败' : '运行正常'
 })
 
+/**
+ * 调 /system/db-check 做检测 —— 不再用 /ping。
+ *
+ * 区别很重要：/ping 只回 {"app":"...","status":"UP"}，能证明"端口通着"，
+ * 但连的是哪个库、表建了几张、Flyway 跑到第几版一概看不出来。
+ * /system/db-check 会遍历 information_schema 把这些全查一遍，
+ * 出问题时能直接看出「连错库了」还是「表没建全」，而不是只告诉你"不通"。
+ */
 const ping = async () => {
   loading.value = true
   healthError.value = ''
-  pong.value = ''
+  report.value = null
   const start = Date.now()
   try {
-    const res = await request.get('/ping')
+    const res: any = await request.get('/system/db-check')
     cost.value = Date.now() - start
-    pong.value = typeof res === 'string' ? res : JSON.stringify(res)
-  } catch (e) {
+    report.value = res
+  } catch (e: any) {
     cost.value = Date.now() - start
-    healthError.value = (e as Error).message || '无法连接后端，请确认服务已启动且代理配置正确'
+    // 后端在 unhealthy 时返回 503，axios 会走这里。
+    // 但 503 的 body 里带着具体的 errors 列表 —— 那才是排查的关键信息，
+    // 不能只丢一句"连接失败"就把线索扔了。
+    const errs = e?.response?.data?.errors
+    healthError.value = Array.isArray(errs) && errs.length
+      ? errs.join('；')
+      : (e as Error).message || '无法连接后端，请确认服务已启动且代理配置正确'
   } finally {
     checked.value = true
     loading.value = false
@@ -113,10 +127,25 @@ const ping = async () => {
             后端连接正常（耗时 {{ cost }} ms）
           </template>
           <el-descriptions :column="1" border size="small" class="health-desc">
-            <el-descriptions-item label="接口">GET /api/ping</el-descriptions-item>
-            <el-descriptions-item label="响应">
-              <code class="resp-code">{{ pong }}</code>
-            </el-descriptions-item>
+            <el-descriptions-item label="接口">GET /api/system/db-check</el-descriptions-item>
+            <template v-if="report">
+              <el-descriptions-item label="数据库">
+                {{ report.connection?.productName }} {{ report.connection?.productVersion }}
+                （库 {{ report.connection?.catalog }}）
+              </el-descriptions-item>
+              <el-descriptions-item label="表">
+                业务表 {{ report.tables?.businessTableCount }} / 预期 {{ report.tables?.expected }}
+                · 引擎表 {{ report.tables?.engineTableCount }}
+              </el-descriptions-item>
+              <el-descriptions-item label="Flyway">
+                已应用 {{ report.flyway?.appliedCount }} 个版本，当前 v{{ report.flyway?.currentVersion }}
+              </el-descriptions-item>
+              <el-descriptions-item label="错误">
+                <span :class="report.errors?.length ? 'err-text' : 'ok-text'">
+                  {{ report.errors?.length ? report.errors.join('；') : '无' }}
+                </span>
+              </el-descriptions-item>
+            </template>
             <el-descriptions-item label="耗时">{{ cost }} ms</el-descriptions-item>
           </el-descriptions>
         </el-alert>
@@ -203,14 +232,53 @@ const ping = async () => {
 .health-result {
   margin-top: 20px;
 }
+/* ---- 表格占满整行 ----
+   【根因：不是 table-layout，是 el-alert 的 flex 收缩】
+   Element Plus 编译后的原始规则是：
+     .el-alert        { display:flex; width:100% }
+     .el-alert__content { display:flex; flex-direction:column; gap:4px }
+   注意 .el-alert__content 没有 flex:1 —— 它作为 .el-alert 的 flex 子项
+   默认 flex:0 1 auto，宽度按内容收缩，descriptions 的 width:100% 只是
+   铺满这个被压窄的容器（实测仅 277px，右侧空 250px）。
+   所以关键修正是让 content 吃掉 alert 的剩余空间：
+     flex:1 1 auto  → 拉伸填满
+     min-width:0    → 允许长 URL / 错误列表收缩并换行，防止溢出
+   下面 width/table-layout/label 宽度是配套，保证列宽稳定不随文案长短跳动。 */
+.health-result :deep(.el-alert__content) {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+.health-result :deep(.el-alert__description) {
+  width: 100%;
+  min-width: 0;
+}
 .health-desc {
   margin-top: 10px;
+  width: 100%;
 }
-.resp-code {
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #f5f7fa;
-  font-size: 12px;
-  color: #476582;
+.health-desc :deep(.el-descriptions__body),
+.health-desc :deep(.el-descriptions__table) {
+  width: 100%;
+  /* fixed 布局让「值」列吃掉 label 之外的全部剩余宽度，
+     不再由内容长度决定 —— 否则长短不一的文案会让列宽忽宽忽窄 */
+  table-layout: fixed;
+}
+/* label 列固定 120px：够放「Flyway / 数据库 / 耗时」等最长标签，
+   又不至于像默认那样把值列压得太窄 */
+.health-desc :deep(.el-descriptions__label) {
+  width: 120px;
+  color: #606266;
+}
+/* 值列里的长文本（URL、错误列表）要能换行，不能撑破表格 */
+.health-desc :deep(.el-descriptions__content) {
+  width: auto;
+  word-break: break-word;
+}
+.ok-text {
+  color: #67c23a;
+}
+.err-text {
+  color: #f56c6c;
 }
 </style>

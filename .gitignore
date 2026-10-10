@@ -5,9 +5,24 @@ node_modules/
 dist/
 dist-ssr/
 
-# Local env overrides (secrets)
-.env.local
-.env.*.local
+# 环境变量：一律不入库，只保留 .env.example 作为模板
+#
+# 【为什么要全挡，而不是只挡 .env.local】
+# Vite 项目的 .env* 是分环境配置（.env / .env.development / .env.production /
+# .env.pre / .env.test），里面装的是各环境的真实后端地址、可能还有 token。
+# 之前只挡了 .env.local 系列，结果 git add . 时把上面五个全吸进去了。
+#
+# 【为什么不能靠"里面没secret"就放心入库】
+# 现在的确没有 token，但这是**当时的快照**：某天有人往 .env.production 里
+# 填了个真实的 access key 再提交，就是泄露，而且 Git 历史一旦提交就洗不掉。
+# 靠"我记得别放密钥"当防线，迟早会破。规则要挡的是"可能放"这件事本身。
+#
+# 新增环境变量时的做法：
+#   1. 复制 .env.example 建对应文件（本地生成，不要提交）
+#   2. 模板里补上这个变量名和注释说明（.env.example 本身入库）
+.env
+.env.*
+!.env.example
 
 # Logs
 logs/
