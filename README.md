@@ -25,7 +25,7 @@ src/
   router/index.ts      # Vue Router（history 模式，base = BASE_URL）
   stores/index.ts      # Pinia 实例
   stores/app.ts        # 示例应用状态
-  views/Home.vue       # 示例首页（Element Plus 演示 + 调后端 /ping）
+  views/Home.vue       # 示例首页（Element Plus 演示 + 调后端 DB 自检 /system/db-check）
   utils/request.ts     # Axios 实例（baseURL 指后端，拦截器）
 ```
 
@@ -63,3 +63,8 @@ npm run build:prod    # --mode production
 ## 分支约定
 
 与后端保持一致：`develop → test →（人工确认）→ master → main → develop`。
+
+## 当前进度（截至 2026-10-12）
+
+- 脚手架已就绪（Vue3 + Vite5 + Element Plus + Pinia + Router4 + Axios），`Home.vue` 演示页可联调后端 DB 自检端点。
+- 业务页面 / API 请求模块 / 业务 Store 均**待开发**，需随后端接口逐步补齐。
