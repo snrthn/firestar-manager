@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Connection, HomeFilled } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Connection, HomeFilled, SwitchButton, UserFilled } from '@element-plus/icons-vue'
+import { useUserStore } from '../stores/user'
 import request from '../utils/request'
 
 const loading = ref<boolean>(false)
@@ -34,6 +37,27 @@ const statusText = computed(() => {
   if (!checked.value) return '未检测'
   return healthError.value ? '连接失败' : '运行正常'
 })
+
+// ===== 退出登录 =====
+// store 里的 logout 会先调 POST /auth/logout 把当前 JWT 的 jti 写进数据库黑名单，
+// 再清本地 token；即使后端调用失败（token 已过期等）也强制清本地，保证一定能退出。
+const userStore = useUserStore()
+const router = useRouter()
+
+const handleLogout = async () => {
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '退出确认', {
+      type: 'warning',
+      confirmButtonText: '退出登录',
+      cancelButtonText: '取消'
+    })
+  } catch {
+    return // 用户点了取消
+  }
+  await userStore.logout()
+  ElMessage.success('已退出登录')
+  router.push('/login')
+}
 
 /**
  * 调 /system/db-check 做检测 —— 不再用 /ping。
@@ -70,6 +94,21 @@ const ping = async () => {
 
 <template>
   <div class="home">
+    <!-- 右上角悬浮用户区：登录人信息 + 退出登录入口（fixed，滚动全程可见） -->
+    <div class="top-user">
+      <span class="top-user-name">
+        <el-icon><UserFilled /></el-icon>
+        {{ userStore.userInfo?.nickname || userStore.userInfo?.username || '未知' }}
+      </span>
+      <el-button
+        class="logout-btn"
+        :icon="SwitchButton"
+        size="small"
+        @click="handleLogout"
+      >
+        退出登录
+      </el-button>
+    </div>
     <!-- 欢迎横幅 -->
     <div class="welcome-banner">
       <div class="banner-info">
@@ -171,6 +210,8 @@ const ping = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* 上下 padding 保持一致；该垂直内距同时决定 banner-info（左侧内容区）的
+     上下沿位置，右上角用户区的 fixed top 与此对齐（见 .top-user 注释） */
   padding: 28px 32px;
   background: linear-gradient(135deg, #001529 0%, #003a70 60%, #1677ff 130%);
   color: #fff;
@@ -189,7 +230,9 @@ const ping = async () => {
   letter-spacing: 1px;
 }
 .banner-desc {
-  margin: 10px 0 14px;
+  /* 上下 margin 撑大（原 10px 0 14px）：抬高左侧内容区高度，
+     使底对齐的 banner-icon 上沿与右上角用户区底部之间留出约 8px 间距 */
+  margin: 16px 0 20px;
   font-size: 14px;
   color: rgba(255, 255, 255, 0.75);
 }
@@ -197,16 +240,58 @@ const ping = async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 8px;
 }
 .tech-tag {
   border-color: rgba(255, 255, 255, 0.35);
   color: rgba(255, 255, 255, 0.9);
   background: rgba(255, 255, 255, 0.08);
 }
+/* 右上角悬浮用户区 */
+.top-user {
+  position: fixed;
+  /* 与 .welcome-banner 的 padding-top(28px) 对齐：
+     用户区上沿 == 左侧内容区(banner-info)上沿（banner 贴视口顶部时成立） */
+  top: 28px;
+  right: 24px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  /* 半透明深色底 + 毛玻璃：无论浮在深色横幅还是浅色内容区上都清晰 */
+  background: rgba(0, 23, 41, 0.55);
+  backdrop-filter: blur(6px);
+}
+.top-user-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.92);
+}
+/* 深色横幅上的退出按钮：描边 + 微透明底，hover 提亮 */
+.logout-btn {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+}
+.logout-btn:hover,
+.logout-btn:focus {
+  color: #fff;
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+}
 .banner-icon {
   color: rgba(255, 255, 255, 0.15);
   flex-shrink: 0;
   margin-left: 24px;
+  /* 底对齐：flex-end 且无 margin-bottom，icon 下沿与左侧 banner-info 底部齐平；
+     与右上角用户区的间距由 banner-desc/tags 增高的 margin 撑出 */
+  align-self: flex-end;
+  position: relative;
+  top: 10px;
 }
 
 /* 状态卡片 */

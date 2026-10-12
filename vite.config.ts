@@ -13,6 +13,7 @@ export default defineConfig({
   },
   server: {
     port: 9090,
+    open: true, // 开发服务器启动后自动打开浏览器
     // 开发期代理：前端 9090 同源请求 /api/* 转发到后端 2025，规避浏览器跨域(CORS)
     // 注意：Vite 5 的改写选项是 rewrite（函数），不是旧版 http-proxy 的 pathRewrite（对象），
     // 用错键名会导致 /api 前缀不被剥离，请求原样发成 /api/ping 而 404。

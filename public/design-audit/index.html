@@ -53,13 +53,14 @@
   </main>
 </div>
 <script>
-  // 文档清单：按原始文档 CreationTime 升序；file 为 public/design-audit/ 下的同名 html
+  // 文档清单：先按原始文档 CreationTime 升序排列，功能清单（进度规划）置最后一项；file 为 public/design-audit/ 下的同名 html
   const docs = [
     { file: '财务术语科普手册.html', name: '财务术语科普' },
     { file: '火星财务系统纪律红线.html', name: '纪律红线' },
     { file: '火星财务系统业务模型.html', name: '业务模型' },
     { file: '火星财务系统接口文档.html', name: '接口文档' },
-    { file: '火星财务系统技术栈文档.html', name: '技术栈文档' }
+    { file: '火星财务系统技术栈文档.html', name: '技术栈文档' },
+    { file: '功能清单与进度.html', name: '功能清单 · 进度' }
   ];
   const nav = document.getElementById('nav');
   const frame = document.getElementById('frame');
