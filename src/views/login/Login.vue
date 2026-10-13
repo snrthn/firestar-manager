@@ -4,7 +4,6 @@
       <h2 class="title">火星财务 · 登录</h2>
       <!-- 研发阶段临时展示：正式上线前移除 -->
       <div class="dev-hint">
-        <span class="dev-hint-tag">研发阶段</span>
         <span>默认账号：<code>admin</code> / 密码：<code>admin123</code></span>
       </div>
       <el-form-item>
@@ -93,6 +92,7 @@ async function onSubmit() {
 .dev-hint {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   margin: 0 0 18px;
   padding: 8px 12px;
@@ -101,14 +101,6 @@ async function onSubmit() {
   background: #fef3c7;
   border: 1px solid #fde68a;
   border-radius: 6px;
-}
-.dev-hint-tag {
-  flex: none;
-  padding: 1px 6px;
-  font-size: 11px;
-  color: #fff;
-  background: #d97706;
-  border-radius: 4px;
 }
 .dev-hint code {
   padding: 0 4px;
