@@ -58,7 +58,8 @@ async function onSubmit() {
     if (resp.forceChangePassword) {
       ElMessage.warning('首次登录，请尽快修改密码')
     }
-    router.push('/')
+    // 登录成功 → 工作台（/dashboard）
+    router.push('/dashboard')
   } catch (e: any) {
     error.value = e?.message || '登录失败'
   } finally {

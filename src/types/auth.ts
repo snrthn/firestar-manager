@@ -42,7 +42,23 @@ export interface MenuVO {
   permCode: string | null
   menuType: string
   sortNo: number
+  visible: number
+  status: string
   children?: MenuVO[]
+}
+
+// 菜单管理页表单（新增 / 修改共用，与后端 MenuRequest 对齐）
+export interface MenuFormData {
+  id?: number
+  parentId: number
+  menuName: string
+  routePath: string
+  component: string
+  permCode: string
+  menuType: 'CATALOG' | 'MENU'
+  sortNo: number
+  visible: number
+  status: string
 }
 
 // 后端统一响应体结构：{ code, message, data }

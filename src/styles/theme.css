@@ -1,0 +1,28 @@
+/* ============================================================
+ * 火星财务管理系统 — 全局主题变量覆盖
+ * 基底沿用 Element Plus 默认设计令牌（中性色 / 功能色 / 文本 / 边框），
+ * 仅替换「品牌主色 primary」及其 10 阶衍生（light-3~9 / dark-2）。
+ * 由 main.ts 在 reset.css 之后引入，确保覆盖生效。
+ * 品牌主色方案：B 信任蓝 #2D6CFF（2026-10-13 虎哥拍板）
+ * ============================================================ */
+
+:root {
+  /* ===== 品牌主色 + 10 阶衍生 =====
+   * 算法：单一主色 → 与白/黑按比例混合生成（同 Element Plus 官方 color 算法）。
+   * light-N = 主色占 N*10% 权重；dark-2 = 主色占 80%（即掺 20% 黑）。 */
+  --fs-primary: #2d6cff;
+  --el-color-primary: #2d6cff;
+  --el-color-primary-light-3: #5789ff; /* hover 态 */
+  --el-color-primary-light-5: #80b6ff;
+  --el-color-primary-light-7: #c0d3ff;
+  --el-color-primary-light-8: #d5e2ff;
+  --el-color-primary-light-9: #eaf0ff; /* 极淡底：选中/悬浮背景 */
+  --el-color-primary-dark-2: #2456cc;  /* active / 按下态 */
+
+  /* ===== 布局尺度（供布局组件复用，统一改一处即可） ===== */
+  --fs-header-height: 56px;
+  --fs-sidebar-width: 220px;
+  --fs-sidebar-collapsed-width: 64px;
+  --fs-content-padding: 16px;
+  --fs-layout-bg: #f5f7fa;
+}
