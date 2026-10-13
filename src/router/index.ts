@@ -41,6 +41,9 @@ const menuPages: Array<{ path: string; name: string; title: string; component: s
   { path: 'system/permission', name: 'systemPermission', title: '权限管理', component: 'system/permission' },
   { path: 'system/menu', name: 'systemMenu', title: '菜单管理', component: 'system/menu' },
   { path: 'system/dict', name: 'systemDict', title: '字典管理', component: 'system/dict' },
+  // 字典数据（隐藏二级页）：菜单表里 visible=0，侧栏不渲染，从字典管理页进入；
+  // 路由照常注册，直接输 URL / 刷新可访问（V7 迁移种子的 route_path 与此对齐）
+  { path: 'system/dict-data', name: 'systemDictData', title: '字典数据', component: 'system/dict-data' },
   { path: 'system/file', name: 'systemFile', title: '文件管理', component: 'system/file' },
 ]
 

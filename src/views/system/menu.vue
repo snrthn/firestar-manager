@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance } from 'element-plus'
-import { Plus, Refresh } from '@element-plus/icons-vue'
+import { Expand, Fold, Plus, Refresh } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -17,9 +17,49 @@ import type { MenuFormData, MenuVO } from '@/types/auth'
 // ===== 列表数据 =====
 const loading = ref(false)
 const menuTree = ref<MenuVO[]>([])
-// 刷新时自增：重挂载 el-table，让 default-expand-all 对刷新后的数据重新生效
-// （default-expand-all 只在 table 首次挂载时求值，单纯换 data 不会重新展开）
-const tableKey = ref(0)
+
+// 展开态受控：el-table 的 expand-row-keys 决定哪些行展开，@expand-change 同步用户操作。
+// ⚠️ key 必须是字符串：EP 内部 treeData 是 Record<string, TreeData>，
+// updateTreeData 用 Object.keys(nested) 取出的 key 与 expand-row-keys 做 includes
+// 比较——传 number[] 时 includes('19') 永远 false，所有行都不展开，
+// 表现为「树表只剩顶级目录、点击展开箭头无效」（2026-10-13 虎哥实测，
+// 与 EP 官方文档示例 expand-row-keys: ['1'] 的字符串用法对齐）。
+const expandRowKeys = ref<string[]>([])
+
+// 收集所有「有 children 的目录节点」id —— 展开全部的可选集合
+const collectCatalogIds = (nodes: MenuVO[]): string[] => {
+  const ids: string[] = []
+  const walk = (list: MenuVO[]) => {
+    for (const n of list) {
+      if (n.children?.length) {
+        ids.push(String(n.id))
+        walk(n.children)
+      }
+    }
+  }
+  walk(nodes)
+  return ids
+}
+
+const allCatalogIds = computed(() => collectCatalogIds(menuTree.value))
+const allExpanded = computed(
+  () => allCatalogIds.value.length > 0 && allCatalogIds.value.every((id) => expandRowKeys.value.includes(id))
+)
+
+const toggleExpandAll = () => {
+  expandRowKeys.value = allExpanded.value ? [] : allCatalogIds.value
+}
+
+const onExpandChange = (row: MenuVO, expanded: boolean) => {
+  const key = String(row.id)
+  const ids = new Set(expandRowKeys.value)
+  if (expanded) {
+    ids.add(key)
+  } else {
+    ids.delete(key)
+  }
+  expandRowKeys.value = [...ids]
+}
 
 // 同级邻居表：parentId → 按 sortNo/id 升序的兄弟节点，用于上移/下移按钮的禁用判断
 const siblingsMap = ref<Map<number, MenuVO[]>>(new Map())
@@ -51,9 +91,24 @@ const loadMenus = async () => {
   loading.value = true
   try {
     const tree = await listMenus()
+    const firstLoad = menuTree.value.length === 0
     menuTree.value = tree
     rebuildSiblings(tree)
-    tableKey.value++
+    if (firstLoad) {
+      // 首次加载展开全部目录（若依默认行为）
+      expandRowKeys.value = collectCatalogIds(tree)
+    } else {
+      // 刷新：保留用户当前展开态，仅剔除已不存在的节点（删掉的菜单/目录）
+      const alive = new Set<string>()
+      const walk = (list: MenuVO[]) => {
+        for (const n of list) {
+          alive.add(String(n.id))
+          if (n.children?.length) walk(n.children)
+        }
+      }
+      walk(tree)
+      expandRowKeys.value = expandRowKeys.value.filter((id) => alive.has(id))
+    }
   } catch (e) {
     ElMessage.error((e as Error).message)
   } finally {
@@ -219,16 +274,19 @@ onMounted(loadMenus)
   <el-card shadow="never">
     <div class="toolbar">
       <el-button type="primary" :icon="Plus" @click="openCreate(0)">新增顶级菜单</el-button>
+      <el-button :icon="allExpanded ? Fold : Expand" @click="toggleExpandAll">
+        {{ allExpanded ? '折叠全部' : '展开全部' }}
+      </el-button>
       <el-button :icon="Refresh" @click="loadMenus">刷新</el-button>
     </div>
 
     <el-table
-      :key="tableKey"
       v-loading="loading"
       :data="menuTree"
       row-key="id"
+      :expand-row-keys="expandRowKeys"
       :tree-props="{ children: 'children' }"
-      default-expand-all
+      @expand-change="onExpandChange"
       border
     >
       <el-table-column prop="menuName" label="菜单名称" min-width="180" />
@@ -358,7 +416,7 @@ onMounted(loadMenus)
 <style scoped>
 .toolbar {
   display: flex;
-  gap: 12px;
+  gap: 0;
   margin-bottom: 16px;
 }
 .sort-no {

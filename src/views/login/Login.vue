@@ -73,7 +73,9 @@ async function onSubmit() {
   display: flex;
   justify-content: center;
   align-items: center;
+  /* dvh 动态视口高度（移动端地址栏收放不冒滚动条），100vh 兜底老浏览器 */
   height: 100vh;
+  height: 100dvh;
   background: #f0f2f5;
 }
 .login-form {

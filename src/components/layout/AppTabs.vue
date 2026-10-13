@@ -45,11 +45,14 @@ function close(path: string, e: MouseEvent) {
 </template>
 
 <style scoped>
+/* 尺寸整体缩小一档（虎哥 2026-10-13：原规格显大）：
+   条高 40→34、标签高 30→26、字号 13→12、内距/圆角/关闭钮同步收。
+   EP 的 size 概念：default(32) → small(24)，这里是自定义标签取其中档。 */
 .tabs {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 40px;
+  height: 34px;
   /* 左右留白与内容区左 padding 一致（--fs-content-padding=16px），页签左缘与正文对齐 */
   padding: 0 var(--fs-content-padding);
   background: #fff;
@@ -60,13 +63,13 @@ function close(path: string, e: MouseEvent) {
 .tab {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 10px 0 12px;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px 0 10px;
   border: 1px solid var(--el-border-color-lighter, #ebeef5);
-  border-radius: 6px;
+  border-radius: 4px;
   background: #fff;
-  font-size: 13px;
+  font-size: 12px;
   color: #606266;
   white-space: nowrap;
   cursor: pointer;
@@ -88,10 +91,10 @@ function close(path: string, e: MouseEvent) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   color: #909399;
   transition: all 0.15s;
