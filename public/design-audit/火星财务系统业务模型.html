@@ -568,7 +568,7 @@
 <div class="doc-header">
     <div class="tag">BUSINESS MODEL</div>
     <h1>火星财务系统 - 业务模型设计</h1>
-    <div class="meta">版本 v6.0 &nbsp;|&nbsp; 基于软件需求1.0版 &nbsp;|&nbsp; Flowable + 应收核销 + 逆向退货 + RBAC + 删除策略 + 初始化重置</div>
+    <div class="meta">版本 v6.1 &nbsp;|&nbsp; 基于软件需求1.0版 &nbsp;|&nbsp; Flowable + 应收核销 + 逆向退货 + 服务分摊（时段型收入自动确认） + RBAC + 删除策略 + 初始化重置</div>
 </div>
 
 <!-- ====== 导航 ====== -->
@@ -583,11 +583,12 @@
     <a href="#payment">8. 回款流程</a>
     <a href="#writeoff">9. 核销机制</a>
     <a href="#return">10. 退货流程</a>
-    <a href="#dependency">11. 依赖关系</a>
-    <a href="#permission">12. 权限矩阵</a>
-    <a href="#dashboard">13. 看板</a>
-    <a href="#delete-policy">14. 删除策略</a>
-    <a href="#init-reset">15. 初始化与重置</a>
+    <a href="#service-allocation">11. 服务分摊</a>
+    <a href="#dependency">12. 依赖关系</a>
+    <a href="#permission">13. 权限矩阵</a>
+    <a href="#dashboard">14. 看板</a>
+    <a href="#delete-policy">15. 删除策略</a>
+    <a href="#init-reset">16. 初始化与重置</a>
 </div>
 
 <div class="container">
@@ -674,6 +675,7 @@
                     <li>发货申请 → 确认发货 → 客户收货</li>
                     <li>支持分批发货</li>
                     <li>每批发货对应一张应收单</li>
+                    <li>服务分摊：时段型收入按计划自动确认</li>
                 </ul>
             </div>
             <div class="dep-card">
@@ -701,7 +703,8 @@
     <div id="entities" class="section">
         <div class="section-title"><span class="num">2</span> 核心业务实体</div>
         <p class="text-block">
-            系统共包含 <strong>23个核心实体</strong>（15个业务实体 + 8个系统实体），以"应收单"为业财桥梁形成单据链。
+            系统共包含 <strong>26个核心实体</strong>（18个业务实体 + 8个系统实体），以"应收单"为业财桥梁形成单据链，
+            服务类收入通过服务明细 + 分摊计划 + 收入确认记录三张表实现时段型自动确认（详见第 11 节）。
             审批流由 Flowable 引擎管理（ACT_* 表），权限系统采用标准 RBAC 模型，字典管理采用类型+数据双表方案。
             所有涉及红字冲减的实体均支持负数单据方向（蓝字/红字）。
         </p>
@@ -739,6 +742,65 @@
                     <li><span class="field-name">数量</span><span class="field-type">int</span></li>
                     <li><span class="field-name">单价</span><span class="field-type">decimal</span></li>
                     <li><span class="field-name">合计金额</span><span class="field-type">decimal</span></li>
+                </ul>
+            </div>
+
+            <div class="entity-card">
+                <div class="entity-name">
+                    <span class="entity-icon">&#128736;</span> 服务明细 ServiceItem
+                </div>
+                <div class="entity-desc">项目下的服务类合同（租赁/服务费），时段型履约，收入按服务期分摊</div>
+                <ul class="entity-fields">
+                    <li><span class="field-name">明细ID <span class="pk">PK</span></span><span class="field-type">bigint</span></li>
+                    <li><span class="field-name">项目ID <span class="pk">FK</span></span><span class="field-type">ref</span></li>
+                    <li><span class="field-name">服务名称</span><span class="field-type">varchar</span></li>
+                    <li><span class="field-name">服务类型</span><span class="field-type">enum</span></li>
+                    <li><span class="field-name">合同总额</span><span class="field-type">decimal</span></li>
+                    <li><span class="field-name">服务开始日</span><span class="field-type">date</span></li>
+                    <li><span class="field-name">服务结束日</span><span class="field-type">date</span></li>
+                    <li><span class="field-name">分摊规则</span><span class="field-type">enum</span></li>
+                    <li><span class="field-name">分摊期数</span><span class="field-type">int</span></li>
+                    <li><span class="field-name">已确认金额</span><span class="field-type">decimal</span></li>
+                    <li><span class="field-name">待确认金额</span><span class="field-type">decimal</span></li>
+                    <li><span class="field-name">分摊状态</span><span class="field-type">enum</span></li>
+                </ul>
+            </div>
+
+            <div class="entity-card">
+                <div class="entity-name">
+                    <span class="entity-icon">&#128197;</span> 分摊计划 AllocationPlan
+                </div>
+                <div class="entity-desc">服务明细生成的分期确认计划，一期一行，期末到期自动确认</div>
+                <ul class="entity-fields">
+                    <li><span class="field-name">计划ID <span class="pk">PK</span></span><span class="field-type">bigint</span></li>
+                    <li><span class="field-name">服务明细ID <span class="pk">FK</span></span><span class="field-type">ref</span></li>
+                    <li><span class="field-name">期序号</span><span class="field-type">int</span></li>
+                    <li><span class="field-name">期间起</span><span class="field-type">date</span></li>
+                    <li><span class="field-name">期间止</span><span class="field-type">date</span></li>
+                    <li><span class="field-name">本期金额</span><span class="field-type">decimal</span></li>
+                    <li><span class="field-name">尾差标记</span><span class="field-type">tinyint</span></li>
+                    <li><span class="field-name">计划状态</span><span class="field-type">enum</span></li>
+                    <li><span class="field-name">确认时间</span><span class="field-type">datetime</span></li>
+                    <li><span class="field-name">确认批次号</span><span class="field-type">varchar</span></li>
+                </ul>
+            </div>
+
+            <div class="entity-card">
+                <div class="entity-name">
+                    <span class="entity-icon">&#9989;</span> 收入确认记录 RevenueConfirm
+                </div>
+                <div class="entity-desc">每期确认生成的收入台账，红冲用负数方向，审计可追溯</div>
+                <ul class="entity-fields">
+                    <li><span class="field-name">确认ID <span class="pk">PK</span></span><span class="field-type">bigint</span></li>
+                    <li><span class="field-name">服务明细ID <span class="pk">FK</span></span><span class="field-type">ref</span></li>
+                    <li><span class="field-name">分摊计划ID <span class="pk">FK</span></span><span class="field-type">ref</span></li>
+                    <li><span class="field-name">确认期间</span><span class="field-type">varchar</span></li>
+                    <li><span class="field-name">确认金额</span><span class="field-type">decimal</span></li>
+                    <li><span class="field-name">确认时间</span><span class="field-type">datetime</span></li>
+                    <li><span class="field-name">触发方式</span><span class="field-type">enum</span></li>
+                    <li><span class="field-name">批次号</span><span class="field-type">varchar</span></li>
+                    <li><span class="field-name">操作人</span><span class="field-type">ref</span></li>
+                    <li><span class="field-name">冲销标记</span><span class="field-type">tinyint</span></li>
                 </ul>
             </div>
 
@@ -2576,9 +2638,114 @@
         </table>
     </div>
 
-    <!-- ====== 11. 依赖关系 ====== -->
+    <!-- ====== 11. 服务分摊与收入确认 ====== -->
+    <div id="service-allocation" class="section">
+        <div class="section-title"><span class="num">11</span> 服务分摊与收入确认</div>
+        <p class="text-block">
+            除货物（<b>时点型履约</b>）外，系统支持<b>服务类收入</b>（<b>时段型履约</b>）：租赁、服务费等。
+            服务合同往往一次性收款或按节点开票，但按权责发生制，收入必须<span class="key">按服务期分期确认</span>。
+            核心机制是<b>收款与收入确认解耦</b>——金额先入「递延收入（合同负债）」，
+            由系统按<span class="key">分摊计划</span>在期末<span class="key">自动生成</span>每期收入确认记录，全程零人工。
+            参考主流方案（SAP RAR / Oracle NetSuite ARM / 用友 NC Cloud 收入计划），轻量版落地为三张表：
+            <b>服务明细 → 分摊计划 → 收入确认记录</b>。
+        </p>
+
+        <div class="arch-diagram">
+            <div class="arch-title">服务分摊链路（时段型履约）</div>
+            <div class="arch-row">
+                <div class="arch-box arch-project">
+                    服务明细登记
+                    <div class="arch-sub">项目下 · 起止日 + 合同总额</div>
+                </div>
+                <div class="arch-arrow">&#10142;</div>
+                <div class="arch-box" style="background:linear-gradient(135deg,#f6d365,#fda085);color:#fff;">
+                    分摊计划生成
+                    <div class="arch-sub">系统按规则拆 N 期</div>
+                </div>
+                <div class="arch-arrow">&#10142;</div>
+                <div class="arch-box arch-invoice">
+                    收款 / 开票
+                    <div class="arch-sub">金额先入递延收入</div>
+                </div>
+            </div>
+            <div class="arch-arrow-v">&#8595;</div>
+            <div class="arch-row">
+                <div class="arch-box" style="background:linear-gradient(135deg,#a29bfe,#6c5ce7);color:#fff;">
+                    收入确认记录
+                    <div class="arch-sub">期末自动 · 一期一条</div>
+                </div>
+                <div class="arch-arrow">&#10142;</div>
+                <div class="arch-box arch-dashboard">
+                    看板
+                    <div class="arch-sub">已确认 / 待确认 / 账龄</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <span class="info-label">与时点型（货物）的本质区别：</span>
+            分批发货由<strong>人/单据驱动</strong>——发货单、签收单到了才确认，一批一条；
+            服务分摊由<strong>系统 schedule 驱动</strong>——服务期到期自动生成，一期一条，无需任何人工动作。
+            两者在数据模型上同构：都是挂在项目下的履约明细，只是<b>确认触发方式</b>不同
+            （货物走发货事件，服务走期末批处理）。
+        </div>
+
+        <div class="dep-grid">
+            <div class="dep-card">
+                <h5>&#128202; 分摊规则</h5>
+                <ul>
+                    <li>按天法（默认）：本期金额 = 合同总额 × 本期天数 ÷ 服务期总天数</li>
+                    <li>按期数法：合同总额 ÷ 期数（日历月对齐场景）</li>
+                    <li>首尾不整期按实际天数折算，不凑整</li>
+                    <li>尾差处理：除不尽部分计入最后一期，保证 Σ确认 = 合同总额</li>
+                    <li>服务期未开始的计划不生成、不确认</li>
+                </ul>
+            </div>
+            <div class="dep-card">
+                <h5>&#9201; 期末自动确认</h5>
+                <ul>
+                    <li>期末批处理扫描：服务期已开始 + 计划状态=待确认</li>
+                    <li>到期自动生成收入确认记录，操作人记 <b>system</b></li>
+                    <li>幂等控制：同一计划同一期间只生成一次（唯一约束）</li>
+                    <li>手动补确认为辅：批处理遗漏时可手工勾选，强制留痕</li>
+                    <li>确认后计划状态置为已确认，同步刷新服务明细已确认/待确认金额</li>
+                </ul>
+            </div>
+            <div class="dep-card">
+                <h5>&#128260; 合同变更</h5>
+                <ul>
+                    <li>退租 / 调价：剩余「待确认」期按新规则重排，已确认期不动</li>
+                    <li>catch-up 补差：轻量版对差额生成一笔「调整」确认记录，不重算历史</li>
+                    <li>提前终止：剩余计划批量作废，已确认部分保留</li>
+                    <li>所有变更留操作日志，审计可回溯</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="dep-grid">
+            <div class="dep-card">
+                <h5>&#128279; 与现有链路的关系</h5>
+                <ul>
+                    <li>服务明细与货物明细<b>平级</b>，同挂项目立项下</li>
+                    <li>轻量版一期：先建收入确认台账，看板展示确认进度</li>
+                    <li>后续迭代：收入确认记录下推应收单 / 开票，纳入核销闭环</li>
+                    <li>字典：服务类型、分摊规则、计划状态、触发方式均走字典表</li>
+                </ul>
+            </div>
+            <div class="dep-card">
+                <h5>&#128465; 删除与冲销策略</h5>
+                <ul>
+                    <li>未生成确认记录的服务明细 / 分摊计划：按分层策略可删</li>
+                    <li>已生成确认记录：<b>不可删只红冲</b>——生成负数确认记录（冲销标记=1）</li>
+                    <li>红冲后该期间额度释放，可重新确认</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 12. 依赖关系 ====== -->
     <div id="dependency" class="section">
-        <div class="section-title"><span class="num">11</span> 单据链依赖关系</div>
+        <div class="section-title"><span class="num">12</span> 单据链依赖关系</div>
 
         <p class="text-block">
             升级为"应收单 + 核销"模式后，三条线不再是完全独立并行，
@@ -2665,7 +2832,7 @@
 
     <!-- ====== 12. 权限矩阵 ====== -->
     <div id="permission" class="section">
-        <div class="section-title"><span class="num">12</span> 角色权限矩阵</div>
+        <div class="section-title"><span class="num">13</span> 角色权限矩阵</div>
 
         <p class="text-block">
             系统共定义 <span class="key">6个角色</span>。权限遵循"最小必要"原则，
@@ -2984,7 +3151,7 @@
 
     <!-- ====== 13. 看板 ====== -->
     <div id="dashboard" class="section">
-        <div class="section-title"><span class="num">13</span> 数据看板</div>
+        <div class="section-title"><span class="num">14</span> 数据看板</div>
 
         <p class="text-block">
             看板是所有项目的汇总列表页面，以 <span class="key">表格形式</span> 展示，
@@ -3091,7 +3258,7 @@
 
     <!-- ====== 14. 删除策略 ====== -->
     <div id="delete-policy" class="section">
-        <div class="section-title"><span class="num">14</span> 数据删除策略</div>
+        <div class="section-title"><span class="num">15</span> 数据删除策略</div>
 
         <div class="note-box">
             <span class="note-label">核心原则：</span>
@@ -3203,7 +3370,7 @@
 
     <!-- ====== 15. 初始化安装与系统重置 ====== -->
     <div id="init-reset" class="section">
-        <div class="section-title"><span class="num">15</span> 初始化安装与系统重置</div>
+        <div class="section-title"><span class="num">16</span> 初始化安装与系统重置</div>
 
         <div class="note-box">
             <span class="note-label">设计原则：</span>

@@ -81,7 +81,7 @@ body { font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; backg
 <div class="doc-header">
     <div class="tag">TECH STACK</div>
     <h1>火星财务系统 - 技术栈文档</h1>
-    <div class="meta">版本 v1.0 &nbsp;|&nbsp; 基于业务模型 v6.0 &nbsp;|&nbsp; Vue 3 + Spring Boot 3 + Flowable</div>
+    <div class="meta">版本 v1.0 &nbsp;|&nbsp; 基于业务模型 v6.1 &nbsp;|&nbsp; Vue 3 + Spring Boot 3 + Flowable</div>
 </div>
 
 <div class="version-info">
@@ -336,7 +336,7 @@ body { font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; backg
                 <td class="tech-name">Flowable</td>
                 <td>7.x</td>
                 <td class="tech-role">审批引擎</td>
-                <td class="tech-reason">业务模型v6.0已选定；支持驳回到任意节点、角色解析、自定义审批人；BPMN 2.0标准</td>
+                <td class="tech-reason">业务模型v6.1已选定；支持驳回到任意节点、角色解析、自定义审批人；BPMN 2.0标准</td>
             </tr>
             <tr>
                 <td class="tech-name">MyBatis-Plus</td>
@@ -378,14 +378,14 @@ body { font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; backg
                 <td class="tech-name">Lombok</td>
                 <td>1.18.x</td>
                 <td class="tech-role">代码简化</td>
-                <td class="tech-reason">@Data/@Builder/@Slf4j减少样板代码；23个实体大量DTO/VO受益</td>
+                <td class="tech-reason">@Data/@Builder/@Slf4j减少样板代码；26个实体大量DTO/VO受益</td>
             </tr>
         </tbody>
     </table>
     <div class="note-box">
         <strong>关键集成点：</strong>
         ① Spring Security + Flowable 共享用户体系，审批人通过 Spring Security 的 Authentication 解析
-        ② MyBatis-Plus 逻辑删除拦截器对23个实体统一生效，第二层实体自动过滤已删除数据
+        ② MyBatis-Plus 逻辑删除拦截器对26个实体统一生效，第二层实体自动过滤已删除数据
         ③ Flyway 的种子数据脚本和 SysConfig 的 sys_initialized 标记配合，防止重复初始化
     </div>
 </div>
@@ -601,7 +601,7 @@ body { font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; backg
   <text x="30" y="380" font-size="9" fill="#aaa" font-family="Segoe UI,sans-serif">生产 logback 级别 error · 开发 logback 级别 debug · 审计日志只增不删不改</text>
 </svg>
     </div>
-    <div class="sub-title">V1 部署架构（端口 2026）</div>
+    <div class="sub-title">V1 部署架构（端口 2025）</div>
     <div class="arch-diagram" style="font-size:0.75rem;">
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 520" style="width:100%;max-width:880px;">
   <defs>
@@ -638,7 +638,7 @@ body { font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; backg
   <!-- Java JAR -->
   <rect x="660" y="50" width="190" height="70" rx="8" fill="#e8f5e9" stroke="#4caf50" stroke-width="2" filter="url(#shadow3)"/>
   <text x="755" y="75" text-anchor="middle" font-size="13" font-weight="700" fill="#2e7d32" font-family="Segoe UI,sans-serif">Java 17</text>
-  <text x="755" y="93" text-anchor="middle" font-size="10" fill="#666" font-family="Segoe UI,sans-serif">JAR 包 :2026</text>
+  <text x="755" y="93" text-anchor="middle" font-size="10" fill="#666" font-family="Segoe UI,sans-serif">JAR 包 :2025</text>
   <text x="755" y="108" text-anchor="middle" font-size="9" fill="#888" font-family="Segoe UI,sans-serif">Spring Boot 3 · Flowable</text>
 
   <!-- Arrows down to data layer -->
@@ -701,9 +701,9 @@ body { font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; backg
   <line x1="580" y1="425" x2="600" y2="425" stroke="#999" stroke-width="1.5" marker-end="url(#arrowhead2)"/>
 
   <rect x="605" y="412" width="245" height="26" rx="4" fill="#e8f5e9" stroke="#66bb6a" stroke-width="1.5"/>
-  <text x="727" y="430" text-anchor="middle" font-size="9" fill="#2e7d32" font-weight="600" font-family="Segoe UI,sans-serif">SPRING_PROFILE=prod bash bin/start.sh 2026 /api/system/health</text>
+  <text x="727" y="430" text-anchor="middle" font-size="9" fill="#2e7d32" font-weight="600" font-family="Segoe UI,sans-serif">SPRING_PROFILE=prod bash bin/start.sh 2025 /api/system/health</text>
 
-  <text x="55" y="470" font-size="9" fill="#aaa" font-family="Segoe UI,sans-serif">V1 单机裸机部署 · V2 预留 Docker 容器化 · 端口 2026（项目2026年立项）</text>
+  <text x="55" y="470" font-size="9" fill="#aaa" font-family="Segoe UI,sans-serif">V1 单机裸机部署 · V2 预留 Docker 容器化 · 端口 2025（项目2026年立项）</text>
 </svg>
     </div>
     <div class="sub-title">多环境配置</div>
@@ -712,13 +712,13 @@ body { font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; backg
         <tbody>
             <tr><td>开发</td><td><code>dev</code></td><td>8080</td><td>.env/dev.env</td><td>本地开发，start.sh自动mvn package重建</td></tr>
             <tr><td>测试</td><td><code>test</code></td><td>8080</td><td>.env/test.env</td><td>测试环境，连测试库</td></tr>
-            <tr><td>预发布</td><td><code>pre</code></td><td>2026</td><td>.env/pre.env</td><td>预发布环境，模拟生产验证</td></tr>
-            <tr><td>生产</td><td><code>prod</code></td><td>2026</td><td>云效私密变量</td><td>DB_URL/DB_USERNAME/DB_PASSWORD全注入</td></tr>
+            <tr><td>预发布</td><td><code>pre</code></td><td>2025</td><td>.env/pre.env</td><td>预发布环境，模拟生产验证</td></tr>
+            <tr><td>生产</td><td><code>prod</code></td><td>2025</td><td>云效私密变量</td><td>DB_URL/DB_USERNAME/DB_PASSWORD全注入</td></tr>
         </tbody>
     </table>
     <div class="note-box">
-        <strong>端口 2026：</strong>生产环境固定 2026 端口（项目2026年立项），本地开发用 8080 互不影响。
-        <strong>云效流水线部署流程：</strong>push → mvn package → 上传JAR到服务器 → <code>bash bin/stop.sh</code> → 上传新JAR → <code>SPRING_PROFILE=prod bash bin/start.sh 2026 /api/system/health</code>
+        <strong>端口 2025：</strong>生产环境固定 2025 端口（项目2026年立项），本地开发用 8080 互不影响。
+        <strong>云效流水线部署流程：</strong>push → mvn package → 上传JAR到服务器 → <code>bash bin/stop.sh</code> → 上传新JAR → <code>SPRING_PROFILE=prod bash bin/start.sh 2025 /api/system/health</code>
     </div>
 </div>
 
@@ -804,7 +804,7 @@ body { font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; backg
                 <td>审批引擎</td>
                 <td class="compat-yes">Flowable 7</td>
                 <td class="compat-no">Camunda / 手撕</td>
-                <td>业务模型v6.0已论证：全高复杂度审批需引擎；Flowable中文资料多、轻量</td>
+                <td>业务模型v6.1已论证：全高复杂度审批需引擎；Flowable中文资料多、轻量</td>
             </tr>
             <tr>
                 <td>ORM</td>
@@ -866,7 +866,7 @@ body { font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; backg
             <tr><td class="tech-name">Flyway</td><td>10.x</td><td>10.0.0</td><td>10.x支持Spring Boot 3</td></tr>
             <tr><td class="tech-name">Nginx</td><td>1.24.x</td><td>1.24.0</td><td>1.24稳定版</td></tr>
             <tr><td class="tech-name">Node.js</td><td>20 LTS</td><td>20.0.0</td><td>前端构建环境（非生产部署依赖）</td></tr>
-            <tr><td class="tech-name">生产端口</td><td>2026</td><td>—</td><td>项目2026年立项</td></tr>
+            <tr><td class="tech-name">生产端口</td><td>2025</td><td>—</td><td>项目2026年立项</td></tr>
         </tbody>
     </table>
     <div class="note-box">
