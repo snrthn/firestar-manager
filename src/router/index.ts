@@ -1,7 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import Home from '../views/Home.vue'
-import Login from '../views/login/Login.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -9,12 +7,13 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: Home,
+      // 路由懒加载：首页只在登录后访问时才下载，首屏（登录页）不为其买单
+      component: () => import('../views/Home.vue'),
     },
     {
       path: '/login',
       name: 'login',
-      component: Login,
+      component: () => import('../views/login/Login.vue'),
     },
   ],
 })

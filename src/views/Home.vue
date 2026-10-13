@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+// 深层路径 import：绕开 element-plus 顶层入口（顶层入口会拖全量组件进宫，详见 main.ts 注释）
+import ElMessage from 'element-plus/es/components/message/index.mjs'
+import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import { Connection, HomeFilled, SwitchButton, UserFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '../stores/user'
 import request from '../utils/request'

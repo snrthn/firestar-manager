@@ -28,5 +28,24 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        // 拆分 vendor：框架与组件库单独成 chunk，哈希稳定、命中缓存，
+        // 业务改动不会逼用户重下 vue / element-plus。
+        // 注意：必须用函数形式对「已进入 bundle 的模块」分组；
+        // 若写包名（{ 'element-plus': ['element-plus'] }），rollup 会把整个包的
+        // 入口图强行拉进该 chunk，按需引入的 tree-shaking 直接失效（实测 939KB）。
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('element-plus') || id.includes('@element-plus')) {
+            return 'element-plus'
+          }
+          if (/[\\/]node_modules[\\/](vue|vue-router|pinia)[\\/]/.test(id)) {
+            return 'vue'
+          }
+          return undefined
+        },
+      },
+    },
   },
 })
