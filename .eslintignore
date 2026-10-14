@@ -1,14 +1,19 @@
 # ============================================================================
 # 代码扫描忽略清单 (ESLint / 云效 js-codescan 只读这个文件，不读 .gitignore)
 # ----------------------------------------------------------------------------
-# 根因：云效代码扫描底层是 ESLint，会对仓库里的 .js/.ts/.vue 逐个建 AST 再套
-#       ali/typescript/vue 规则集。vite 的构建产物(dist / dist_vNN / dist-ssr)
-#       是压缩后的巨包(单 chunk 1MB+)，解析它们会让 AST 瞬间撑爆 V8 默认 2GB
-#       堆 -> FATAL ERROR: Reached heap limit Allocation failed (OOM)。
-#       这些产物既不是源码、也不该被 lint，必须显式排除，否则扫描阶段必挂。
+# 重要事实（2026-10-14 实测 .temp/scan.log 证实）：
+#   云效 js-codescan 自带默认排除 test/,build/,node_modules/,vendor/,dist/,
+#   **/*.min.js 等，并把本文件内容合并进它临时生成的 .gitignore。所以
+#   node_modules / dist 本来就扫不到，dist_v* 也已从仓库删除 —— 这些都【不是】
+#   OOM 元凶。OOM 真凶是 ali/typescript/vue 规则集对 55 个源文件做「类型感知
+#   lint」(parserOptions.project 拉起整个 vue/element-plus/@types 类型图)，
+#   在 V8 默认 2GB 堆下吃满爆掉。真正的解法是在云效扫描步骤加
+#   NODE_OPTIONS=--max-old-space-size=4096（见对话）。本文件只是双保险，
+#   额外挡住默认清单没覆盖的 dist-ssr / dist_v* / coverage。
+#   注意：绝不要写 *.d.ts —— 扫描器 git clean -dfx 会把 src/env.d.ts 当忽略项删掉。
 # ============================================================================
 
-# vite 构建产物
+# vite 构建产物（dist 其实已被插件默认排除，这里再写一道双保险）
 dist
 dist-ssr
 
@@ -20,7 +25,6 @@ dist_v*
 # 依赖与第三方（ESLint 默认也跳 node_modules，这里显式写死更稳妥）
 node_modules
 
-# 其它非业务源码
+# 其它非业务源码（*.min.js 插件默认已排除，这里冗余一道；勿加 *.d.ts）
 coverage
 *.min.js
-*.d.ts
