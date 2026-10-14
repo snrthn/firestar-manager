@@ -37,6 +37,8 @@ export interface UserVO {
   lastLoginAt: string | null
   /** 手机号（nullable，未填为空） */
   phone: string | null
+  /** 邮箱（nullable，未填为空） */
+  email: string | null
   /** 岗位 ID → sys_post.id（null = 未分配） */
   postId: number | null
   /** 岗位名称（服务层回填） */
@@ -56,6 +58,8 @@ export interface UserFormData {
   status: string
   /** 手机号（非必填；填了需 11 位，页面层校验） */
   phone: string
+  /** 邮箱（非必填；填了需符合邮箱格式，页面层校验） */
+  email: string
   /** 岗位 ID → sys_post.id（null = 未分配；创建/修改非必填） */
   postId: number | null
 }

@@ -184,6 +184,7 @@ const assignTarget = ref<RoleManageVO | null>(null)
 // el-tree 实例只需用到 filter 方法，这里用最小接口描述，避免引入 element-plus 深层类型
 interface ElTreeExpose {
   filter: (value: string) => void
+  setCheckedKeys: (keys: number[]) => void
 }
 const menuTreeRef = ref<ElTreeExpose | null>(null)
 const permTreeRef = ref<ElTreeExpose | null>(null)
@@ -246,6 +247,44 @@ const onPermCheck = (_data: unknown, payload: { checkedKeys: (string | number)[]
 
 const onMenuCheck = (_data: unknown, payload: { checkedKeys: (string | number)[] }) => {
   checkedMenuIds.value = payload.checkedKeys.map(Number)
+}
+
+// ===== 全选 / 清空（菜单树与权限树各自独立）=====
+// 递归收集整棵树所有节点 id（含父与子）：默认非 check-strictly（父子联动）下，
+// 这与「手动把每个节点逐个勾上」完全等价，保存提交的集合与手动全勾一致。
+const collectTreeIds = (nodes: { id: number; children?: unknown }[]): number[] => {
+  const ids: number[] = []
+  const walk = (list: { id: number; children?: unknown }[]) => {
+    for (const n of list) {
+      ids.push(n.id)
+      const kids = n.children
+      if (Array.isArray(kids) && kids.length) {
+        walk(kids as { id: number; children?: unknown }[])
+      }
+    }
+  }
+  walk(nodes)
+  return ids
+}
+
+const checkAllMenu = () => {
+  const ids = collectTreeIds(menuTree.value)
+  menuTreeRef.value?.setCheckedKeys(ids)
+  // 显式回写：setCheckedKeys 是编程式设置，不能依赖 @check 事件时序（同上 default-checked-keys 教训）
+  checkedMenuIds.value = ids
+}
+const clearMenu = () => {
+  menuTreeRef.value?.setCheckedKeys([])
+  checkedMenuIds.value = []
+}
+const checkAllPerm = () => {
+  const ids = collectTreeIds(permTree.value)
+  permTreeRef.value?.setCheckedKeys(ids)
+  checkedPermIds.value = ids
+}
+const clearPerm = () => {
+  permTreeRef.value?.setCheckedKeys([])
+  checkedPermIds.value = []
 }
 
 onMounted(loadRoles)
@@ -358,14 +397,20 @@ onMounted(loadRoles)
       <!-- 左栏：菜单权限 -->
       <div class="assign-col">
         <div class="assign-title">菜单权限<span class="assign-sub">（控制侧边栏可见菜单）</span></div>
-        <el-input
-          v-model="menuFilter"
-          class="assign-filter"
-          placeholder="筛选菜单"
-          clearable
-          :prefix-icon="Search"
-          @input="filterMenu"
-        />
+        <div class="filter-row">
+          <el-input
+            v-model="menuFilter"
+            class="assign-filter"
+            placeholder="筛选菜单"
+            clearable
+            :prefix-icon="Search"
+            @input="filterMenu"
+          />
+          <div class="tree-actions">
+            <el-button @click="checkAllMenu">全选</el-button>
+            <el-button @click="clearMenu">清空</el-button>
+          </div>
+        </div>
         <div class="tree-wrap">
           <el-tree
             ref="menuTreeRef"
@@ -384,14 +429,20 @@ onMounted(loadRoles)
       <!-- 右栏：操作权限 -->
       <div class="assign-col">
         <div class="assign-title">操作权限<span class="assign-sub">（按钮级 API 权限）</span></div>
-        <el-input
-          v-model="permFilter"
-          class="assign-filter"
-          placeholder="筛选权限"
-          clearable
-          :prefix-icon="Search"
-          @input="filterPerm"
-        />
+        <div class="filter-row">
+          <el-input
+            v-model="permFilter"
+            class="assign-filter"
+            placeholder="筛选权限"
+            clearable
+            :prefix-icon="Search"
+            @input="filterPerm"
+          />
+          <div class="tree-actions">
+            <el-button @click="checkAllPerm">全选</el-button>
+            <el-button @click="clearPerm">清空</el-button>
+          </div>
+        </div>
         <div class="tree-wrap">
           <el-tree
             ref="permTreeRef"
@@ -439,6 +490,24 @@ onMounted(loadRoles)
   font-size: 12px;
   color: #909399;
 }
+/* 筛选输入框 + 全选/清空 同一行：输入框撑满剩余宽，按钮组贴右 */
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+/* 全选 / 清空：与底部取消同款默认按钮（32px 高，和筛选输入框等高对齐）。
+   间距由 EP 相邻按钮自带 margin-left 提供，叠 gap 会双倍 */
+.tree-actions {
+  display: flex;
+  flex-shrink: 0;
+}
+/* EP 相邻按钮默认 margin-left:12px，这里压到 6px 让两个按钮更紧凑。
+   el-button 是子组件根元素，能继承父组件 scope 属性，无需 :deep() */
+.tree-actions .el-button + .el-button {
+  margin-left: 6px;
+}
 .assign-cols {
   display: flex;
   gap: 16px;
@@ -462,7 +531,7 @@ onMounted(loadRoles)
   color: #909399;
 }
 .assign-filter {
-  margin-bottom: 8px;
+  flex: 1;
 }
 .tree-wrap {
   flex: 1;

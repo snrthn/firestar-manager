@@ -110,6 +110,7 @@ const emptyForm = (): UserFormData => ({
   roleIds: [],
   status: 'ENABLED',
   phone: '',
+  email: '',
   postId: null,
 })
 
@@ -137,6 +138,17 @@ const rules = {
       trigger: 'blur',
     },
   ],
+  // 邮箱非必填：空值放行；填了需符合基本邮箱格式（与 phone 同款口径，后端不重复校验）
+  email: [
+    {
+      validator: (_rule: unknown, value: string, callback: (err?: Error) => void) => {
+        if (!value) return callback()
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return callback(new Error('邮箱格式不正确'))
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
 }
 
 const openCreate = () => {
@@ -158,6 +170,7 @@ const openEdit = (row: UserVO) => {
   form.roleIds = [...row.roleIds]
   form.status = row.status
   form.phone = row.phone || ''
+  form.email = row.email || ''
   form.postId = row.postId
   dialogTitle.value = `修改用户 - ${row.nickname}`
   dialogVisible.value = true
@@ -279,6 +292,9 @@ onMounted(() => {
       <el-table-column label="手机号" min-width="140">
         <template #default="{ row }">{{ row.phone || '—' }}</template>
       </el-table-column>
+      <el-table-column label="邮箱" min-width="180">
+        <template #default="{ row }">{{ row.email || '—' }}</template>
+      </el-table-column>
       <el-table-column label="状态" width="90" align="center">
         <template #default="{ row }">
           <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
@@ -354,6 +370,9 @@ onMounted(() => {
       </el-form-item>
       <el-form-item label="手机号" prop="phone">
         <el-input v-model="form.phone" placeholder="选填，11 位手机号" maxlength="11" />
+      </el-form-item>
+      <el-form-item label="邮箱" prop="email">
+        <el-input v-model="form.email" placeholder="选填，如 name@example.com" maxlength="128" />
       </el-form-item>
       <el-form-item label="状态" prop="status">
         <el-radio-group v-model="form.status">
