@@ -8,6 +8,7 @@ import {
   FullScreen,
   ArrowDown,
   SwitchButton,
+  User,
 } from '@element-plus/icons-vue'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
@@ -30,6 +31,11 @@ const initial = computed(() => (nickname.value || '管').slice(0, 1))
 const userMenuOpen = ref(false)
 function toggleUserMenu() {
   userMenuOpen.value = !userMenuOpen.value
+}
+
+function goProfile() {
+  userMenuOpen.value = false
+  router.push('/profile')
 }
 
 async function handleLogout() {
@@ -85,6 +91,10 @@ function toggleFullscreen() {
         <el-icon :size="14" class="caret"><ArrowDown /></el-icon>
 
         <div v-if="userMenuOpen" class="user-menu">
+          <div class="user-menu-item" @click.stop="goProfile">
+            <el-icon :size="15"><User /></el-icon>
+            <span>个人中心</span>
+          </div>
           <div class="user-menu-item" @click.stop="handleLogout">
             <el-icon :size="15"><SwitchButton /></el-icon>
             <span>退出登录</span>

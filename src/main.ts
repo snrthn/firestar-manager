@@ -58,6 +58,8 @@ import ElTree from 'element-plus/es/components/tree/index.mjs'
 // （它们是 menu/src/ 下的子文件，es/components/ 下不存在 sub-menu/、menu-item/ 目录），
 // JS 一律从 menu 入口具名导入，样式由 menu/style/css 统一聚合，勿手撕子路径。
 import ElMenu, { ElSubMenu, ElMenuItem } from 'element-plus/es/components/menu/index.mjs'
+// 个人中心页签（若依风格：基本资料 / 修改密码）
+import ElTabs, { ElTabPane } from 'element-plus/es/components/tabs/index.mjs'
 // 侧栏菜单滚动容器（成熟组件，折叠/展开时比原生 overflow 更顺滑）
 import ElScrollbar from 'element-plus/es/components/scrollbar/index.mjs'
 // 与上方组件一一对应的样式（每个组件的 style/css 内部会带入 theme-chalk base 样式）
@@ -97,6 +99,7 @@ import 'element-plus/es/components/tree-select/style/css'
 import 'element-plus/es/components/select/style/css'
 import 'element-plus/es/components/tree/style/css'
 import 'element-plus/es/components/menu/style/css'
+import 'element-plus/es/components/tabs/style/css'
 import 'element-plus/es/components/scrollbar/style/css'
 import '@/styles/reset.css'
 import '@/styles/theme.css'
@@ -141,5 +144,7 @@ app.use(ElTree)
 app.use(ElMenu)
 app.use(ElSubMenu)
 app.use(ElMenuItem)
+app.use(ElTabs)
+app.use(ElTabPane)
 app.use(ElScrollbar)
 app.mount('#app')

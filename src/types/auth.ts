@@ -31,6 +31,29 @@ export interface ProfileVO {
   forceChangePassword: boolean
   roles: RoleVO[]
   permissions: string[]
+  /** 手机号（可空） */
+  phone: string | null
+  /** 邮箱（可空） */
+  email: string | null
+  /** 所属部门名称（后端按 deptId 回填） */
+  deptName: string | null
+  /** 岗位名称（后端按 postId 回填） */
+  postName: string | null
+  /** 最后登录时间 */
+  lastLoginAt: string | null
+  /** 创建时间 */
+  createdAt: string | null
+  /** 最后登录 IP */
+  lastLoginIp: string | null
+  /** 直属上级名称（后端按 parentId 回填） */
+  parentName: string | null
+}
+
+/** 当前用户自助更新资料请求体（昵称 / 手机号 / 邮箱） */
+export interface ProfileUpdateRequest {
+  nickname: string
+  phone: string
+  email: string
 }
 
 export interface MenuVO {

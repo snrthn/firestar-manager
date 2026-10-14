@@ -6,6 +6,7 @@ import type {
   ProfileVO,
   MenuVO,
   ChangePasswordRequest,
+  ProfileUpdateRequest,
 } from '@/types/auth'
 
 export function login(data: LoginRequest) {
@@ -22,6 +23,10 @@ export function getProfile() {
 
 export function changePassword(data: ChangePasswordRequest) {
   return request.put<ApiResult<null>>('/auth/password', data).then((r) => r.data)
+}
+
+export function updateProfile(data: ProfileUpdateRequest) {
+  return request.put<ApiResult<null>>('/auth/profile', data).then((r) => r.data)
 }
 
 export function getMenus() {

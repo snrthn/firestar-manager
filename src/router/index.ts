@@ -36,6 +36,8 @@ const menuPages: Array<{ path: string; name: string; title: string; component: s
   { path: 'return', name: 'return', title: '退货管理', component: 'return/list' },
   { path: 'approval', name: 'approval', title: '审批中心', component: 'approval/list' },
   { path: 'dashboard/data', name: 'dashboardData', title: '数据看板', component: 'dashboard/data' },
+  // 个人中心（header 用户下拉入口，不进侧栏；component 落到 views/profile/index.vue）
+  { path: 'profile', name: 'profile', title: '个人中心', component: 'profile/index' },
   // 组织架构（V8 迁移把它排在系统管理组 sort_no=1，路由注册顺序与侧栏顺序保持一致）
   { path: 'system/org', name: 'systemOrg', title: '组织架构', component: 'system/org' },
   { path: 'system/user', name: 'systemUser', title: '用户管理', component: 'system/user' },
