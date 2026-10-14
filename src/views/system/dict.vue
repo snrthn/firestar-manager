@@ -14,6 +14,26 @@ import {
 } from '@/api/dict'
 import type { DictTypeFormData, DictTypeVO } from '@/types/dict'
 
+// ===== 查询条件（顶部查询栏：字典名称/字典类型模糊、状态精确；空则不参与过滤）=====
+const query = reactive({
+  typeName: '',
+  typeCode: '',
+  status: '',
+})
+
+const handleQuery = () => {
+  pageNum.value = 1
+  loadTypes()
+}
+
+const resetQuery = () => {
+  query.typeName = ''
+  query.typeCode = ''
+  query.status = ''
+  pageNum.value = 1
+  loadTypes()
+}
+
 // ===== 列表数据（分页：默认每页 10 条，el-pagination 标准分页器）=====
 const loading = ref(false)
 const typeList = ref<DictTypeVO[]>([])
@@ -24,7 +44,11 @@ const total = ref(0)
 const loadTypes = async () => {
   loading.value = true
   try {
-    const page = await listDictTypes(pageNum.value, pageSize.value)
+    const page = await listDictTypes(pageNum.value, pageSize.value, {
+      typeName: query.typeName || undefined,
+      typeCode: query.typeCode || undefined,
+      status: query.status || undefined,
+    })
     typeList.value = page.records
     total.value = page.total
   } catch (e) {
@@ -149,6 +173,26 @@ onMounted(loadTypes)
 
 <template>
   <el-card shadow="never">
+    <!-- 查询区 -->
+    <el-form :inline="true" :model="query" class="query-bar">
+      <el-form-item label="字典名称">
+        <el-input v-model="query.typeName" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="字典类型">
+        <el-input v-model="query.typeCode" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
+      </el-form-item>
+      <el-form-item label="状态">
+        <el-select v-model="query.status" placeholder="全部" clearable>
+          <el-option label="启用" value="ENABLED" />
+          <el-option label="停用" value="DISABLED" />
+        </el-select>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>
+        <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
+      </el-form-item>
+    </el-form>
+
     <div class="toolbar">
       <el-button type="primary" :icon="Plus" @click="openCreate">新增字典类型</el-button>
       <el-button :icon="Refresh" @click="loadTypes">刷新</el-button>
@@ -226,6 +270,11 @@ onMounted(loadTypes)
 </template>
 
 <style scoped>
+/* 查询区：inline 表单 + 底部间距，与 user.vue / role.vue 同口径；控件宽度由
+   pages.css 统一为 200px（.query-bar .el-input/.el-select/.el-tree-select） */
+.query-bar {
+  margin-bottom: 4px;
+}
 /* 与 system/menu.vue 保持同一套工具栏规格：flex + gap 0（间距由 EP 按钮
    自带 margin-left 提供，叠 gap 会双倍），下边距 16px */
 .toolbar {

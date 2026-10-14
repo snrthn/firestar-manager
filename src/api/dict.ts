@@ -1,16 +1,17 @@
 import request from './request'
 import type { ApiResult } from '@/types/auth'
-import type { DictTypeVO, DictTypePageVO, DictTypeFormData, DictDataPageVO, DictDataFormData } from '@/types/dict'
+import type { DictTypeVO, DictTypePageVO, DictTypeFormData, DictTypeQuery, DictDataPageVO, DictDataFormData } from '@/types/dict'
 
 // 字典管理接口（后端 /system/dict/type/** 与 /system/dict/data/**，全量不过滤，
 // 与 auth.ts 的字典读取语义区分：这里是管理端维护入口）
 
 // ===== 字典类型 =====
 
-/** 分页类型列表（管理页用，默认每页 10 条，与 dict.vue 分页器一致） */
-export function listDictTypes(pageNum = 1, pageSize = 10) {
+/** 分页类型列表（管理页用，默认每页 10 条，与 dict.vue 分页器一致）。params 为可选查询条件，
+ *  空字段传 undefined，axios 自动忽略不发送，后端对应 @RequestParam(required=false) 不参与过滤。 */
+export function listDictTypes(pageNum = 1, pageSize = 10, params?: DictTypeQuery) {
   return request
-    .get<ApiResult<DictTypePageVO>>('/system/dict/type/list', { params: { pageNum, pageSize } })
+    .get<ApiResult<DictTypePageVO>>('/system/dict/type/list', { params: { pageNum, pageSize, ...params } })
     .then((r) => r.data.data!)
 }
 

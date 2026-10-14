@@ -18,6 +18,16 @@ export interface DictTypePageVO {
   pages: number
 }
 
+/** 字典类型查询条件（管理页顶部查询栏；字段均可选，空则后端不拼接过滤） */
+export interface DictTypeQuery {
+  /** 字典名称，模糊匹配 */
+  typeName?: string
+  /** 字典类型编码，模糊匹配 */
+  typeCode?: string
+  /** 状态精确：ENABLED / DISABLED（空=全部） */
+  status?: string
+}
+
 export interface DictTypeVO {
   id: number
   /** 类型编码（业务键，创建后不可改） */
