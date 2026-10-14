@@ -1,0 +1,1 @@
+import{P as a}from"./index-EIbO3RlF.js";import{d as e,E as t,o}from"./vue-BfwqiZvi.js";import"./element-plus-DhM8DHgi.js";const n=e({__name:"data",setup(r){return(s,d)=>(o(),t(a,{title:"数据看板",path:"/dashboard/data",perm:"dashboard:view",desc:"经营数据可视化看板（ECharts）规划中：收款趋势、应收账龄、审批时效等指标卡片。"}))}});export{n as default};

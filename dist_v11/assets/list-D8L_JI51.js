@@ -1,0 +1,1 @@
+import{P as e}from"./index-EIbO3RlF.js";import{d as r,E as t,o}from"./vue-BfwqiZvi.js";import"./element-plus-DhM8DHgi.js";const i=r({__name:"list",setup(a){return(n,p)=>(o(),t(e,{title:"退货管理",path:"/return",perm:"return:view"}))}});export{i as default};

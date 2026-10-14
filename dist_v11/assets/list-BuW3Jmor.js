@@ -1,0 +1,1 @@
+import{P as e}from"./index-EIbO3RlF.js";import{d as a,E as o,o as r}from"./vue-BfwqiZvi.js";import"./element-plus-DhM8DHgi.js";const n=a({__name:"list",setup(t){return(p,s)=>(r(),o(e,{title:"审批中心",path:"/approval",perm:"approval:view"}))}});export{n as default};

@@ -1,5 +1,6 @@
 import request from './request'
-import type { ApiResult, DictTypeVO, DictTypePageVO, DictTypeFormData, DictDataPageVO, DictDataFormData } from '@/types/dict'
+import type { ApiResult } from '@/types/auth'
+import type { DictTypeVO, DictTypePageVO, DictTypeFormData, DictDataPageVO, DictDataFormData } from '@/types/dict'
 
 // 字典管理接口（后端 /system/dict/type/** 与 /system/dict/data/**，全量不过滤，
 // 与 auth.ts 的字典读取语义区分：这里是管理端维护入口）

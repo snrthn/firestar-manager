@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useTabsStore } from '@/stores/tabs'
@@ -12,6 +12,14 @@ const appStore = useAppStore()
 const tabsStore = useTabsStore()
 const { isCompact } = useBreakpoint()
 const route = useRoute()
+
+// 页签右键「刷新当前页」：自增 reloadKey 强制 router-view 下的组件重新挂载。
+// AdminLayout provide 出去，AppTabs 的「刷新」菜单项 inject 调用。
+const reloadKey = ref(0)
+function reload() {
+  reloadKey.value++
+}
+provide('reload', reload)
 
 // 紧凑模式下侧栏以抽屉呈现，drawerVisible 控制开合
 const drawerVisible = ref(false)
@@ -58,7 +66,9 @@ watch(
       <main class="content">
         <AppTabs />
         <div class="view-wrap">
-          <router-view />
+          <router-view v-slot="{ Component }">
+            <component :is="Component" :key="reloadKey" />
+          </router-view>
         </div>
       </main>
     </div>

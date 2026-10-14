@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>财务术语小白科普手册 - 火星财务软件需求</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            line-height: 1.8;
+        }
+
+        /* ====== 顶部封面 ====== */
+        .cover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 80px 20px 60px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cover::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -10%;
+            width: 400px;
+            height: 400px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 50%;
+        }
+
+        .cover::after {
+            content: '';
+            position: absolute;
+            bottom: -30%;
+            left: -10%;
+            width: 300px;
+            height: 300px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 50%;
+        }
+
+        .cover h1 {
+            font-size: 2.6rem;
+            margin-bottom: 16px;
+            position: relative;
+            z-index: 1;
+            letter-spacing: 2px;
+        }
+
+        .cover .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .cover .tag {
+            display: inline-block;
+            margin-top: 24px;
+            padding: 8px 24px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 30px;
+            font-size: 0.9rem;
+            position: relative;
+            z-index: 1;
+            backdrop-filter: blur(10px);
+        }
+
+        /* ====== 流程导航 ====== */
+        .flow-nav {
+            max-width: 1000px;
+            margin: -36px auto 0;
+            padding: 0 20px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .flow-nav-inner {
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .flow-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 18px;
+            background: #f3f4ff;
+            border: 1px solid #e0e0f0;
+            border-radius: 24px;
+            font-size: 0.85rem;
+            color: #555;
+            text-decoration: none;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .flow-chip:hover {
+            background: #667eea;
+            color: #fff;
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102,126,234,0.3);
+        }
+
+        .flow-chip .num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .flow-chip:hover .num {
+            background: #fff;
+            color: #667eea;
+        }
+
+        /* ====== 主内容区 ====== */
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px 80px;
+        }
+
+        /* ====== 角色卡片区 ====== */
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 24px;
+            padding-left: 16px;
+            border-left: 4px solid #667eea;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title .emoji {
+            font-size: 1.2rem;
+        }
+
+        .role-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 50px;
+        }
+
+        .role-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #eee;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .role-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 20px rgba(102,126,234,0.15);
+            transform: translateY(-2px);
+        }
+
+        .role-card .icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            font-size: 1.4rem;
+        }
+
+        .role-card h4 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .role-card p {
+            font-size: 0.85rem;
+            color: #888;
+            line-height: 1.6;
+        }
+
+        /* ====== 流程术语区 ====== */
+        .process-section {
+            margin-bottom: 50px;
+            scroll-margin-top: 20px;
+        }
+
+        .process-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            padding: 20px 28px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .process-header .step-num {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.25);
+            font-size: 1.1rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .process-header h3 {
+            font-size: 1.15rem;
+            font-weight: bold;
+        }
+
+        .process-header .desc {
+            font-size: 0.8rem;
+            opacity: 0.85;
+            margin-left: auto;
+        }
+
+        .process-body {
+            background: #fff;
+            border-radius: 0 0 12px 12px;
+            border: 1px solid #eee;
+            border-top: none;
+            padding: 8px 0;
+        }
+
+        .term-item {
+            padding: 18px 28px;
+            border-bottom: 1px solid #f5f5f5;
+            transition: background 0.2s;
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .term-item:last-child {
+            border-bottom: none;
+        }
+
+        .term-item:hover {
+            background: #faf9ff;
+        }
+
+        .term-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            background: #eef0ff;
+            color: #667eea;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            white-space: nowrap;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+
+        .term-content {
+            flex: 1;
+        }
+
+        .term-content .term-name {
+            font-size: 1.05rem;
+            font-weight: bold;
+            color: #2d2d44;
+            margin-bottom: 4px;
+        }
+
+        .term-content .term-plain {
+            font-size: 0.9rem;
+            color: #e67e22;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .term-content .term-explain {
+            font-size: 0.9rem;
+            color: #555;
+            line-height: 1.8;
+        }
+
+        .term-content .term-explain strong {
+            color: #667eea;
+        }
+
+        .term-content .example {
+            margin-top: 8px;
+            padding: 10px 14px;
+            background: #f8f9fc;
+            border-left: 3px solid #667eea;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: #777;
+        }
+
+        /* ====== 全流程示意图 ====== */
+        .flow-diagram {
+            background: #fff;
+            border-radius: 16px;
+            padding: 32px 24px;
+            margin-bottom: 50px;
+            border: 1px solid #eee;
+        }
+
+        .flow-diagram h3 {
+            text-align: center;
+            font-size: 1.3rem;
+            margin-bottom: 28px;
+            color: #333;
+        }
+
+        .flow-steps {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .flow-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            min-width: 100px;
+        }
+
+        .flow-step .step-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+            color: #fff;
+            transition: transform 0.2s;
+        }
+
+        .flow-step:hover .step-icon {
+            transform: scale(1.1);
+        }
+
+        .flow-step .step-label {
+            font-size: 0.8rem;
+            color: #555;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .flow-arrow {
+            font-size: 1.2rem;
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+
+        /* ====== 底部鼓励 ====== */
+        .encouragement {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            border-radius: 16px;
+            padding: 36px 28px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .encouragement h3 {
+            font-size: 1.3rem;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+
+        .encouragement p {
+            font-size: 0.95rem;
+            color: rgba(255,255,255,0.95);
+            line-height: 1.8;
+        }
+
+        /* ====== 响应式 ====== */
+        @media (max-width: 600px) {
+            .cover h1 { font-size: 1.8rem; }
+            .term-item { flex-direction: column; gap: 8px; }
+            .term-badge { margin-top: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ====== 封面 ====== -->
+<div class="cover">
+    <h1>财务术语小白科普手册</h1>
+    <p class="subtitle">把《火星财务软件需求1.0版》里的专业术语，全部翻译成"人话"</p>
+    <span class="tag">谁也不是天生就会的，看完这份你就是懂的</span>
+</div>
+
+<!-- ====== 流程导航 ====== -->
+<div class="flow-nav">
+    <div class="flow-nav-inner">
+        <a class="flow-chip" href="#roles"><span class="num">R</span> 角色篇</a>
+        <a class="flow-chip" href="#step1"><span class="num">1</span> 项目立项</a>
+        <a class="flow-chip" href="#step2"><span class="num">2</span> 项目数据</a>
+        <a class="flow-chip" href="#step3"><span class="num">3</span> 发货流程</a>
+        <a class="flow-chip" href="#step4"><span class="num">4</span> 回款流程</a>
+        <a class="flow-chip" href="#step5"><span class="num">5</span> 开票流程</a>
+        <a class="flow-chip" href="#step6"><span class="num">6</span> 数据看板</a>
+        <a class="flow-chip" href="#diagram"><span class="num">D</span> 全流程图</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- ====== 角色篇 ====== -->
+    <div id="roles" class="process-section">
+        <div class="section-title"><span class="emoji">&#128100;</span> 先认识一下"谁是谁"——角色篇</div>
+        <div class="role-grid">
+            <div class="role-card">
+                <div class="icon" style="background:#e3f2fd;">&#128209;</div>
+                <h4>销售人员</h4>
+                <p>跑在一线的人，负责谈客户、提交申请、确认收货。整个流程的"发起者"</p>
+            </div>
+            <div class="role-card">
+                <div class="icon" style="background:#e8f5e9;">&#128188;</div>
+                <h4>销售经理</h4>
+                <p>销售的"头儿"，负责提交回款申请和开票申请，权限比普通销售大</p>
+            </div>
+            <div class="role-card">
+                <div class="icon" style="background:#fff3e0;">&#128176;</div>
+                <h4>出纳</h4>
+                <p>公司"管钱袋子"的人，负责确认客户的钱到账了没，是回款流程的审批人</p>
+            </div>
+            <div class="role-card">
+                <div class="icon" style="background:#f3e5f5;">&#128221;</div>
+                <h4>开票员</h4>
+                <p>专门负责开发票的人，收到开票申请后开具发票并上传系统</p>
+            </div>
+            <div class="role-card">
+                <div class="icon" style="background:#e0f7fa;">&#128666;</div>
+                <h4>主管发货人员</h4>
+                <p>仓库/物流的负责人，接到发货申请后安排发货，确认"已发货"</p>
+            </div>
+            <div class="role-card">
+                <div class="icon" style="background:#fce4ec;">&#9881;</div>
+                <h4>管理员</h4>
+                <p>系统的"大管家"，设置审批流程、定义谁能审批、管理权限</p>
+            </div>
+            <div class="role-card">
+                <div class="icon" style="background:#e8eaf6;">&#128100;</div>
+                <h4>审批人/审批人员</h4>
+                <p>负责"拍板"的人，可以同意、不同意或驳回。可以逐级往上走，也可以自定义</p>
+            </div>
+            <div class="role-card">
+                <div class="icon" style="background:#fff8e1;">&#128101;</div>
+                <h4>客户</h4>
+                <p>买你们东西的人/公司。收货、付款的都是他们</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== Step 1: 项目立项 ====== -->
+    <div id="step1" class="process-section">
+        <div class="process-header">
+            <div class="step-num">1</div>
+            <h3>项目立项</h3>
+            <span class="desc">谈成生意后，正式登记"开个项目"</span>
+        </div>
+        <div class="process-body">
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">项目立项</div>
+                    <div class="term-plain">&#128526; 大白话：就是"给这笔生意建个档案"</div>
+                    <div class="term-explain">销售跟客户谈好了，要在系统里正式登记一下：项目叫啥、客户是谁、卖什么东西、多少钱。就像去医院先<strong>挂号</strong>，挂了号才能看病的道理一样。</div>
+                    <div class="example">举例：张三跟"火星科技公司"谈成了一笔单子，他在系统里填了项目名称、客户名称、卖什么货、多少钱，点了"提交"——这个动作就叫"项目立项"。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">货物清单</div>
+                    <div class="term-plain">&#128526; 大白话：卖的东西的"购物小票"</div>
+                    <div class="term-explain">就是你要卖的<strong>所有东西的明细表</strong>，每样东西都要写清楚：叫什么名字、什么型号、单位（个/箱/台）、卖几个、一个多少钱、加起来多少钱。</div>
+                    <div class="example">举例：货物名称=笔记本电脑，规格型号=ThinkPad X1，单位=台，数量=10，单价=8000，合计=80000。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">规格型号</div>
+                    <div class="term-plain">&#128526; 大白话：商品的"身份证号"</div>
+                    <div class="term-explain">同一个东西可能有不同版本，规格型号就是用来<strong>区分到底卖的是哪个版本</strong>的。不然都叫"电脑"，谁知道卖的是哪款？</div>
+                    <div class="example">举例：同样是手机，"iPhone 16 Pro 256G 钛金属色"就是规格型号，和"iPhone 16 128G 蓝色"是两个不同的东西。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">单价 / 合计金额</div>
+                    <div class="term-plain">&#128526; 大白话：单价=一个多少钱，合计=全部加起来多少钱</div>
+                    <div class="term-explain"><strong>单价</strong>就是一件商品卖多少钱；<strong>合计金额</strong>就是单价 × 数量，所有东西加起来的总价格。</div>
+                    <div class="example">举例：单价8000元/台 × 10台 = 合计金额80000元。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">逐级审批</div>
+                    <div class="term-plain">&#128526; 大白话：一层一层往上"签字"</div>
+                    <div class="term-explain">就像学校请假的流程：班主任批 → 年级组长批 → 校长批。系统里也一样，<strong>从下往上一级一级审批</strong>。管理员也可以不走逐级，自定义指定谁来批。</div>
+                    <div class="example">举例：销售提交 → 部门主管审批 → 财务总监审批 → 总经理审批。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">驳回</div>
+                    <div class="term-plain">&#128526; 大白话："打回去重新改"</div>
+                    <div class="term-explain">审批人看了觉得有问题，不批，打回给上一步的人重新弄。可以<strong>驳回到前面任何一个人</strong>那里，也可以打回给最开始提交的人。驳回时要写理由，不是随便打回的。</div>
+                    <div class="example">举例：总经理看到货物单价明显偏高，驳回给销售经理："这个单价不对，核实一下重新提交。"</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== Step 2: 项目数据 ====== -->
+    <div id="step2" class="process-section">
+        <div class="process-header">
+            <div class="step-num">2</div>
+            <h3>项目数据</h3>
+            <span class="desc">审批通过后，项目正式"建档"了</span>
+        </div>
+        <div class="process-body">
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">项目编号</div>
+                    <div class="term-plain">&#128526; 大白话：给项目发个"学号"</div>
+                    <div class="term-explain">审批通过后，系统自动给这个项目分配一个<strong>唯一编号</strong>，就像学生入学后发学号一样。以后查这个项目，搜编号就行。</div>
+                    <div class="example">举例：项目编号 HT-2026-001，一搜就能找到。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">合同是否签约</div>
+                    <div class="term-plain">&#128526; 大白话：正式合同签了没</div>
+                    <div class="term-explain">记录这个项目<strong>有没有正式签合同</strong>。签了=板上钉钉，没签=还在推进中。这个状态会跟踪整个项目周期。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">合同总金额</div>
+                    <div class="term-plain">&#128526; 大白话：这笔生意一共值多少钱</div>
+                    <div class="term-explain">合同上写的<strong>总金额</strong>，就是客户最终应该付的全部金额。这是后面所有发货、回款、开票的"基准线"。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">发货金额 / 回款金额 / 已开具发票金额</div>
+                    <div class="term-plain">&#128526; 大白话：发了多少货的钱、收了多少客户的钱、开了多少发票的钱</div>
+                    <div class="term-explain">
+                        <strong>发货金额</strong>=已经发出去的货值多少钱；<br>
+                        <strong>回款金额</strong>=客户已经付回来多少钱；<br>
+                        <strong>已开具发票金额</strong>=已经给客户开了多少发票的金额。<br>
+                        这三个数跟合同总金额对比，就能看出项目"完成度"到哪了。
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== Step 3: 发货流程 ====== -->
+    <div id="step3" class="process-section">
+        <div class="process-header">
+            <div class="step-num">3</div>
+            <h3>发货流程</h3>
+            <span class="desc">把东西从仓库送到客户手里的全过程</span>
+        </div>
+        <div class="process-body">
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">发货申请</div>
+                    <div class="term-plain">&#128526; 大白话："我要发货了，来人安排一下"</div>
+                    <div class="term-explain">销售人员在系统上提交一个申请，说<strong>什么时候发、发什么货</strong>，然后仓库那边看到申请就安排发货。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">分批发货</div>
+                    <div class="term-plain">&#128526; 大白话：一次发不完，分几批发</div>
+                    <div class="term-explain">订单量太大或者库存不够，<strong>一次发不了全部</strong>，就分几批发货。每批都要走"申请→发货→确认收货"的流程，不能偷懒跳过。</div>
+                    <div class="example">举例：客户订了100台电脑，仓库只有30台，先发30台，等生产出来再发70台。这就是分批。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">客户已收货</div>
+                    <div class="term-plain">&#128526; 大白话："东西我收到了，确认！"</div>
+                    <div class="term-explain">货发出去了不算完，客户收到后，<strong>销售人员要点击确认</strong>。就像快递签收一样，签了收才算这笔发货真正完成。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== Step 4: 回款流程 ====== -->
+    <div id="step4" class="process-section">
+        <div class="process-header">
+            <div class="step-num">4</div>
+            <h3>回款流程</h3>
+            <span class="desc">客户付钱了，我们要确认钱到账了</span>
+        </div>
+        <div class="process-body">
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">回款</div>
+                    <div class="term-plain">&#128526; 大白话：客户付钱给我们</div>
+                    <div class="term-explain">"回款"就是<strong>钱回到我们公司账上</strong>的意思。卖东西不能光发货，还得收到钱才算真正赚到了。</div>
+                    <div class="example">举例：客户该付100万，今天打了50万过来，这50万就是"回款"。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">银行回单</div>
+                    <div class="term-plain">&#128526; 大白话：银行开的"收到钱证明"</div>
+                    <div class="term-explain">客户说"我付了"不行，得有<strong>银行出具的凭证</strong>来证明钱真的到了。这个凭证就是银行回单，相当于银行的"签收回执"。</div>
+                    <div class="example">举例：你去银行转账后，银行给你的那张"转账成功"的小票，就是银行回单。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">回款明细</div>
+                    <div class="term-plain">&#128526; 大白话：每次收了多少钱的详细记录</div>
+                    <div class="term-explain">一个项目可能分好几次收款，每次<strong>什么时间、收了多少、什么银行回单</strong>都记录下来。点开"已回款金额"就能看到这些详细记录。</div>
+                    <div class="example">举例：3月1日回了30万、5月15日回了50万、8月1日回了20万，加起来100万。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== Step 5: 开票流程 ====== -->
+    <div id="step5" class="process-section">
+        <div class="process-header">
+            <div class="step-num">5</div>
+            <h3>开具发票流程</h3>
+            <span class="desc">给客户开正式发票，这是税务合规的必需品</span>
+        </div>
+        <div class="process-body">
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">开具发票（开票）</div>
+                    <div class="term-plain">&#128526; 大白话：给客户开"正规收据"——发票</div>
+                    <div class="term-explain">发票是<strong>国家税务局认可的正式收款凭证</strong>。客户付了钱，我们需要开发票给他们做账。这不是随便开开的，是要走正规流程的。</div>
+                    <div class="example">举例：你吃完饭跟餐厅要的发票，就是"开具发票"。只不过在公司里这更正式，有专人负责。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">开票申请</div>
+                    <div class="term-plain">&#128526; 大白话："帮忙开张发票吧"</div>
+                    <div class="term-explain">销售经理在系统上提交申请，说<strong>给哪个项目开多少钱的发票</strong>。开票员看到申请后才开始干活，不能自己想开就开。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">发票上传</div>
+                    <div class="term-plain">&#128526; 大白话：把开好的发票电子版传到系统里</div>
+                    <div class="term-explain">开票员开完发票后，要<strong>把发票文件上传到系统</strong>，这样销售才能下载发给客户，系统也会记录一切。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">记录下载时间</div>
+                    <div class="term-plain">&#128526; 大白话：系统记下销售什么时候拿走了发票</div>
+                    <div class="term-explain">销售人员从系统下载发票发给客户，系统会<strong>自动记录谁、什么时间下载的</strong>。这是为了留痕，出了问题可以追溯。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== Step 6: 看板 ====== -->
+    <div id="step6" class="process-section">
+        <div class="process-header">
+            <div class="step-num">6</div>
+            <h3>数据看板</h3>
+            <span class="desc">所有项目一览无余的"数据大屏"</span>
+        </div>
+        <div class="process-body">
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">看板</div>
+                    <div class="term-plain">&#128526; 大白话：项目的"一览表/数据大屏"</div>
+                    <div class="term-explain">就是把所有项目的关键信息<strong>汇总在一张表上</strong>，一目了然。不用一个个项目去翻，看这张表就知道每个项目什么状态。</div>
+                    <div class="example">看板上能看到：项目编号、名称、客户、合同签了没、总金额、发了多少货、收了多少款、开了多少票。</div>
+                </div>
+            </div>
+            <div class="term-item">
+                <span class="term-badge">术语</span>
+                <div class="term-content">
+                    <div class="term-name">合同签约情况</div>
+                    <div class="term-plain">&#128526; 大白话：合同签了还是没签，状态如何</div>
+                    <div class="term-explain">看板上会显示每个项目的合同状态——<strong>已签约 / 未签约</strong>。让管理者一眼看出哪些项目还在"路上"。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 全流程示意图 ====== -->
+    <div id="diagram" class="flow-diagram">
+        <h3>&#128640; 一张图看懂整个业务流程</h3>
+        <div class="flow-steps">
+            <div class="flow-step">
+                <div class="step-icon" style="background:linear-gradient(135deg,#667eea,#764ba2);">&#128203;</div>
+                <div class="step-label">项目立项<br><small style="color:#999;font-weight:normal;">销售发起</small></div>
+            </div>
+            <div class="flow-arrow">&#10142;</div>
+            <div class="flow-step">
+                <div class="step-icon" style="background:linear-gradient(135deg,#f093fb,#f5576c);">&#9989;</div>
+                <div class="step-label">审批通过<br><small style="color:#999;font-weight:normal;">逐级/自定义</small></div>
+            </div>
+            <div class="flow-arrow">&#10142;</div>
+            <div class="flow-step">
+                <div class="step-icon" style="background:linear-gradient(135deg,#4facfe,#00f2fe);">&#128230;</div>
+                <div class="step-label">发货<br><small style="color:#999;font-weight:normal;">可分批</small></div>
+            </div>
+            <div class="flow-arrow">&#10142;</div>
+            <div class="flow-step">
+                <div class="step-icon" style="background:linear-gradient(135deg,#43e97b,#38f9d7);">&#128176;</div>
+                <div class="step-label">回款<br><small style="color:#999;font-weight:normal;">出纳审批</small></div>
+            </div>
+            <div class="flow-arrow">&#10142;</div>
+            <div class="flow-step">
+                <div class="step-icon" style="background:linear-gradient(135deg,#fa709a,#fee140);">&#128221;</div>
+                <div class="step-label">开票<br><small style="color:#999;font-weight:normal;">开票员开具</small></div>
+            </div>
+            <div class="flow-arrow">&#10142;</div>
+            <div class="flow-step">
+                <div class="step-icon" style="background:linear-gradient(135deg,#a8edea,#fed6e3);">&#128202;</div>
+                <div class="step-label">看板<br><small style="color:#999;font-weight:normal;">汇总展示</small></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 底部鼓励 ====== -->
+    <div class="encouragement">
+        <h3>&#128170; 你已经不是"财务小菜鸡"了！</h3>
+        <p>
+            以上就是这份需求文档里所有的专业术语。<br>
+            记住：<strong>立项</strong>是开头，<strong>审批</strong>是把关，<strong>发货→回款→开票</strong>是三条并行的线，<strong>看板</strong>是总览全局的窗口。<br>
+            每个术语拆开看都很简单，别被名字唬住了。下次谁再说你，你直接甩这份手册过去！
+        </p>
+    </div>
+
+</div>
+
+</body>
+</html>

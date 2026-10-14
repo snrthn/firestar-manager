@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>火星财务系统 - 纪律红线</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+            background: #0f0f1a;
+            color: #e0e0e0;
+            line-height: 1.8;
+        }
+
+        /* ====== 封面 ====== */
+        .cover {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            padding: 70px 20px 50px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 3px solid #e74c3c;
+        }
+
+        .cover::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 20px,
+                rgba(231,76,60,0.03) 20px,
+                rgba(231,76,60,0.03) 40px
+            );
+        }
+
+        .cover .badge {
+            display: inline-block;
+            padding: 6px 20px;
+            background: #e74c3c;
+            color: #fff;
+            font-size: 0.8rem;
+            font-weight: bold;
+            letter-spacing: 3px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cover h1 {
+            font-size: 2.4rem;
+            color: #fff;
+            position: relative;
+            z-index: 1;
+            letter-spacing: 4px;
+            margin-bottom: 12px;
+        }
+
+        .cover .subtitle {
+            font-size: 1rem;
+            color: rgba(255,255,255,0.6);
+            position: relative;
+            z-index: 1;
+        }
+
+        .cover .red-line {
+            width: 60px;
+            height: 4px;
+            background: #e74c3c;
+            margin: 24px auto 0;
+            position: relative;
+            z-index: 1;
+            border-radius: 2px;
+        }
+
+        /* ====== 导航 ====== */
+        .nav-bar {
+            background: #1a1a2e;
+            padding: 16px 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid #2a2a4a;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .nav-bar a {
+            padding: 6px 14px;
+            font-size: 0.8rem;
+            color: #888;
+            text-decoration: none;
+            border: 1px solid #333;
+            border-radius: 20px;
+            transition: all 0.2s;
+        }
+
+        .nav-bar a:hover {
+            color: #e74c3c;
+            border-color: #e74c3c;
+            background: rgba(231,76,60,0.1);
+        }
+
+        /* ====== 主内容 ====== */
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 40px 20px 80px;
+        }
+
+        /* ====== 红线卡片 ====== */
+        .redline-card {
+            background: #1a1a2e;
+            border: 1px solid #2a2a4a;
+            border-left: 4px solid #e74c3c;
+            border-radius: 0 12px 12px 0;
+            margin-bottom: 28px;
+            overflow: hidden;
+            scroll-margin-top: 60px;
+            transition: border-color 0.2s;
+        }
+
+        .redline-card:hover {
+            border-left-color: #ff5e4e;
+        }
+
+        .redline-header {
+            padding: 20px 28px 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            border-bottom: 1px solid #2a2a4a;
+        }
+
+        .redline-num {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: rgba(231,76,60,0.15);
+            color: #e74c3c;
+            font-size: 1.1rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .redline-header h3 {
+            font-size: 1.15rem;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .redline-header .severity {
+            margin-left: auto;
+            padding: 3px 12px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+
+        .severity-critical {
+            background: rgba(231,76,60,0.2);
+            color: #e74c3c;
+            border: 1px solid rgba(231,76,60,0.4);
+        }
+
+        .severity-high {
+            background: rgba(241,196,15,0.15);
+            color: #f1c40f;
+            border: 1px solid rgba(241,196,15,0.3);
+        }
+
+        .severity-medium {
+            background: rgba(52,152,219,0.15);
+            color: #3498db;
+            border: 1px solid rgba(52,152,219,0.3);
+        }
+
+        .redline-body {
+            padding: 20px 28px;
+        }
+
+        .redline-body p {
+            font-size: 0.9rem;
+            color: #bbb;
+            margin-bottom: 12px;
+            line-height: 1.9;
+        }
+
+        .redline-body strong {
+            color: #e0e0e0;
+        }
+
+        .redline-body .highlight {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .warn-box {
+            margin: 14px 0;
+            padding: 14px 18px;
+            background: rgba(231,76,60,0.08);
+            border: 1px solid rgba(231,76,60,0.2);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #ccc;
+        }
+
+        .warn-box .warn-label {
+            color: #e74c3c;
+            font-weight: bold;
+            margin-right: 6px;
+        }
+
+        .tip-box {
+            margin: 14px 0;
+            padding: 14px 18px;
+            background: rgba(52,152,219,0.08);
+            border: 1px solid rgba(52,152,219,0.2);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #ccc;
+        }
+
+        .tip-box .tip-label {
+            color: #3498db;
+            font-weight: bold;
+            margin-right: 6px;
+        }
+
+        .question-list {
+            margin: 14px 0;
+            padding-left: 0;
+            list-style: none;
+        }
+
+        .question-list li {
+            padding: 8px 0 8px 24px;
+            font-size: 0.85rem;
+            color: #aaa;
+            position: relative;
+        }
+
+        .question-list li::before {
+            content: '?';
+            position: absolute;
+            left: 0;
+            top: 8px;
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .data-table {
+            width: 100%;
+            margin: 14px 0;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            background: #2a2a4a;
+            color: #ccc;
+            font-size: 0.8rem;
+            padding: 10px 14px;
+            text-align: left;
+            border: 1px solid #2a2a4a;
+        }
+
+        .data-table td {
+            padding: 10px 14px;
+            font-size: 0.85rem;
+            color: #aaa;
+            border: 1px solid #2a2a4a;
+        }
+
+        .data-table td.do-not {
+            color: #e74c3c;
+        }
+
+        .data-table td.do-yes {
+            color: #2ecc71;
+        }
+
+        .flow-inline {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #2a2a4a;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: #ccc;
+            margin: 2px;
+        }
+
+        .flow-arrow {
+            color: #555;
+            margin: 0 4px;
+        }
+
+        /* ====== 优先级矩阵 ====== */
+        .priority-section {
+            margin-top: 40px;
+        }
+
+        .priority-section h3 {
+            text-align: center;
+            font-size: 1.3rem;
+            color: #fff;
+            margin-bottom: 28px;
+            letter-spacing: 2px;
+        }
+
+        .priority-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media (max-width: 700px) {
+            .priority-grid { grid-template-columns: 1fr; }
+        }
+
+        .priority-card {
+            border-radius: 12px;
+            padding: 24px 20px;
+            border: 1px solid;
+        }
+
+        .priority-card h4 {
+            font-size: 1rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .priority-card ul {
+            list-style: none;
+        }
+
+        .priority-card li {
+            font-size: 0.85rem;
+            padding: 6px 0;
+            padding-left: 18px;
+            position: relative;
+            line-height: 1.7;
+        }
+
+        .priority-must {
+            background: rgba(231,76,60,0.08);
+            border-color: rgba(231,76,60,0.3);
+        }
+        .priority-must h4 { color: #e74c3c; }
+        .priority-must li::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 13px;
+            width: 8px; height: 8px;
+            background: #e74c3c;
+            border-radius: 50%;
+        }
+
+        .priority-simplify {
+            background: rgba(241,196,15,0.06);
+            border-color: rgba(241,196,15,0.25);
+        }
+        .priority-simplify h4 { color: #f1c40f; }
+        .priority-simplify li::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 13px;
+            width: 8px; height: 8px;
+            background: #f1c40f;
+            border-radius: 50%;
+        }
+
+        .priority-never {
+            background: rgba(100,100,100,0.08);
+            border-color: rgba(100,100,100,0.25);
+        }
+        .priority-never h4 { color: #888; }
+        .priority-never li::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 13px;
+            width: 8px; height: 8px;
+            background: #555;
+            border-radius: 50%;
+        }
+
+        /* ====== 底部 ====== */
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            border-top: 1px solid #2a2a4a;
+        }
+
+        .footer .motto {
+            font-size: 1.1rem;
+            color: #e74c3c;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .footer .motto-sub {
+            font-size: 0.85rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ====== 封面 ====== -->
+<div class="cover">
+    <span class="badge">INTERNAL DISCIPLINE</span>
+    <h1>纪 律 红 线</h1>
+    <p class="subtitle">火星财务系统开发告诫书 - 不可逾越的底线</p>
+    <div class="red-line"></div>
+</div>
+
+<!-- ====== 导航 ====== -->
+<div class="nav-bar">
+    <a href="#rl1">1.审批引擎</a>
+    <a href="#rl2">2.金额一致性</a>
+    <a href="#rl3">3.状态机爆炸</a>
+    <a href="#rl4">4.文件存储</a>
+    <a href="#rl5">5.审计日志</a>
+    <a href="#rl6">6.产品边界</a>
+    <a href="#rl7">7.技术提醒</a>
+    <a href="#priority">优先级矩阵</a>
+</div>
+
+<div class="container">
+
+    <!-- ====== 红线1: 审批引擎 ====== -->
+    <div id="rl1" class="redline-card">
+        <div class="redline-header">
+            <div class="redline-num">1</div>
+            <h3>审批引擎：最大的深坑</h3>
+            <span class="severity severity-critical">致命</span>
+        </div>
+        <div class="redline-body">
+            <p>
+                需求中"逐级审批 + 自定义审批人 + 驳回到任意节点 + 驳回发起人重新提交"四条加在一起，
+                意味着你在做一个<strong>审批工作流引擎</strong>，不是几个 if-else 能搞定的。
+            </p>
+            <div class="warn-box">
+                <span class="warn-label">必须先回答这些问题：</span>
+            </div>
+            <ul class="question-list">
+                <li>驳回到第3步重新审批，第4、5步的审批意见<strong>保留还是清空</strong>？</li>
+                <li>重新提交后是<strong>从头走全流程</strong>，还是从驳回处<strong>续走</strong>？</li>
+                <li>自定义审批人和逐级审批能不能<strong>混用</strong>？（比如前两级逐级，第三级自定义指定）</li>
+                <li>驳回时中间审批人的状态是<strong>自动失效</strong>还是<strong>保留意见</strong>？</li>
+            </ul>
+            <div class="tip-box">
+                <span class="tip-label">建议：</span>
+                第一版砍到最简 —— <span class="highlight">只支持线性逐级审批 + 驳回发起人重新提交</span>。
+                自定义审批人、驳回到任意中间节点，放二期。
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 红线2: 金额一致性 ====== -->
+    <div id="rl2" class="redline-card">
+        <div class="redline-header">
+            <div class="redline-num">2</div>
+            <h3>金额一致性：财务系统的命门</h3>
+            <span class="severity severity-critical">致命</span>
+        </div>
+        <div class="redline-body">
+            <p>
+                一个项目同时存在5个金额：合同总金额、发货金额、回款金额、已开票金额、合计金额。
+                它们之间有逻辑关系，任何一个算错就是账务事故。
+            </p>
+            <div class="warn-box">
+                <span class="warn-label">红线规则：</span>
+            </div>
+            <ul class="question-list">
+                <li>发货金额 &le; 合同总金额</li>
+                <li>回款金额 &le; 合同总金额</li>
+                <li>已开票金额 &le; 合同总金额</li>
+                <li>回款金额和已开票金额<strong>不一定相等</strong>（先开票后回款，或先回款后开票都合法）</li>
+            </ul>
+            <div class="tip-box">
+                <span class="tip-label">技术红线：</span>
+            </div>
+            <ul class="question-list">
+                <li>金额字段必须用 <strong>Decimal 类型</strong>，绝不能用浮点数（float/double），否则精度丢失导致对不上账</li>
+                <li>金额计算必须在<strong>后端完成</strong>，前端只负责展示，绝不信任前端传来的金额</li>
+                <li>分批发货时，发货金额是<strong>多次累加</strong>的，要设计好每次发货的金额记录和汇总逻辑</li>
+                <li>要预留<strong>退货/冲红</strong>的数据模型 —— 发货了客户退了怎么办？开了票要作废怎么办？</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ====== 红线3: 状态机爆炸 ====== -->
+    <div id="rl3" class="redline-card">
+        <div class="redline-header">
+            <div class="redline-num">3</div>
+            <h3>状态机爆炸：三条线并行</h3>
+            <span class="severity severity-high">高危</span>
+        </div>
+        <div class="redline-body">
+            <p>一个项目同时有三条<strong>互相独立但数据有关联</strong>的工作流：</p>
+            <p style="margin: 12px 0;">
+                <span class="flow-inline">发货：申请 &rarr; 已发货 &rarr; 客户已收货</span>
+                <span class="flow-arrow">&nbsp;（可分批，多轮）</span>
+            </p>
+            <p style="margin: 12px 0;">
+                <span class="flow-inline">回款：申请 &rarr; 出纳审批 &rarr; 已回款</span>
+                <span class="flow-arrow">&nbsp;（可分次，多轮）</span>
+            </p>
+            <p style="margin: 12px 0;">
+                <span class="flow-inline">开票：申请 &rarr; 开票员开具 &rarr; 上传 &rarr; 销售下载</span>
+                <span class="flow-arrow">&nbsp;（可分次，多轮）</span>
+            </p>
+            <div class="warn-box">
+                <span class="warn-label">必须在需求阶段明确：</span>
+            </div>
+            <ul class="question-list">
+                <li>先发货还是先回款？（不同客户不同节奏，<strong>都要支持</strong>）</li>
+                <li>先开票还是先回票？（<strong>都要支持</strong>）</li>
+                <li>发了货没收完款，能开发票吗？（业务上可以，但<strong>要不要限制</strong>？）</li>
+                <li>三条线之间的<strong>前后依赖关系</strong>是什么？</li>
+            </ul>
+            <div class="tip-box">
+                <span class="tip-label">告诫：</span>
+                不明确这些规则，开发时状态判断到处是 if-else，<span class="highlight">改一个地方崩三个地方</span>。
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 红线4: 文件存储 ====== -->
+    <div id="rl4" class="redline-card">
+        <div class="redline-header">
+            <div class="redline-num">4</div>
+            <h3>文件存储：别忽视</h3>
+            <span class="severity severity-high">高危</span>
+        </div>
+        <div class="redline-body">
+            <p>系统涉及大量文件上传下载：银行回单（回款）、发票文件（开票）、合同文件（迟早要加）。</p>
+            <div class="warn-box">
+                <span class="warn-label">红线规则：</span>
+            </div>
+            <ul class="question-list">
+                <li>文件<strong>不能存数据库里</strong>，存磁盘/对象存储，数据库只存路径</li>
+                <li>文件命名规范：<strong>项目编号 + 类型 + 日期</strong>，不然文件一多就是噩梦</li>
+                <li>下载权限控制 —— 销售只能下载<strong>自己项目</strong>的发票，不能下载别人的</li>
+                <li>财务凭证保留周期长，要设计<strong>归档和清理</strong>策略</li>
+                <li>文件上传要校验<strong>格式和大小</strong>，防止恶意文件</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ====== 红线5: 审计日志 ====== -->
+    <div id="rl5" class="redline-card">
+        <div class="redline-header">
+            <div class="redline-num">5</div>
+            <h3>审计日志：财务系统的底线</h3>
+            <span class="severity severity-critical">致命</span>
+        </div>
+        <div class="redline-body">
+            <p>
+                需求里只提到"记录销售人员下载发票的时间"，这<strong>远远不够</strong>。
+                财务系统每一个动作都要有记录，没有审计日志的财务系统，出了问题就是扯皮。
+            </p>
+            <div class="warn-box">
+                <span class="warn-label">至少记录以下操作：</span>
+            </div>
+            <ul class="question-list">
+                <li>谁创建了项目立项</li>
+                <li>谁审批通过 / 驳回了什么，什么时候</li>
+                <li>谁修改了金额、<strong>改前是多少、改后是多少</strong></li>
+                <li>谁上传了什么文件</li>
+                <li>谁下载了什么文件、什么时间</li>
+                <li>谁登录了系统、IP 地址</li>
+            </ul>
+            <div class="tip-box">
+                <span class="tip-label">原则：</span>
+                <span class="highlight">所有金额变更和状态变更必须可追溯，审计日志不可删除、不可篡改。</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 红线6: 产品边界 ====== -->
+    <div id="rl6" class="redline-card">
+        <div class="redline-header">
+            <div class="redline-num">6</div>
+            <h3>产品边界：这些千万别碰</h3>
+            <span class="severity severity-critical">致命</span>
+        </div>
+        <div class="redline-body">
+            <p>这是"收不住边界"的核心问题。以下功能<strong>第一版绝对不要做</strong>：</p>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width:35%">不要做的功能</th>
+                        <th>为什么不能做</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="do-not">库存管理</td>
+                        <td>这是另一个系统，一旦碰就收不住了</td>
+                    </tr>
+                    <tr>
+                        <td class="do-not">完整合同管理 / 电子签章</td>
+                        <td>合同状态记个字段就行，别做合同全生命周期</td>
+                    </tr>
+                    <tr>
+                        <td class="do-not">银企直连</td>
+                        <td>技术难度和成本极高，二期再说</td>
+                    </tr>
+                    <tr>
+                        <td class="do-not">税务系统对接</td>
+                        <td>开票员手动开票上传就行，别自动</td>
+                    </tr>
+                    <tr>
+                        <td class="do-not">CRM 客户管理</td>
+                        <td>客户信息记个名称就行，别做客户档案</td>
+                    </tr>
+                    <tr>
+                        <td class="do-not">复杂财务报表</td>
+                        <td>先做好看板这一个页面，别急着做报表中心</td>
+                    </tr>
+                    <tr>
+                        <td class="do-not">多公司 / 多组织架构</td>
+                        <td>第一版就单公司，别碰多租户</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="warn-box">
+                <span class="warn-label">边界原则：</span>
+                这个系统是<strong>"项目管理 + 审批 + 发货回款开票跟踪"</strong>，
+                <span class="highlight">不是 ERP，不是财务软件，不是 CRM。</span>
+                别人提需求说"加个库存查询吧""加个客户管理吧"，要敢于说"不在本期范围"。
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 红线7: 技术提醒 ====== -->
+    <div id="rl7" class="redline-card">
+        <div class="redline-header">
+            <div class="redline-num">7</div>
+            <h3>技术上的几个提醒</h3>
+            <span class="severity severity-medium">注意</span>
+        </div>
+        <div class="redline-body">
+            <ul class="question-list">
+                <li><strong>审批流转引擎</strong>：别自己从零写，用成熟的工作流引擎（如 Flowable / Camunda）或至少参考其设计思路</li>
+                <li><strong>金额计算</strong>：后端统一算，前端只展示，绝不信任前端传来的金额</li>
+                <li><strong>并发控制</strong>：出纳审批回款时，如果两个出纳同时操作同一个项目，要加锁防重复</li>
+                <li><strong>分批发货数据模型</strong>：一开始就要按"发货记录"设计（一对多），不要用单字段记录发货状态，不然分批没法扩展</li>
+                <li><strong>权限模型</strong>：用 RBAC（角色-权限）模型，别把权限写死在代码里</li>
+                <li><strong>接口幂等性</strong>：审批、回款、开票等关键操作接口必须支持幂等，防止网络重试导致重复操作</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ====== 优先级矩阵 ====== -->
+    <div id="priority" class="priority-section">
+        <h3>&#9888; 第一版优先级矩阵</h3>
+        <div class="priority-grid">
+            <div class="priority-card priority-must">
+                <h4>&#128308; 必须做好</h4>
+                <ul>
+                    <li>审批流程（功能砍到最简）</li>
+                    <li>金额准确性和一致性</li>
+                    <li>审计日志（全链路）</li>
+                    <li>文件上传下载</li>
+                    <li>后端权限控制</li>
+                </ul>
+            </div>
+            <div class="priority-card priority-simplify">
+                <h4>&#128313; 可以简化</h4>
+                <ul>
+                    <li>审批只支持线性逐级（自定义留二期）</li>
+                    <li>看板只做列表展示（图表留二期）</li>
+                    <li>分批发货先支持（数据模型预留好）</li>
+                    <li>银行回单手动上传（银企直连留二期）</li>
+                    <li>合同只记状态字段（全生命周期留二期）</li>
+                </ul>
+            </div>
+            <div class="priority-card priority-never">
+                <h4>&#9899; 千万别做</h4>
+                <ul>
+                    <li>库存管理</li>
+                    <li>CRM 客户管理</li>
+                    <li>电子签章</li>
+                    <li>银企直连</li>
+                    <li>税务系统对接</li>
+                    <li>多公司 / 多租户</li>
+                    <li>复杂报表中心</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 底部 ====== -->
+    <div class="footer">
+        <div class="motto">先跑通主流程，再优化边界情况</div>
+        <div class="motto">先保证金额对得上，再追求自动化</div>
+        <p class="motto-sub">财务系统不怕简陋，怕的是算错账</p>
+    </div>
+
+</div>
+
+</body>
+</html>

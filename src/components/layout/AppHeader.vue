@@ -14,7 +14,8 @@ import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { useUserStore } from '@/stores/user'
 import AppBreadcrumb from './AppBreadcrumb.vue'
 
-const props = defineProps<{ collapsed: boolean; compact: boolean }>()
+// props 供模板直接按名使用（script 内不引用，故不接 const 绑定，避免 noUnusedLocals 误伤）
+defineProps<{ collapsed: boolean; compact: boolean }>()
 const emit = defineEmits<{ (e: 'toggle'): void }>()
 
 const userStore = useUserStore()

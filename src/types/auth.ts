@@ -44,6 +44,7 @@ export interface MenuVO {
   sortNo: number
   visible: number
   status: string
+  icon?: string | null
   children?: MenuVO[]
 }
 
@@ -59,6 +60,7 @@ export interface MenuFormData {
   sortNo: number
   visible: number
   status: string
+  icon?: string
 }
 
 // 后端统一响应体结构：{ code, message, data }

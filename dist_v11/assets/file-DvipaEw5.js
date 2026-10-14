@@ -1,0 +1,1 @@
+import{P as e}from"./index-EIbO3RlF.js";import{d as t,E as a,o}from"./vue-BfwqiZvi.js";import"./element-plus-DhM8DHgi.js";const i=t({__name:"file",setup(r){return(m,p)=>(o(),a(e,{title:"文件管理",path:"/system/file",perm:"file:manage"}))}});export{i as default};

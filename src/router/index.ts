@@ -36,10 +36,13 @@ const menuPages: Array<{ path: string; name: string; title: string; component: s
   { path: 'return', name: 'return', title: '退货管理', component: 'return/list' },
   { path: 'approval', name: 'approval', title: '审批中心', component: 'approval/list' },
   { path: 'dashboard/data', name: 'dashboardData', title: '数据看板', component: 'dashboard/data' },
+  // 组织架构（V8 迁移把它排在系统管理组 sort_no=1，路由注册顺序与侧栏顺序保持一致）
+  { path: 'system/org', name: 'systemOrg', title: '组织架构', component: 'system/org' },
   { path: 'system/user', name: 'systemUser', title: '用户管理', component: 'system/user' },
   { path: 'system/role', name: 'systemRole', title: '角色管理', component: 'system/role' },
   { path: 'system/permission', name: 'systemPermission', title: '权限管理', component: 'system/permission' },
   { path: 'system/menu', name: 'systemMenu', title: '菜单管理', component: 'system/menu' },
+  { path: 'system/post', name: 'systemPost', title: '岗位管理', component: 'system/post' },
   { path: 'system/dict', name: 'systemDict', title: '字典管理', component: 'system/dict' },
   // 字典数据（隐藏二级页）：菜单表里 visible=0，侧栏不渲染，从字典管理页进入；
   // 路由照常注册，直接输 URL / 刷新可访问（V7 迁移种子的 route_path 与此对齐）
@@ -99,11 +102,17 @@ function isTokenAlive(token: string): boolean {
 // - 已登录访问登录页 → 跳工作台（/dashboard）。
 // - 刷新恢复：token 有效但 store 里 userInfo 为空（F5 后内存态丢失，正是刷新后的状态）
 //   → 补摘 /auth/profile（修用户信息显示"未知"）+ /auth/menus（菜单数据就绪）再放行。
-router.beforeEach(async (to, from, next) => {
+// _from 保位：vue-router 的 NavigationGuard 按位置推断参数类型，少写一个参数会把
+// next 绑成 from 的类型（TS2349 not callable）；下划线前缀满足 noUnusedParameters。
+router.beforeEach(async (to, _from, next) => {
   const token = localStorage.getItem('token')
   if (!token || !isTokenAlive(token)) {
     if (token) localStorage.removeItem('token')
-    next(to.path === '/login' ? undefined : '/login')
+    if (to.path === '/login') {
+      next()
+    } else {
+      next('/login')
+    }
     return
   }
   if (to.path === '/login') {

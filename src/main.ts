@@ -29,6 +29,11 @@ import ElInputNumber from 'element-plus/es/components/input-number/index.mjs'
 import ElLoading from 'element-plus/es/components/loading/index.mjs'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
+// ElPopover：菜单管理页「菜单图标」选择浮层（点击按钮弹出，省表单空间）。
+// 未注册时 Vue 把 <el-popover> 当未知元素渲染——浮层内容直接内联摊进表单，
+// 参考按钮被淹没、点选/回显交互全废（2026-10-14 虎哥截图实锤）。
+// 内部由 ElTooltip 承载定位与箭头，tooltip 样式需一并引入。
+import ElPopover from 'element-plus/es/components/popover/index.mjs'
 // 分页器（字典数据页标准分页）：独立包目录，内部只依赖 icon（已注册）
 import ElPagination from 'element-plus/es/components/pagination/index.mjs'
 // ElOption 与 ElSelect 同入口具名导出（官方 select/index.ts：
@@ -43,7 +48,10 @@ import ElTag from 'element-plus/es/components/tag/index.mjs'
 import ElTable, { ElTableColumn } from 'element-plus/es/components/table/index.mjs'
 // ElTreeSelect 是独立包，但内部由 ElSelect + ElTree 组合渲染（官方 tree-select.vue），
 // 见下方样式区对 select / tree 的补充说明。
+// 注意：tree-select 内部自己 install 的是它 src 内部的 Tree 实例，不等于全局注册
+// <el-tree> 标签——角色管理页「分配权限」弹窗直接用 <el-tree>，必须单独注册。
 import ElTreeSelect from 'element-plus/es/components/tree-select/index.mjs'
+import ElTree from 'element-plus/es/components/tree/index.mjs'
 // 后台布局菜单：用 Element Plus 成熟组件 el-menu / el-sub-menu / el-menu-item，
 // 不再手写递归菜单的样式与交互（激活态、折叠、层级缩进均由组件接管）。
 // 注意：ElSubMenu / ElMenuItem 与 descriptions-item / form-item 同理，没有独立包目录
@@ -73,6 +81,9 @@ import 'element-plus/es/components/loading/style/css'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
 import 'element-plus/es/components/pagination/style/css'
+import 'element-plus/es/components/popover/style/css'
+// popover 浮层由 ElTooltip 渲染（定位/箭头在 tooltip 包内），缺它浮层错位无箭头
+import 'element-plus/es/components/tooltip/style/css'
 import 'element-plus/es/components/radio/style/css'
 import 'element-plus/es/components/result/style/css'
 import 'element-plus/es/components/switch/style/css'
@@ -89,6 +100,7 @@ import 'element-plus/es/components/menu/style/css'
 import 'element-plus/es/components/scrollbar/style/css'
 import '@/styles/reset.css'
 import '@/styles/theme.css'
+import '@/styles/pages.css'
 import App from './App.vue'
 import router from './router'
 
@@ -113,6 +125,7 @@ app.use(ElLoading)
 app.use(ElMessage)
 app.use(ElMessageBox)
 app.use(ElPagination)
+app.use(ElPopover)
 app.use(ElSelect)
 app.use(ElOption)
 app.use(ElRadio)
@@ -123,6 +136,8 @@ app.use(ElTag)
 app.use(ElTable)
 app.use(ElTableColumn)
 app.use(ElTreeSelect)
+// 角色管理页分配权限弹窗的 <el-tree>（tree-select 不附带全局注册）
+app.use(ElTree)
 app.use(ElMenu)
 app.use(ElSubMenu)
 app.use(ElMenuItem)

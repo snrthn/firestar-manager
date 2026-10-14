@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance } from 'element-plus'
-import { Expand, Fold, Plus, Refresh } from '@element-plus/icons-vue'
+import { Expand, Fold, Plus, Refresh, Folder } from '@element-plus/icons-vue'
+// 菜单图标注册表（若依 / vue-element-admin 成熟做法：存图标组件名，<component :is> 渲染，空值兜底 Folder）
+import { resolveMenuIcon, ELEMENT_ICON_LIST } from '@/utils/elementIcons'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -95,8 +97,8 @@ const loadMenus = async () => {
     menuTree.value = tree
     rebuildSiblings(tree)
     if (firstLoad) {
-      // 首次加载展开全部目录（若依默认行为）
-      expandRowKeys.value = collectCatalogIds(tree)
+      // 虎哥 2026-10-14：菜单管理页树默认折叠（仅用户手动点开的目录才展开），不再首次全展开
+      expandRowKeys.value = []
     } else {
       // 刷新：保留用户当前展开态，仅剔除已不存在的节点（删掉的菜单/目录）
       const alive = new Set<string>()
@@ -132,7 +134,26 @@ const emptyForm = (): MenuFormData => ({
   sortNo: 0,
   visible: 1,
   status: 'ENABLED',
+  icon: '',
 })
+
+// 图标选择器：弹层可见态 + 搜索关键字 + 当前选中图标预览（空值兜底 Folder）
+const iconPopoverVisible = ref(false)
+const iconKeyword = ref('')
+const currentIconComp = computed(() => resolveMenuIcon(form.icon) || Folder)
+const filteredIcons = computed(() =>
+  iconKeyword.value
+    ? ELEMENT_ICON_LIST.filter((i) => i.name.toLowerCase().includes(iconKeyword.value.toLowerCase()))
+    : ELEMENT_ICON_LIST,
+)
+const selectIcon = (name: string) => {
+  form.icon = name
+  iconPopoverVisible.value = false
+}
+const clearIcon = () => {
+  form.icon = ''
+  iconPopoverVisible.value = false
+}
 
 const form = reactive<MenuFormData>(emptyForm())
 
@@ -200,6 +221,7 @@ const openEdit = (row: MenuVO) => {
   form.sortNo = row.sortNo
   form.visible = row.visible
   form.status = row.status || 'ENABLED'
+  form.icon = row.icon || ''
   dialogTitle.value = `修改菜单 - ${row.menuName}`
   dialogVisible.value = true
   nextTick(() => formRef.value?.clearValidate())
@@ -377,6 +399,29 @@ onMounted(loadMenus)
       <el-form-item label="菜单名称" prop="menuName">
         <el-input v-model="form.menuName" placeholder="请输入菜单名称" maxlength="32" show-word-limit />
       </el-form-item>
+      <el-form-item label="菜单图标" prop="icon">
+        <el-popover v-model:visible="iconPopoverVisible" :width="360" trigger="click" placement="bottom-start">
+          <template #reference>
+            <el-button :icon="currentIconComp" plain>{{ form.icon || '选择图标' }}</el-button>
+          </template>
+          <div class="icon-picker">
+            <el-input v-model="iconKeyword" placeholder="搜索图标" clearable size="small" class="icon-search" />
+            <div class="icon-grid">
+              <div
+                v-for="item in filteredIcons"
+                :key="item.name"
+                class="icon-cell"
+                :class="{ active: form.icon === item.name }"
+                @click="selectIcon(item.name)"
+              >
+                <el-icon :size="18"><component :is="item.component" /></el-icon>
+                <span class="icon-name">{{ item.name }}</span>
+              </div>
+            </div>
+          </div>
+        </el-popover>
+        <el-button v-if="form.icon" link type="primary" size="small" class="clear-icon" @click="clearIcon">清除</el-button>
+      </el-form-item>
       <el-form-item label="显示排序" prop="sortNo">
         <el-input-number v-model="form.sortNo" :min="0" :max="9999" controls-position="right" />
         <span class="form-tip">同级内数字越小越靠前</span>
@@ -432,5 +477,44 @@ onMounted(loadMenus)
 }
 .w-full {
   width: 100%;
+}
+.icon-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.icon-search {
+  margin-bottom: 4px;
+}
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.icon-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 4px;
+  background: #fff;
+  color: #606266;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.icon-cell:hover {
+  color: var(--fs-primary);
+  border-color: var(--el-color-primary-light-7, #c6e2ff);
+}
+.icon-cell.active {
+  color: #fff;
+  background: var(--fs-primary);
+  border-color: var(--fs-primary);
+}
+.icon-cell.clear {
+  font-size: 12px;
 }
 </style>

@@ -1,0 +1,1 @@
+import{P as e}from"./index-EIbO3RlF.js";import{d as r,E as t,o as a}from"./vue-BfwqiZvi.js";import"./element-plus-DhM8DHgi.js";const m=r({__name:"list",setup(o){return(c,p)=>(a(),t(e,{title:"应收管理",path:"/receivable",perm:"receivable:view"}))}});export{m as default};
