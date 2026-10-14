@@ -1,1 +1,0 @@
-import{P as e}from"./index-D2yCtaEs.js";import{d as o,E as t,o as r}from"./vue-BfwqiZvi.js";import"./element-plus-DhM8DHgi.js";const m=o({__name:"list",setup(a){return(i,c)=>(r(),t(e,{title:"发票管理",path:"/invoice",perm:"invoice:view"}))}});export{m as default};

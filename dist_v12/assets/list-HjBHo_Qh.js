@@ -1,1 +1,0 @@
-import{P as e}from"./index-D2yCtaEs.js";import{d as t,E as r,o}from"./vue-BfwqiZvi.js";import"./element-plus-DhM8DHgi.js";const n=t({__name:"list",setup(a){return(p,c)=>(o(),r(e,{title:"收款管理",path:"/receipt",perm:"receipt:view"}))}});export{n as default};

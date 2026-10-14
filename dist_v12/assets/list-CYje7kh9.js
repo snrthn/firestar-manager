@@ -1,1 +1,0 @@
-import{P as e}from"./index-D2yCtaEs.js";import{d as t,E as o,o as r}from"./vue-BfwqiZvi.js";import"./element-plus-DhM8DHgi.js";const c=t({__name:"list",setup(a){return(p,s)=>(r(),o(e,{title:"发货管理",path:"/shipment",perm:"shipment:view"}))}});export{c as default};

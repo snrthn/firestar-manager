@@ -1,1 +1,0 @@
-import{P as e}from"./index-EIbO3RlF.js";import{d as t,E as o,o as r}from"./vue-BfwqiZvi.js";import"./element-plus-DhM8DHgi.js";const i=t({__name:"list",setup(a){return(p,c)=>(r(),o(e,{title:"项目列表",path:"/project",perm:"project:view"}))}});export{i as default};

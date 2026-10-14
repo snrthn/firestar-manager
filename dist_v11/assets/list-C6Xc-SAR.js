@@ -1,1 +1,0 @@
-import{P as e}from"./index-EIbO3RlF.js";import{d as t,E as o,o as r}from"./vue-BfwqiZvi.js";import"./element-plus-DhM8DHgi.js";const m=t({__name:"list",setup(a){return(p,i)=>(r(),o(e,{title:"核销管理",path:"/writeoff",perm:"writeoff:view"}))}});export{m as default};
