@@ -184,7 +184,8 @@ const assignTarget = ref<RoleManageVO | null>(null)
 // el-tree 实例只需用到 filter 方法，这里用最小接口描述，避免引入 element-plus 深层类型
 interface ElTreeExpose {
   filter: (value: string) => void
-  setCheckedKeys: (keys: number[]) => void
+  /** leafOnly=true 只勾叶子节点，父节点按联动自动呈半选/全选（回显语义正确） */
+  setCheckedKeys: (keys: number[], leafOnly?: boolean) => void
 }
 const menuTreeRef = ref<ElTreeExpose | null>(null)
 const permTreeRef = ref<ElTreeExpose | null>(null)
@@ -215,6 +216,21 @@ const openAssignPerms = async (row: RoleManageVO) => {
     checkedMenuIds.value = mids
     permRoleName.value = row.roleName
     permDialogVisible.value = true
+    // 勾选态一次性编程式初始化。两条 EP 源码级教训（虎哥 2026-10-15 两次实测）：
+    // ① 切勿把回写集合绑到 :default-checked-keys 做受控——组件 watch 该 prop，
+    //    变化即走 setDefaultCheckedKey → 对父节点 setChecked(true, deep) 级联勾所有子孙，
+    //    表现为「取消一个子项、兄弟全被勾上，再点一次才生效」。
+    // ② setCheckedKeys 自身也有同一缺陷：_setCheckedKeys 对「集合内的父节点」先执行
+    //    setChecked(true, deep=true) 深度勾整棵子树（tree-store.mjs:194），leafOnly 的
+    //    事后修正只回溯非叶子子孙、叶子子孙被永久勾上，最后 reInitChecked 把父组恢复全选。
+    //    而 onMenuCheck 合并 halfCheckedKeys 提交使半选父组 id 必然在库里——原样回显即
+    //    「只勾了 B，重开窗口 B、C 全勾上」。
+    // 故回显集合必须先 filterLeafIds 筛出纯叶子 id：只传叶子时 _setCheckedKeys 走
+    // setChecked(true, false)，父组由 Node.setChecked → reInitChecked(parent) 自动半选/全选。
+    // 之后用户操作只靠 @check 回写本地 ref（提交用），不再喂给树的任何 prop。
+    await nextTick()
+    permTreeRef.value?.setCheckedKeys(filterLeafIds(permTree.value, pids), true)
+    menuTreeRef.value?.setCheckedKeys(filterLeafIds(menuTree.value, mids), true)
   } catch (e) {
     ElMessage.error((e as Error).message)
   }
@@ -245,8 +261,12 @@ const onPermCheck = (_data: unknown, payload: { checkedKeys: (string | number)[]
   checkedPermIds.value = payload.checkedKeys.map(Number)
 }
 
-const onMenuCheck = (_data: unknown, payload: { checkedKeys: (string | number)[] }) => {
-  checkedMenuIds.value = payload.checkedKeys.map(Number)
+// 父子联动（未开 check-strictly）下，取消个别子项会让父组呈半选态，
+// halfCheckedKeys 里的父组 id 必须一并提交：
+// 否则 sys_role_menu 缺父组，后端 menus() 父链剪枝会把整组子项误剪
+// （虎哥 2026-10-15 实测：只移除菜单组中的一项，整个组都不返回）
+const onMenuCheck = (_data: unknown, payload: { checkedKeys: (string | number)[]; halfCheckedKeys: (string | number)[] }) => {
+  checkedMenuIds.value = [...payload.checkedKeys, ...payload.halfCheckedKeys].map(Number)
 }
 
 // ===== 全选 / 清空（菜单树与权限树各自独立）=====
@@ -265,6 +285,28 @@ const collectTreeIds = (nodes: { id: number; children?: unknown }[]): number[] =
   }
   walk(nodes)
   return ids
+}
+
+// 从树数据中筛出「纯叶子」节点 id（无 children 或 children 为空数组即叶子）。
+// 用途：回显前过滤掉集合里的半选/全选父组 id——理由见 openAssignPerms 内注释
+// （EP _setCheckedKeys 对集合内的父节点会深度勾选整棵子树，leafOnly 挡不住）
+const filterLeafIds = (
+  nodes: { id: number; children?: unknown }[],
+  ids: number[],
+): number[] => {
+  const leafIds = new Set<number>()
+  const walk = (list: { id: number; children?: unknown }[]) => {
+    for (const n of list) {
+      const kids = n.children
+      if (Array.isArray(kids) && kids.length) {
+        walk(kids as { id: number; children?: unknown }[])
+      } else {
+        leafIds.add(n.id)
+      }
+    }
+  }
+  walk(nodes)
+  return ids.filter((id) => leafIds.has(id))
 }
 
 const checkAllMenu = () => {
@@ -412,13 +454,15 @@ onMounted(loadRoles)
           </div>
         </div>
         <div class="tree-wrap">
+          <!-- check-on-click-node：EP 默认只有叶子行整行可勾选（check-on-click-leaf 默认 true），
+               目录节点行内除勾框外点击无效；显式开启后勾框+文本区域统一可点（展开图标仍独立） -->
           <el-tree
             ref="menuTreeRef"
             :data="menuTree"
             :props="{ label: 'menuName', children: 'children' }"
             node-key="id"
             show-checkbox
-            :default-checked-keys="checkedMenuIds"
+            check-on-click-node
             default-expand-all
             :expand-on-click-node="false"
             :filter-node-method="menuNodeFilter"
@@ -444,13 +488,15 @@ onMounted(loadRoles)
           </div>
         </div>
         <div class="tree-wrap">
+          <!-- check-on-click-node：EP 默认只有叶子行整行可勾选（check-on-click-leaf 默认 true），
+               目录节点行内除勾框外点击无效；显式开启后勾框+文本区域统一可点（展开图标仍独立） -->
           <el-tree
             ref="permTreeRef"
             :data="permTree"
             :props="{ label: 'permName', children: 'children' }"
             node-key="id"
             show-checkbox
-            :default-checked-keys="checkedPermIds"
+            check-on-click-node
             default-expand-all
             :expand-on-click-node="false"
             :filter-node-method="permNodeFilter"

@@ -49,8 +49,20 @@ function connect() {
     .then((res) => {
       if (!res.ok || !res.body) {
         if (res.status === 401) {
-          // 握手即被拒（被顶号后旧会话重连）：直接走会话失效流程
-          import('@/api/sessionGuard').then((m) => m.handleSessionExpired('会话已失效，请重新登录'))
+          // 握手即被拒（被顶号后旧会话重连）：优先展示后端 message
+          //（stream 端点已区分「已在其他设备登录」与「登录已过期」两种语义），
+          // 读不到再回落统一兜底文案，保证与 FORCE_LOGOUT 推送路径展示一致。
+          // 动态 import 避开 sessionGuard→router→realtimeClient 的循环依赖
+          import('@/api/sessionGuard').then((m) => {
+            res
+              .json()
+              .then((body: { message?: string }) => {
+                m.handleSessionExpired(body?.message || '您的账号已在其他设备登录，原会话已失效，请重新登录')
+              })
+              .catch(() => {
+                m.handleSessionExpired('您的账号已在其他设备登录，原会话已失效，请重新登录')
+              })
+          })
         }
         scheduleReconnect()
         return
