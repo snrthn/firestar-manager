@@ -1,7 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { defineAsyncComponent, defineComponent, h } from 'vue'
 import type { Component } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { startRealtime, stopRealtime } from '@/utils/realtimeClient'
+import { routeNameFor, flattenMenus } from '@/utils/menuRoute'
+import type { MenuVO } from '@/types/auth'
 import PagePlaceholder from '@/components/PagePlaceholder.vue'
 
 // 页面文件按后端 sys_menu.component 约定的相对路径存放（若依风格）：
@@ -15,43 +18,34 @@ const viewModules = import.meta.glob('../views/**/*.vue') as Record<
   () => Promise<{ default: Component }>
 >
 
-// 注意：直接返回 glob 的 loader 函数，不要再包 defineAsyncComponent——
-// Vue Router 4 的 component 字段本身接受 `() => import()` 形式（内部自行
-// 包装异步组件，见下方 /login 路由），外层再套 defineAsyncComponent 是重复
-// 包装，会触发 [Vue Router warn] Component "default" ... defineAsyncComponent()。
-const resolveView = (component: string): Component => {
+// 视图解析：glob 收拢全部视图，运行时按 sys_menu.component 字符串查找；
+// 好处：菜单管理页改 component 即改落地页，路由表不用跟着动。
+// 找到 → 包一层 defineComponent 挂 name（keep-alive include 匹配组件名，见下方注释）；
+// 缺失 → 兜底 PagePlaceholder，不至于白屏。
+const resolveView = (component: string, name: string): Component => {
   const loader = viewModules[`../views/${component}.vue`]
-  return loader ?? PagePlaceholder
+  if (!loader) return PagePlaceholder
+  const inner = defineAsyncComponent(loader)
+  // keep-alive 的 include 按「组件 name」匹配（不是路由名也不是 path），而 SFC
+  // 默认没有 name——包一层 defineComponent 显式挂名，name 与路由名同规则
+  // （routeNameFor，AdminLayout cachedRouteNames 同源才能命中）。
+  // 内层异步组件引用稳定；keep-alive 缓存的是本包装层实例，切回页面即恢复状态。
+  return defineComponent({ name, setup: () => () => h(inner) })
 }
 
-// 与 V4 种子菜单一一对应（route_path / component 同库）；title 同时喂给
-// meta.title，面包屑 / 页签的文案直接从 meta.title 取，不依赖这份表。
-const menuPages: Array<{ path: string; name: string; title: string; component: string }> = [
-  { path: 'dashboard', name: 'dashboard', title: '工作台', component: 'dashboard/index' },
-  { path: 'project', name: 'project', title: '项目列表', component: 'project/list' },
-  { path: 'shipment', name: 'shipment', title: '发货管理', component: 'shipment/list' },
-  { path: 'receivable', name: 'receivable', title: '应收管理', component: 'receivable/list' },
-  { path: 'receipt', name: 'receipt', title: '收款管理', component: 'receipt/list' },
-  { path: 'invoice', name: 'invoice', title: '发票管理', component: 'invoice/list' },
-  { path: 'writeoff', name: 'writeoff', title: '核销管理', component: 'writeoff/list' },
-  { path: 'return', name: 'return', title: '退货管理', component: 'return/list' },
-  { path: 'approval', name: 'approval', title: '审批中心', component: 'approval/list' },
-  { path: 'dashboard/data', name: 'dashboardData', title: '数据看板', component: 'dashboard/data' },
-  // 个人中心（header 用户下拉入口，不进侧栏；component 落到 views/profile/index.vue）
+// 内置常驻路由（不随授权动态注册）：
+// - /profile：header 用户下拉入口，sys_menu 无对应行，任何登录态可用。
+// 注：/system/dict-data 曾在此硬编码放行，2026-10-15 语义修正后删除——
+// 隐藏菜单（visible=0）与普通菜单走同一条授权链路：/auth/menus 返回可访问集
+// （授权 ∧ 启用，visible 不参与）→ 动态注册；侧栏另按 visible 过滤展示。
+// 特殊放行反而制造了「隐藏菜单不受授权控制」的语义裂缝，与虎哥定的三维度
+// 正交模型（授权/状态/可见性）冲突。
+const builtinPages: Array<{ path: string; name: string; title: string; component: string }> = [
   { path: 'profile', name: 'profile', title: '个人中心', component: 'profile/index' },
-  // 组织架构（V8 迁移把它排在系统管理组 sort_no=1，路由注册顺序与侧栏顺序保持一致）
-  { path: 'system/org', name: 'systemOrg', title: '组织架构', component: 'system/org' },
-  { path: 'system/user', name: 'systemUser', title: '用户管理', component: 'system/user' },
-  { path: 'system/role', name: 'systemRole', title: '角色管理', component: 'system/role' },
-  { path: 'system/permission', name: 'systemPermission', title: '权限管理', component: 'system/permission' },
-  { path: 'system/menu', name: 'systemMenu', title: '菜单管理', component: 'system/menu' },
-  { path: 'system/post', name: 'systemPost', title: '岗位管理', component: 'system/post' },
-  { path: 'system/dict', name: 'systemDict', title: '字典管理', component: 'system/dict' },
-  // 字典数据（隐藏二级页）：菜单表里 visible=0，侧栏不渲染，从字典管理页进入；
-  // 路由照常注册，直接输 URL / 刷新可访问（V7 迁移种子的 route_path 与此对齐）
-  { path: 'system/dict-data', name: 'systemDictData', title: '字典数据', component: 'system/dict-data' },
-  { path: 'system/file', name: 'systemFile', title: '文件管理', component: 'system/file' },
 ]
+
+// 布局壳路由名：同时作为 addRoute 动态挂载业务页的父级引用（须在 createRouter 前声明，避免 TDZ）
+const ADMIN_LAYOUT_NAME = 'AdminLayout'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -65,21 +59,80 @@ const router = createRouter({
     },
     {
       // 后台布局壳：所有登录后页面挂在其下。
-      // 子路由由 menuPages 数据驱动装配（glob 解析 component），
-      // 未登录访问任意子路由都会被下方守卫拦回登录页。
+      // 业务子路由不静态注册——登录态就绪后按授权菜单树动态 addRoute
+      // （见下方 syncDynamicRoutes），未授权路径落 403 兜底页。
+      // name 同时作为 addRoute 的挂载父级引用。
       path: '/',
+      name: ADMIN_LAYOUT_NAME,
       component: () => import('../layouts/AdminLayout.vue'),
       // 默认定向到工作台（/dashboard），菜单「工作台」route_path 与之对应
       redirect: '/dashboard',
-      children: menuPages.map((p) => ({
-        path: p.path,
-        name: p.name,
-        component: resolveView(p.component),
-        meta: { title: p.title },
-      })),
+      children: [
+        ...builtinPages.map((p) => ({
+          path: p.path,
+          name: p.name,
+          component: resolveView(p.component, p.name),
+          meta: { title: p.title },
+        })),
+        {
+          // 兜底：未授权 / 不存在的路径落此页（壳内渲染，header 退出登录可用）。
+          // 静态段路由（含后注册的动态路由）匹配优先级高于通配段，不会误吞。
+          path: ':pathMatch(.*)*',
+          name: 'Forbidden',
+          component: () => import('../views/error/403.vue'),
+          meta: { title: '无访问权限' },
+        },
+      ],
     },
   ],
 })
+
+// ===== 动态路由（RuoYi / Ant Design Pro 模式：路由表 = 授权集的投影）=====
+// 修复前：业务页全量静态注册 + 守卫不比对授权 → 侧栏隐藏只是后端数据层过滤，
+// 敲 URL 照样开页（虎哥 2026-10-15 报障：角色关了某菜单，侧栏不渲染但路由可
+// 直达；页面壳能开，数据层靠 @RequirePerm 兜底返 403）。成熟平台同款做法：
+//   - RuoYi-Vue3：getInfo → generateRoutes → router.addRoute → {...to, replace}
+//     重新导航到原目标，未授权路径落 404 兜底（src/permission.js 实锤）；
+//   - Ant Design Pro v5：路由声明 access 鉴权函数，false → 路由禁用 + 菜单
+//     移除 + URL 直访显示 403 页（官方文档 authority-management）。
+interface DynRoute {
+  name: string
+  path: string
+}
+const dynamicRoutes: DynRoute[] = []
+// 已同步的菜单数据引用（身份比对）：menus 换成新引用才重跑同步，
+// 避免每次导航都 remove+add 把页面组件重挂
+let syncedMenus: MenuVO[] | null = null
+
+/** 按授权菜单集合同步动态路由：移除失效项（切换用户/权限收紧）、注册新增项。
+ *  只注册带 routePath 的节点——CATALOG（无路径）/ BUTTON（权限节点）/
+ *  LINK（外链走 <a target=_blank>，不进 SPA 路由）天然被过滤。 */
+function syncDynamicRoutes(menus: MenuVO[]) {
+  const desired = new Map<string, MenuVO>()
+  for (const m of flattenMenus(menus)) {
+    if (m.routePath) desired.set(m.routePath, m)
+  }
+  // 移除不再授权的（如退出后换账号登录，靠 diff 自动清理，无残留）
+  for (let i = dynamicRoutes.length - 1; i >= 0; i--) {
+    const rec = dynamicRoutes[i]
+    if (!desired.has(rec.path)) {
+      router.removeRoute(rec.name)
+      dynamicRoutes.splice(i, 1)
+    }
+  }
+  // 注册新增授权的
+  for (const [path, vo] of desired) {
+    if (dynamicRoutes.some((r) => r.path === path)) continue
+    const name = routeNameFor(path)
+    router.addRoute(ADMIN_LAYOUT_NAME, {
+      path: path.replace(/^\//, ''), // 子路由相对路径，与静态表一致（'system/user'）
+      name,
+      component: resolveView(vo.component, name),
+      meta: { title: vo.menuName },
+    })
+    dynamicRoutes.push({ name, path })
+  }
+}
 
 // 本地校验 JWT 是否在有效期内：只解 payload 不验签（签名校验归后端），
 // 用于在「未登录」场景下避免向 /auth/profile 发注定失败的请求。
@@ -104,9 +157,12 @@ function isTokenAlive(token: string): boolean {
 //   过期残留 token 顺手清掉，避免后续请求再吃 401。
 // - 已登录访问登录页 → 跳工作台（/dashboard）。
 // - 刷新恢复：token 有效但 store 里 userInfo 为空（F5 后内存态丢失，正是刷新后的状态）
-//   → 补摘 /auth/profile（修用户信息显示"未知"）+ /auth/menus（菜单数据就绪）再放行。
-// _from 保位：vue-router 的 NavigationGuard 按位置推断参数类型，少写一个参数会把
-// next 绑成 from 的类型（TS2349 not callable）；下划线前缀满足 noUnusedParameters。
+//   → 补摘 /auth/profile（修用户信息显示"未知"）+ /auth/menus（授权菜单，用于动态注册路由）再放行。
+// - 动态路由同步：menus 数组身份变化（登录/刷新补水/换账号）时才 remove+add，
+//   同步后必须带着原目标重新导航一次——动态路由是导航解析后才注册的，此刻 to
+//   已匹配到 403 兜底，直接 next() 会把用户摁在 403 页（RuoYi 同款 replace 重导航）。
+// - _from 保位：vue-router 的 NavigationGuard 按位置推断参数类型，少写一个参数会把
+//   next 绑成 from 的类型（TS2349 not callable）；下划线前缀满足 noUnusedParameters。
 router.beforeEach(async (to, _from, next) => {
   const token = localStorage.getItem('token')
   if (!token || !isTokenAlive(token)) {
@@ -127,13 +183,15 @@ router.beforeEach(async (to, _from, next) => {
   if (!userStore.userInfo) {
     try {
       await userStore.fetchProfile()
-      // 菜单与 userInfo 一样是内存态，F5 即丢。后期要做菜单装配，
-      // 这里刷新恢复时顺带补摘一次 /auth/menus，先把数据就绪。
-      // 菜单失败不阻塞导航：用户信息已恢复，顶多菜单空，再刷一次即可。
+      // 菜单与 userInfo 一样是内存态，F5 即丢。这里刷新恢复时顺带补摘一次
+      // /auth/menus，它是动态路由注册的授权数据源。
+      // 菜单失败不踢登录（保留已恢复的登录态），但动态路由架构下没有
+      // 「未注册还能开」的中间态：摘取失败 = 授权集为空 → 落 403 兜底页，
+      // 刷新即可恢复（虎哥 2026-10-15 确认的 fail-closed 语义）。
       try {
         await userStore.fetchMenus()
       } catch {
-        // 菜单摘取失败不致命，保留已恢复的登录态直接放行
+        // 见上：落 403，不阻塞、不踢登录
       }
     } catch {
       // 摘取失败（后端关闭/网络断/502/401/token 被后台置黑）：登录态已不可用。
@@ -145,6 +203,14 @@ router.beforeEach(async (to, _from, next) => {
       next('/login')
       return
     }
+  }
+  if (userStore.menus !== syncedMenus) {
+    syncDynamicRoutes(userStore.menus)
+    syncedMenus = userStore.menus
+    // 带着原目标重新导航：此刻路由表已补齐，重新匹配才能命中刚注册的
+    // 动态路由；replace 避免浏览器历史堆栈里留一条 403 记录。
+    next({ path: to.fullPath, replace: true })
+    return
   }
   // 已进入登录态：启动 SSE 实时连接（被顶号时服务端即时推 FORCE_LOGOUT，毫秒级弹「重新登录」模态框）
   startRealtime()

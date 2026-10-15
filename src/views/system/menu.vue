@@ -128,12 +128,14 @@ const emptyForm = (): MenuFormData => ({
   parentId: 0,
   menuName: '',
   routePath: '',
+  linkUrl: '',
   component: '',
   permCode: '',
   menuType: 'MENU',
   sortNo: 0,
   visible: 1,
   status: 'ENABLED',
+  isCache: 0,
   icon: '',
 })
 
@@ -157,14 +159,52 @@ const clearIcon = () => {
 
 const form = reactive<MenuFormData>(emptyForm())
 
+// 外链地址正则：只放行 http/https 协议 + 非空白主体（与后端 MenuServiceImpl
+// applyForm 同款——双端校验，绕过前端直发也要挡住 javascript:/data: 等危险协议）
+const LINK_URL_PATTERN = /^https?:\/\/\S+$/i
+
 const rules = {
   menuName: [{ required: true, message: '请输入菜单名称', trigger: 'blur' }],
-  // 菜单类型为「菜单」时路由必填；目录允许为空（走 validator 动态判断）
+  // 路由地址：仅「菜单」型必填（其它类型走 validator 动态判断；目录允许为空）
   routePath: [
     {
       validator: (_rule: unknown, value: string, callback: (err?: Error) => void) => {
         if (form.menuType === 'MENU' && !value) {
           callback(new Error('菜单类型为「菜单」时，路由地址必填'))
+        } else if (value && /^https?:\/\//i.test(value)) {
+          callback(new Error('路由地址请填站内相对路径；外部链接请选择「外链」类型'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
+  // 链接地址：仅「外链」型必填 + 协议白名单校验（防乱填）
+  linkUrl: [
+    {
+      validator: (_rule: unknown, value: string, callback: (err?: Error) => void) => {
+        if (form.menuType === 'LINK') {
+          if (!value) {
+            callback(new Error('菜单类型为「外链」时，链接地址必填'))
+          } else if (!LINK_URL_PATTERN.test(value)) {
+            callback(new Error('链接地址须以 http:// 或 https:// 开头，且不能含空白字符'))
+          } else {
+            callback()
+          }
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
+  // 权限编码：仅「按钮」型必填（按钮型菜单的存在意义就是权限节点）
+  permCode: [
+    {
+      validator: (_rule: unknown, value: string, callback: (err?: Error) => void) => {
+        if (form.menuType === 'BUTTON' && !value) {
+          callback(new Error('菜单类型为「按钮」时，权限编码必填'))
         } else {
           callback()
         }
@@ -215,12 +255,14 @@ const openEdit = (row: MenuVO) => {
   form.parentId = row.parentId
   form.menuName = row.menuName
   form.routePath = row.routePath || ''
+  form.linkUrl = row.linkUrl || ''
   form.component = row.component || ''
   form.permCode = row.permCode || ''
-  form.menuType = (row.menuType as 'CATALOG' | 'MENU') || 'MENU'
+  form.menuType = row.menuType || 'MENU'
   form.sortNo = row.sortNo
   form.visible = row.visible
   form.status = row.status || 'ENABLED'
+  form.isCache = row.isCache ?? 0
   form.icon = row.icon || ''
   dialogTitle.value = `修改菜单 - ${row.menuName}`
   dialogVisible.value = true
@@ -243,7 +285,18 @@ const handleSubmit = async () => {
   saving.value = true
   try {
     // 解构剥出 id：既用于区分新增/修改分支，又让 payload 与后端 MenuRequest 对齐
-    const { id, ...payload } = form
+    const { id, ...rest } = form
+    // 按类型净化 payload：表单按类型隐藏的字段一律置空/归一，避免隐藏字段带旧值
+    // 撞后端强校验（如非 MENU 型残留 routePath → 「仅菜单类型可填路由地址」）。
+    // 用户在弹窗里来回切类型时不清空（体验优先），净化集中在提交口。
+    const payload: MenuFormData = { ...rest }
+    if (payload.menuType !== 'MENU') {
+      payload.routePath = ''
+      payload.component = ''
+      payload.isCache = 0
+    }
+    if (payload.menuType !== 'LINK') payload.linkUrl = ''
+    if (payload.menuType === 'CATALOG' || payload.menuType === 'LINK') payload.permCode = ''
     if (id) {
       await updateMenu(id, payload)
       ElMessage.success('菜单已保存')
@@ -288,6 +341,16 @@ const handleDelete = async (row: MenuVO) => {
     ElMessage.error((e as Error).message)
   }
 }
+
+// 菜单类型展示辅助（列表 tag 用；域值与后端 applyForm 白名单对齐）
+const MENU_TYPE_META: Record<string, { label: string; tag: 'warning' | 'success' | 'danger' | 'info' }> = {
+  CATALOG: { label: '目录', tag: 'warning' },
+  MENU: { label: '菜单', tag: 'success' },
+  BUTTON: { label: '按钮', tag: 'danger' },
+  LINK: { label: '外链', tag: 'info' },
+}
+const menuTypeLabel = (t: string) => MENU_TYPE_META[t]?.label ?? t
+const menuTypeTagType = (t: string): 'warning' | 'success' | 'danger' | 'info' => MENU_TYPE_META[t]?.tag ?? 'info'
 
 onMounted(loadMenus)
 </script>
@@ -338,6 +401,12 @@ onMounted(loadMenus)
       <el-table-column label="路由地址" min-width="140">
         <template #default="{ row }">{{ row.routePath || '—' }}</template>
       </el-table-column>
+      <el-table-column label="链接地址" min-width="140">
+        <template #default="{ row }">
+          <span v-if="row.linkUrl" class="link-url" :title="row.linkUrl">{{ row.linkUrl }}</span>
+          <span v-else>—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="组件路径" min-width="140">
         <template #default="{ row }">{{ row.component || '—' }}</template>
       </el-table-column>
@@ -346,8 +415,8 @@ onMounted(loadMenus)
       </el-table-column>
       <el-table-column label="类型" width="90" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.menuType === 'CATALOG' ? 'warning' : 'success'" size="small">
-            {{ row.menuType === 'CATALOG' ? '目录' : '菜单' }}
+          <el-tag :type="menuTypeTagType(row.menuType)" size="small">
+            {{ menuTypeLabel(row.menuType) }}
           </el-tag>
         </template>
       </el-table-column>
@@ -355,6 +424,13 @@ onMounted(loadMenus)
         <template #default="{ row }">
           <el-tag :type="row.visible === 1 ? 'success' : 'info'" size="small">
             {{ row.visible === 1 ? '显示' : '隐藏' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="缓存" width="80" align="center">
+        <template #default="{ row }">
+          <el-tag :type="row.isCache === 1 ? 'warning' : 'info'" size="small">
+            {{ row.isCache === 1 ? '缓存' : '—' }}
           </el-tag>
         </template>
       </el-table-column>
@@ -382,6 +458,8 @@ onMounted(loadMenus)
         <el-radio-group v-model="form.menuType">
           <el-radio label="CATALOG">目录</el-radio>
           <el-radio label="MENU">菜单</el-radio>
+          <el-radio label="BUTTON">按钮</el-radio>
+          <el-radio label="LINK">外链</el-radio>
         </el-radio-group>
       </el-form-item>
       <el-form-item label="上级菜单" prop="parentId">
@@ -399,7 +477,11 @@ onMounted(loadMenus)
       <el-form-item label="菜单名称" prop="menuName">
         <el-input v-model="form.menuName" placeholder="请输入菜单名称" maxlength="32" show-word-limit />
       </el-form-item>
-      <el-form-item label="菜单图标" prop="icon">
+      <!-- 字段按类型联动显隐（降低心智，同 RuoYi menu 页思路）：
+           按钮型是权限节点，不占侧栏位置 → 无图标/无显示状态；
+           外链走 <a target=_blank> → 无路由/组件/缓存；
+           缓存仅菜单型有意义（目录/按钮/外链无 SPA 页面可缓存） -->
+      <el-form-item v-if="form.menuType !== 'BUTTON'" label="菜单图标" prop="icon">
         <el-popover v-model:visible="iconPopoverVisible" :width="360" trigger="click" placement="bottom-start">
           <template #reference>
             <el-button :icon="currentIconComp" plain>{{ form.icon || '选择图标' }}</el-button>
@@ -426,19 +508,33 @@ onMounted(loadMenus)
         <el-input-number v-model="form.sortNo" :min="0" :max="9999" controls-position="right" />
         <span class="form-tip">同级内数字越小越靠前</span>
       </el-form-item>
-      <el-form-item label="路由地址" prop="routePath">
+      <el-form-item v-if="form.menuType === 'MENU'" label="路由地址" prop="routePath">
         <el-input
           v-model="form.routePath"
-          :placeholder="form.menuType === 'MENU' ? '如 /system/user（菜单必填）' : '目录可不填'"
+          placeholder="如 /system/user（菜单必填）"
         />
       </el-form-item>
-      <el-form-item label="组件路径" prop="component">
-        <el-input v-model="form.component" placeholder="如 system/user（目录可不填）" />
+      <el-form-item v-if="form.menuType === 'MENU'" label="组件路径" prop="component">
+        <el-input v-model="form.component" placeholder="如 system/user（菜单必填）" />
       </el-form-item>
-      <el-form-item label="权限编码" prop="permCode">
-        <el-input v-model="form.permCode" placeholder="如 system:user（可空）" />
+      <el-form-item v-if="form.menuType === 'LINK'" label="链接地址" prop="linkUrl">
+        <el-input
+          v-model="form.linkUrl"
+          placeholder="如 https://example.com（须以 http(s):// 开头）"
+        />
+        <span class="form-tip">侧栏渲染为图标+文字，点击新标签页打开</span>
       </el-form-item>
-      <el-form-item label="显示状态" prop="visible">
+      <el-form-item v-if="form.menuType === 'MENU' || form.menuType === 'BUTTON'" label="权限编码" prop="permCode">
+        <el-input
+          v-model="form.permCode"
+          :placeholder="form.menuType === 'BUTTON' ? '如 system:user:add（按钮必填）' : '如 system:user（可空）'"
+        />
+      </el-form-item>
+      <el-form-item v-if="form.menuType === 'MENU'" label="页面缓存" prop="isCache">
+        <el-switch v-model="form.isCache" :active-value="1" :inactive-value="0" />
+        <span class="form-tip">开启后切走再切回该页保留状态（页签来回切换不清空）</span>
+      </el-form-item>
+      <el-form-item v-if="form.menuType !== 'BUTTON'" label="显示状态" prop="visible">
         <el-radio-group v-model="form.visible">
           <el-radio :label="1">显示</el-radio>
           <el-radio :label="0">隐藏</el-radio>
@@ -469,6 +565,14 @@ onMounted(loadMenus)
   min-width: 28px;
   margin-right: 4px;
   color: #606266;
+}
+.link-url {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 .form-tip {
   margin-left: 12px;

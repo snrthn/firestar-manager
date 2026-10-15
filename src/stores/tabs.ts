@@ -14,10 +14,27 @@ export interface TabItem {
 
 /** 固定页签（affix）：工作台常驻不可关闭，参考 RuoYi TagsView 的 affix 语义 */
 export const AFFIX_TAB_PATH = '/dashboard'
+// 播种用标题：与 router/index.ts 的 menuPages 种子表对齐（静态表，不随后端菜单名变动）
+const AFFIX_TAB_TITLE = '工作台'
 
 export const useTabsStore = defineStore('tabs', () => {
   const tabs = ref<TabItem[]>([])
   const active = ref('')
+
+  // 固定页签钉位不变式：affix 永远在数组左一（= 页签条最左），不在集合里则补种。
+  // 对应 RuoYi addAffixView 的 unshift 语义：普通页签 push 追加，affix 只能钉头部；
+  // 且 delOthers/delLeft/delRight/delAll 全部对 affix 豁免（RuoYi-Vue3 tagsView.js 实锤）。
+  // 修复前只做了「不可关闭」没钉位：刷新落在深页时当前页先入栈，之后再点开
+  // 工作台 → push 追加到中后部（虎哥 2026-10-15 实测「老往中间跑」）。
+  function pinAffix() {
+    const idx = tabs.value.findIndex((t) => t.path === AFFIX_TAB_PATH)
+    if (idx > 0) {
+      const [affix] = tabs.value.splice(idx, 1)
+      tabs.value.unshift(affix)
+    } else if (idx === -1) {
+      tabs.value.unshift({ path: AFFIX_TAB_PATH, title: AFFIX_TAB_TITLE, name: 'dashboard' })
+    }
+  }
 
   function add(route: RouteLocationNormalizedLoaded) {
     const path = route.path
@@ -27,8 +44,16 @@ export const useTabsStore = defineStore('tabs', () => {
         (route.meta?.title as string) ||
         (typeof route.name === 'string' ? route.name : '') ||
         path
-      tabs.value.push({ path, title, name: route.name })
+      // RuoYi 语义分流：固定页签 unshift 钉左一，其余 push 追加
+      if (path === AFFIX_TAB_PATH) {
+        tabs.value.unshift({ path, title, name: route.name })
+      } else {
+        tabs.value.push({ path, title, name: route.name })
+      }
     }
+    // 每次入栈后兜底钉位：刷新后首个 add 的往往是深页（当前页先于工作台入栈），
+    // 此时把工作台补种到左一——等价于 RuoYi「affix 启动即播种」的语义。
+    pinAffix()
     active.value = path
   }
 
@@ -45,31 +70,25 @@ export const useTabsStore = defineStore('tabs', () => {
     }
   }
 
-  // 批量关闭后保证 affix 页签仍在集合里（被 slice 关掉则放回头部原位）
-  const withAffix = (list: TabItem[]) => {
-    if (!list.some((t) => t.path === AFFIX_TAB_PATH)) {
-      const affix = tabs.value.find((t) => t.path === AFFIX_TAB_PATH)
-      if (affix) list.unshift(affix)
-    }
-    return list
-  }
-
   function closeOthers(path: string) {
     tabs.value = tabs.value.filter((t) => t.path === path || t.path === AFFIX_TAB_PATH)
+    pinAffix() // filter 只做保留不保序，affix 可能已不在左一，钉回去
     active.value = path
   }
 
   function closeLeft(path: string) {
     const idx = tabs.value.findIndex((t) => t.path === path)
     if (idx <= 0) return
-    tabs.value = withAffix(tabs.value.slice(idx))
+    tabs.value = tabs.value.slice(idx)
+    pinAffix() // slice 可能把 affix 切掉 → 补种回左一（RuoYi delLeftTags 同款豁免）
     if (!tabs.value.some((t) => t.path === active.value)) active.value = path
   }
 
   function closeRight(path: string) {
     const idx = tabs.value.findIndex((t) => t.path === path)
     if (idx < 0 || idx >= tabs.value.length - 1) return
-    tabs.value = withAffix(tabs.value.slice(0, idx + 1))
+    tabs.value = tabs.value.slice(0, idx + 1)
+    pinAffix()
     if (!tabs.value.some((t) => t.path === active.value)) active.value = path
   }
 

@@ -61,12 +61,14 @@ export interface MenuVO {
   parentId: number
   menuName: string
   routePath: string
+  linkUrl: string
   component: string
   permCode: string | null
-  menuType: string
+  menuType: 'CATALOG' | 'MENU' | 'BUTTON' | 'LINK'
   sortNo: number
   visible: number
   status: string
+  isCache: number
   icon?: string | null
   children?: MenuVO[]
 }
@@ -77,12 +79,14 @@ export interface MenuFormData {
   parentId: number
   menuName: string
   routePath: string
+  linkUrl: string
   component: string
   permCode: string
-  menuType: 'CATALOG' | 'MENU'
+  menuType: 'CATALOG' | 'MENU' | 'BUTTON' | 'LINK'
   sortNo: number
   visible: number
   status: string
+  isCache: number
   icon?: string
 }
 

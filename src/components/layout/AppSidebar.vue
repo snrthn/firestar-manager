@@ -11,7 +11,8 @@ const userStore = useUserStore()
 const appStore = useAppStore()
 const route = useRoute()
 
-const menus = computed(() => userStore.menus)
+// 侧栏消费展示集（visible 过滤后的）；可访问全集在 userStore.menus，供路由同步用
+const menus = computed(() => userStore.visibleMenus)
 // 当前路由 path 作为 el-menu 高亮项（与 el-menu-item 的 index=routePath 精确匹配）
 const activePath = computed(() => route.path)
 </script>

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { provide, ref, watch } from 'vue'
+import { computed, provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useTabsStore } from '@/stores/tabs'
+import { useUserStore } from '@/stores/user'
 import { useBreakpoint } from '@/composables/useBreakpoint'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
@@ -10,6 +11,7 @@ import AppTabs from '@/components/layout/AppTabs.vue'
 
 const appStore = useAppStore()
 const tabsStore = useTabsStore()
+const userStore = useUserStore()
 const { isCompact } = useBreakpoint()
 const route = useRoute()
 
@@ -20,6 +22,11 @@ function reload() {
   reloadKey.value++
 }
 provide('reload', reload)
+
+// keep-alive 缓存集合：isCache=1 的菜单（后端 sys_menu.is_cache，种子默认 0）。
+// include 匹配「组件 name」——resolveView 包装层注入的 name 与动态路由名同规则
+// （routeNameFor），cachedRouteNames 在 store 里同源计算，三处对齐才命中。
+const cachedViews = computed(() => userStore.cachedRouteNames)
 
 // 紧凑模式下侧栏以抽屉呈现，drawerVisible 控制开合
 const drawerVisible = ref(false)
@@ -66,8 +73,16 @@ watch(
       <main class="content">
         <AppTabs />
         <div class="view-wrap">
+          <!-- keep-alive：isCache=1 的菜单页面切走再切回时保留状态（列表滚动/表单草稿）。
+               key 必须含 route.path——keep-alive 缓存键是 vnode key，全局共用一个
+               reloadKey 会让所有页面撞成同一个缓存键互相顶掉（2026-10-15 实测教训）；
+               reloadKey 参与 key 保证页签右键「刷新当前页」仍能清缓存重挂。
+               用 path 不用 fullPath：query 变化（如字典数据 ?typeCode=A→B）不重建组件，
+               由组件内部 watch route.query 自行响应，避免被打回初始态。 -->
           <router-view v-slot="{ Component }">
-            <component :is="Component" :key="reloadKey" />
+            <keep-alive :include="cachedViews">
+              <component :is="Component" :key="route.path + ':' + reloadKey" />
+            </keep-alive>
           </router-view>
         </div>
       </main>
