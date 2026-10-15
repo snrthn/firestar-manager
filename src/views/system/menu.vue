@@ -506,7 +506,7 @@ onMounted(() => {
            外链走 <a target=_blank> → 无路由/组件/缓存；
            缓存仅菜单型有意义（目录/按钮/外链无 SPA 页面可缓存） -->
       <el-form-item v-if="form.menuType !== 'BUTTON'" label="菜单图标" prop="icon">
-        <el-popover v-model:visible="iconPopoverVisible" :width="360" trigger="click" placement="bottom-start">
+        <el-popover v-model:visible="iconPopoverVisible" :width="380" trigger="click" placement="bottom-start">
           <template #reference>
             <el-button :icon="currentIconComp" plain>{{ form.icon || '选择图标' }}</el-button>
           </template>
@@ -616,8 +616,8 @@ onMounted(() => {
 }
 .icon-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
   max-height: 240px;
   overflow-y: auto;
 }
@@ -625,13 +625,21 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   height: 32px;
+  padding: 0 6px;
+  min-width: 0;
   border: 1px solid var(--el-border-color-lighter, #ebeef5);
   border-radius: 4px;
   background: #fff;
   color: #606266;
   cursor: pointer;
   transition: all 0.15s;
+}
+.icon-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .icon-cell:hover {
   color: var(--fs-primary);
