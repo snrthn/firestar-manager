@@ -209,7 +209,15 @@ router.beforeEach(async (to, _from, next) => {
     syncedMenus = userStore.menus
     // 带着原目标重新导航：此刻路由表已补齐，重新匹配才能命中刚注册的
     // 动态路由；replace 避免浏览器历史堆栈里留一条 403 记录。
-    next({ path: to.fullPath, replace: true })
+    // ⚠️ 必须按 path + query + hash 重组，不能写 next({ ...to })：
+    //   第一趟 to 尚未匹配到动态路由，会被通配兜底路由 Forbidden 吞掉，
+    //   to.name 因此被设为 'Forbidden'；vue-router 导航目标里 name 优先级
+    //   高于 path，若把整个 to 透传，二次导航直接跳 403 页（2026-10-15
+    //   复现：/system/user?tab=2 重导航后 name=Forbidden → 内容区全 403）。
+    //   也不能写 { path: to.fullPath }（旧写法）：字符串形式 vue-router 不解析
+    //   query，/target?q=1 会变 /target，参数丢失。正解：按 path 导航（避开
+    //   catch-all 的 name）再把 query/hash 显式带上 → 命中真实页且参数保真。
+    next({ path: to.path, query: to.query, hash: to.hash, replace: true })
     return
   }
   // 已进入登录态：启动 SSE 实时连接（被顶号时服务端即时推 FORCE_LOGOUT，毫秒级弹「重新登录」模态框）

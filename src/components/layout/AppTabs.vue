@@ -16,16 +16,16 @@ const router = useRouter()
 // 由 AdminLayout provide：刷新当前页（key 变化强制重挂 router-view 组件），未提供则为 no-op
 const reload = inject<() => void>('reload')
 
-function go(path: string) {
-  tabsStore.active = path
-  router.push(path)
+function go(fullPath: string) {
+  tabsStore.active = fullPath
+  router.push(fullPath)
 }
 
-function closeTab(path: string, e: MouseEvent) {
+function closeTab(fullPath: string, e: MouseEvent) {
   e.stopPropagation()
-  if (path === AFFIX_TAB_PATH) return // 工作台固定页签不可关闭
-  const wasActive = tabsStore.active === path
-  tabsStore.close(path)
+  if (fullPath === AFFIX_TAB_PATH) return // 工作台固定页签不可关闭
+  const wasActive = tabsStore.active === fullPath
+  tabsStore.close(fullPath)
   // 关掉的是当前页 → 跳到新激活页（若有）
   if (wasActive && tabsStore.active) {
     router.push(tabsStore.active)
@@ -36,16 +36,16 @@ function closeTab(path: string, e: MouseEvent) {
 }
 
 // ===== 右键上下文菜单（参考 vue-element-admin TagsView：刷新/关闭当前/关闭其他/关闭左/右/全部）=====
-const menu = reactive<{ visible: boolean; x: number; y: number; path: string }>({
+const menu = reactive<{ visible: boolean; x: number; y: number; fullPath: string }>({
   visible: false,
   x: 0,
   y: 0,
-  path: '',
+  fullPath: '',
 })
 
-function openMenu(path: string, e: MouseEvent) {
+function openMenu(fullPath: string, e: MouseEvent) {
   e.preventDefault()
-  menu.path = path
+  menu.fullPath = fullPath
   // 钳制到视口内，避免菜单超出屏幕（菜单 min-width 106px）
   menu.x = Math.min(e.clientX, window.innerWidth - 118)
   menu.y = Math.min(e.clientY, window.innerHeight - 200)
@@ -62,7 +62,7 @@ function navToActive() {
 }
 
 function onRefresh() {
-  const p = menu.path
+  const p = menu.fullPath
   const done = () => reload?.()
   // 先确保目标页为激活态，再强制重挂当前路由组件
   if (tabsStore.active !== p) router.push(p).finally(done)
@@ -70,21 +70,21 @@ function onRefresh() {
   closeMenu()
 }
 function onCloseCurrent() {
-  closeTab(menu.path, new MouseEvent('click'))
+  closeTab(menu.fullPath, new MouseEvent('click'))
   closeMenu()
 }
 function onCloseOthers() {
-  tabsStore.closeOthers(menu.path)
+  tabsStore.closeOthers(menu.fullPath)
   navToActive()
   closeMenu()
 }
 function onCloseLeft() {
-  tabsStore.closeLeft(menu.path)
+  tabsStore.closeLeft(menu.fullPath)
   navToActive()
   closeMenu()
 }
 function onCloseRight() {
-  tabsStore.closeRight(menu.path)
+  tabsStore.closeRight(menu.fullPath)
   navToActive()
   closeMenu()
 }
@@ -106,17 +106,17 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   <div v-if="tabsStore.tabs.length" class="tabs">
     <div
       v-for="t in tabsStore.tabs"
-      :key="t.path"
+      :key="t.fullPath"
       class="tab"
-      :class="{ active: t.path === tabsStore.active }"
-      @click="go(t.path)"
-      @contextmenu.prevent="openMenu(t.path, $event)"
+      :class="{ active: t.fullPath === tabsStore.active }"
+      @click="go(t.fullPath)"
+      @contextmenu.prevent="openMenu(t.fullPath, $event)"
     >
       <span class="tab-title">{{ t.title }}</span>
       <span
-        v-if="t.path !== AFFIX_TAB_PATH"
+        v-if="t.fullPath !== AFFIX_TAB_PATH"
         class="tab-close"
-        @click="closeTab(t.path, $event)"
+        @click="closeTab(t.fullPath, $event)"
         >×</span
       >
     </div>
@@ -125,8 +125,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
     <ul v-show="menu.visible" class="ctx-menu" :style="{ left: menu.x + 'px', top: menu.y + 'px' }">
       <li @click="onRefresh"><el-icon><Refresh /></el-icon>刷新页面</li>
       <li
-        :class="{ disabled: menu.path === AFFIX_TAB_PATH }"
-        @click="menu.path !== AFFIX_TAB_PATH && onCloseCurrent()"
+        :class="{ disabled: menu.fullPath === AFFIX_TAB_PATH }"
+        @click="menu.fullPath !== AFFIX_TAB_PATH && onCloseCurrent()"
       >
         <el-icon><Close /></el-icon>关闭当前
       </li>

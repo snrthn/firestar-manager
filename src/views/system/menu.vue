@@ -14,7 +14,27 @@ import {
   deleteMenu,
   moveMenu,
 } from '@/api/menu'
+// 字典消费样板（虎哥 2026-10-15）：菜单类型不再是页面硬编码 radio，
+// 改为读 sys_dict_data 的 menu_type——在字典维护页停用某类型，
+// 本弹窗实时少一个选项。约定详见 useDict.ts 文件头，后续业务页照此接入。
+import { loadDictOptions, type DictOption } from '@/composables/useDict'
 import type { MenuFormData, MenuVO } from '@/types/auth'
+
+// ===== 菜单类型选项：字典驱动（消费样板）=====
+// 弹窗 radio 的选项来源。字典不可用（接口炸/全被停用）时回退内置四型，
+// 保证弹窗永远可用——兜底值即后端 applyForm 白名单，与种子同域。
+const menuTypeOptions = ref<DictOption[]>([])
+const loadMenuTypeOptions = async () => {
+  const options = await loadDictOptions('menu_type')
+  menuTypeOptions.value = options.length
+    ? options
+    : [
+        { value: 'CATALOG', label: '目录' },
+        { value: 'MENU', label: '菜单' },
+        { value: 'BUTTON', label: '按钮' },
+        { value: 'LINK', label: '外链' },
+      ]
+}
 
 // ===== 列表数据 =====
 const loading = ref(false)
@@ -352,7 +372,10 @@ const MENU_TYPE_META: Record<string, { label: string; tag: 'warning' | 'success'
 const menuTypeLabel = (t: string) => MENU_TYPE_META[t]?.label ?? t
 const menuTypeTagType = (t: string): 'warning' | 'success' | 'danger' | 'info' => MENU_TYPE_META[t]?.tag ?? 'info'
 
-onMounted(loadMenus)
+onMounted(() => {
+  loadMenus()
+  loadMenuTypeOptions()
+})
 </script>
 
 <template>
@@ -455,11 +478,12 @@ onMounted(loadMenus)
   <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
       <el-form-item label="菜单类型" prop="menuType">
+        <!-- 选项来自字典 menu_type（启用中、按 sort_no 升序）：
+             停用「外链」后这里只剩三个选项，字典维护即业务生效 -->
         <el-radio-group v-model="form.menuType">
-          <el-radio label="CATALOG">目录</el-radio>
-          <el-radio label="MENU">菜单</el-radio>
-          <el-radio label="BUTTON">按钮</el-radio>
-          <el-radio label="LINK">外链</el-radio>
+          <el-radio v-for="opt in menuTypeOptions" :key="opt.value" :label="opt.value">
+            {{ opt.label }}
+          </el-radio>
         </el-radio-group>
       </el-form-item>
       <el-form-item label="上级菜单" prop="parentId">
