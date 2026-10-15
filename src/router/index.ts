@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { Component } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { startRealtime, stopRealtime } from '@/utils/realtimeClient'
 import PagePlaceholder from '@/components/PagePlaceholder.vue'
 
 // 页面文件按后端 sys_menu.component 约定的相对路径存放（若依风格）：
@@ -110,6 +111,7 @@ router.beforeEach(async (to, _from, next) => {
   const token = localStorage.getItem('token')
   if (!token || !isTokenAlive(token)) {
     if (token) localStorage.removeItem('token')
+    stopRealtime()
     if (to.path === '/login') {
       next()
     } else {
@@ -144,6 +146,8 @@ router.beforeEach(async (to, _from, next) => {
       return
     }
   }
+  // 已进入登录态：启动 SSE 实时连接（被顶号时服务端即时推 FORCE_LOGOUT，毫秒级弹「重新登录」模态框）
+  startRealtime()
   next()
 })
 

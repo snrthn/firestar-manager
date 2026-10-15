@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+import { handleSessionExpired, hangSilently } from '@/api/sessionGuard'
 
 /**
  * Axios 实例（对接后端 firestar-service）。
@@ -38,12 +39,11 @@ request.interceptors.response.use(
     return body
   },
   (error) => {
-    // 401：token 缺失/过期/已被登出（黑名单）→ 清本地并跳登录页
+    // 401：token 缺失/过期/已被顶下线（单点登录 jti 不匹配）→ 统一走会话守卫：
+    // 单例模态框去重 + 静默挂起，不再 window.location 硬跳（避免绕过模态框交互）
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      if (window.location.pathname !== '/login') {
-        window.location.assign('/login')
-      }
+      handleSessionExpired(error.response.data?.message)
+      return hangSilently()
     }
     return Promise.reject(error)
   },
