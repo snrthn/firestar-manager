@@ -106,7 +106,7 @@ onMounted(loadLogs)
 
 <template>
   <el-card shadow="never">
-    <el-form :inline="true" :model="query" class="query-bar">
+    <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
       <el-form-item label="操作人">
         <el-input v-model="query.operator" placeholder="模糊匹配账号" clearable @keyup.enter="handleQuery" />
       </el-form-item>
@@ -189,7 +189,9 @@ onMounted(loadLogs)
       </el-descriptions-item>
       <el-descriptions-item label="目标类型">{{ targetTypeLabel(detailRow.targetType) }}</el-descriptions-item>
       <el-descriptions-item label="目标 ID">{{ detailRow.targetId ?? '—' }}</el-descriptions-item>
-      <el-descriptions-item label="IP 地址">{{ detailRow.ipAddress || '—' }}</el-descriptions-item>
+      <el-descriptions-item label="IP 地址">
+        <span class="ip-cell" :title="detailRow.ipAddress || ''">{{ detailRow.ipAddress || '—' }}</span>
+      </el-descriptions-item>
       <el-descriptions-item label="操作时间">{{ formatDateTime(detailRow.operatedAt) }}</el-descriptions-item>
       <el-descriptions-item label="备注" :span="2">{{ detailRow.remark || '—' }}</el-descriptions-item>
     </el-descriptions>
@@ -224,5 +226,16 @@ onMounted(loadLogs)
 .detail-diff-title {
   margin: 16px 0 8px;
   font-weight: 600;
+}
+/* 详情弹窗 IP 定宽 + 超出省略：IPv4 最长 15 字符、IPv6 最长 39 字符，
+   不固定宽度会把 el-descriptions 内容列撑得时宽时窄（2026-10-17 虎哥要求）；
+   title 兜底，hover 可见完整地址 */
+.ip-cell {
+  display: inline-block;
+  width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 </style>

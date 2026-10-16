@@ -149,7 +149,9 @@ async function savePwd() {
         </el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ fmt(profile?.createdAt) }}</el-descriptions-item>
         <el-descriptions-item label="最后登录时间">{{ fmt(profile?.lastLoginAt) }}</el-descriptions-item>
-        <el-descriptions-item label="最后登录 IP">{{ profile?.lastLoginIp || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="最后登录 IP">
+          <span class="ip-cell" :title="profile?.lastLoginIp || ''">{{ profile?.lastLoginIp || '—' }}</span>
+        </el-descriptions-item>
       </el-descriptions>
     </el-card>
 
@@ -163,6 +165,7 @@ async function savePwd() {
             :rules="baseRules"
             label-width="80px"
             class="profile-form"
+            @submit.prevent
           >
             <el-form-item label="用户名">
               <el-input :model-value="profile?.username" disabled />
@@ -190,6 +193,7 @@ async function savePwd() {
             :rules="pwdRules"
             label-width="80px"
             class="profile-form"
+            @submit.prevent
           >
             <el-form-item v-if="!forceChange" label="原密码" prop="oldPassword">
               <el-input
@@ -235,6 +239,16 @@ async function savePwd() {
   width: 480px;
   flex-shrink: 0;
   border-radius: 8px;
+}
+/* IP 定宽 + 超出省略：IPv4/IPv6 长度差一倍多，不固定宽度会把描述列表内容列
+   撑得时宽时窄（2026-10-17 虎哥要求，同操作日志详情弹窗口径）；title 兜底全值 */
+.ip-cell {
+  display: inline-block;
+  width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 .main-card {
   flex: 1;

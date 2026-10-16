@@ -229,7 +229,7 @@ onMounted(loadFiles)
 
 <template>
   <el-card shadow="never">
-    <el-form :inline="true" :model="query" class="query-bar">
+    <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
       <el-form-item label="文件名 / 业务">
         <el-input v-model="query.keyword" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
@@ -316,7 +316,7 @@ onMounted(loadFiles)
       <el-icon class="el-icon--upload"><Upload /></el-icon>
       <div class="el-upload__text">将文件拖到此处，或<em>点击选择</em></div>
     </el-upload>
-    <el-form :model="uploadForm" label-width="90px" style="margin-top: 16px">
+    <el-form :model="uploadForm" label-width="90px" style="margin-top: 16px" @submit.prevent>
       <el-form-item label="业务类型">
         <el-select v-model="uploadForm.bizType" placeholder="默认归 common" clearable class="w-full">
           <el-option v-for="o in bizTypeOptions" :key="o.value" :label="o.label" :value="o.value" />
@@ -341,7 +341,7 @@ onMounted(loadFiles)
 
   <!-- 别名编辑（V23：别名只在文件管理处维护，上传时填或在这里改） -->
   <el-dialog v-model="aliasVisible" title="编辑别名" width="480px">
-    <el-form :model="aliasForm" label-width="80px">
+    <el-form :model="aliasForm" label-width="80px" @submit.prevent>
       <el-form-item label="别名">
         <el-input
           v-model="aliasForm.alias"

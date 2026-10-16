@@ -532,7 +532,7 @@ onMounted(() => {
 
   <!-- 新增 / 修改弹窗 -->
   <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px">
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
       <el-form-item label="菜单类型" prop="menuType">
         <!-- 选项来自字典 menu_type（启用中、按 sort_no 升序）：
              停用「外链」后这里只剩三个选项，字典维护即业务生效 -->

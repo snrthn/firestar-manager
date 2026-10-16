@@ -51,7 +51,7 @@ onMounted(loadLogs)
 
 <template>
   <el-card shadow="never">
-    <el-form :inline="true" :model="query" class="query-bar">
+    <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
       <el-form-item label="文件名">
         <el-input v-model="query.keyword" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>

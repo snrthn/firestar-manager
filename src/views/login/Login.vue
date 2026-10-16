@@ -18,7 +18,6 @@
           placeholder="密码"
           size="large"
           show-password
-          @keyup.enter="onSubmit"
         >
           <template #prepend>密码</template>
         </el-input>

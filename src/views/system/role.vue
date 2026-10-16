@@ -336,7 +336,7 @@ onMounted(loadRoles)
 <template>
   <el-card shadow="never">
     <!-- 查询区 -->
-    <el-form :inline="true" :model="query" class="query-bar">
+    <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
       <el-form-item label="角色名称">
         <el-input v-model="query.roleName" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
@@ -399,7 +399,7 @@ onMounted(loadRoles)
 
   <!-- 新增 / 修改弹窗 -->
   <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px">
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
       <el-form-item label="角色编码" prop="roleCode">
         <el-input
           v-model="form.roleCode"
