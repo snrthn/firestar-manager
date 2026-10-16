@@ -3,8 +3,12 @@ import { onMounted, reactive, ref } from 'vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { listAllDownloadLogs } from '@/api/file'
+import { useDictLabels } from '@/composables/useDict'
 import { formatDateTime } from '@/utils/datetime'
 import type { FileDownloadLogVO } from '@/types/file'
+
+// 业务类型展示走字典（file_biz_type），与文件列表页口径一致，不再裸显英文域值
+const { label: bizTypeLabel } = useDictLabels('file_biz_type')
 
 // 下载记录（全局，不按文件过滤；菜单「下载记录」独立入口）
 const query = reactive({ keyword: '' })
@@ -61,8 +65,11 @@ onMounted(loadLogs)
       <el-table-column prop="fileName" label="文件名" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">{{ row.fileName || '—' }}</template>
       </el-table-column>
+      <el-table-column label="别名" min-width="140" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.alias || '—' }}</template>
+      </el-table-column>
       <el-table-column prop="bizType" label="业务类型" width="120">
-        <template #default="{ row }">{{ row.bizType || 'common' }}</template>
+        <template #default="{ row }">{{ bizTypeLabel(row.bizType || 'common') }}</template>
       </el-table-column>
       <el-table-column prop="downloaderName" label="下载人" width="140" />
       <el-table-column prop="downloadIp" label="下载 IP" width="150" />

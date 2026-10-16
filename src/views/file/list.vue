@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import type { UploadRequestOptions } from 'element-plus'
-import { Delete, Download, Refresh, Search, Upload, View } from '@element-plus/icons-vue'
+import type { UploadUserFile } from 'element-plus'
+import { Delete, Download, Edit, Refresh, Search, Upload, View } from '@element-plus/icons-vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
-import { deleteFile, downloadFileUrl, listFiles, previewFileUrl, uploadFile } from '@/api/file'
+import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
+import { deleteFile, downloadFileUrl, listFiles, updateFileAlias, uploadFile } from '@/api/file'
+import { downloadViaBackend } from '@/utils/fileDownload'
 import { loadDictOptions, useDictLabels, type DictOption } from '@/composables/useDict'
 import { formatDateTime } from '@/utils/datetime'
 import type { FileVO } from '@/types/file'
@@ -88,10 +90,15 @@ function statusTagType(s?: string | null) {
   return 'danger'
 }
 
-// ===== 上传（自定义请求，Bearer 由拦截器注入）=====
+// ===== 上传（手动确认：选文件只暂存，点「确认上传」才提交）=====
+// 背景（2026-10-16 虎哥反馈）：auto-upload 模式下选好文件的瞬间就自动上传并关窗，
+// 用户根本来不及选业务类型/文件类型/别名，交互割裂。
+// 现在改为：auto-upload=false，on-change 只暂存（单文件，重复选自动替换），
+// 底部「确认上传」统一提交——表单三选一可以先选后传，也可以传后再在列表里编辑别名。
 const uploadVisible = ref(false)
 const uploading = ref(false)
-const uploadForm = reactive({ bizType: '', fileType: '' })
+const uploadForm = reactive({ bizType: '', fileType: '', alias: '' })
+const uploadFileList = ref<UploadUserFile[]>([])
 
 // 业务类型 / 文件类型：字典驱动（useDict 消费样板，同 menu.vue 菜单类型）。
 // 字典不可用时回退内置最小集，保证弹窗永远可传；「不选」即后端默认（common / ATTACHMENT）。
@@ -107,19 +114,39 @@ const loadUploadDictOptions = async () => {
 const openUpload = () => {
   uploadForm.bizType = ''
   uploadForm.fileType = ''
+  uploadForm.alias = ''
+  uploadFileList.value = []
   loadUploadDictOptions()
   uploadVisible.value = true
 }
 
-const handleUpload = async (options: UploadRequestOptions) => {
+/** 选中文件：只暂存不提交（单文件，后选替换先选） */
+const onPickFile = (_uploadFile: UploadUserFile, uploadFiles: UploadUserFile[]) => {
+  uploadFileList.value = uploadFiles.slice(-1)
+}
+
+/** 移除已选文件：同步暂存列表 */
+const onRemoveFile = (_uploadFile: UploadUserFile, uploadFiles: UploadUserFile[]) => {
+  uploadFileList.value = uploadFiles
+}
+
+/** 确认上传：带上业务/文件类型/别名一起提交 */
+const submitUpload = async () => {
+  const picked = uploadFileList.value[0]
+  if (!picked || !picked.raw) {
+    ElMessage.warning('请先选择要上传的文件')
+    return
+  }
   const form = new FormData()
-  form.append('file', options.file)
+  form.append('file', picked.raw)
   if (uploadForm.bizType) form.append('bizType', uploadForm.bizType)
   if (uploadForm.fileType) form.append('fileType', uploadForm.fileType)
+  if (uploadForm.alias.trim()) form.append('alias', uploadForm.alias.trim())
   uploading.value = true
   try {
     await uploadFile(form)
     ElMessage.success('上传成功')
+    uploadFileList.value = []
     uploadVisible.value = false
     await reloadAfterMutation()
   } catch (e) {
@@ -130,23 +157,53 @@ const handleUpload = async (options: UploadRequestOptions) => {
 }
 
 // ===== 下载 / 预览 / 删除 =====
+// 下载/预览统一「取字节 → 本地落地」：不再 window.open 新页签（本地模式相对路径不带 JWT 会 403），
+// OSS 签名 URL 免鉴权直连。分流逻辑在 utils/fileDownload 与 FilePreviewDialog。
 const handleDownload = async (row: FileVO) => {
   try {
     const url = await downloadFileUrl(row.id)
-    window.open(url, '_blank')
+    await downloadViaBackend(url, row.alias || row.originalName || row.fileName || 'download')
   } catch (e) {
     ElMessage.error((e as Error).message)
   }
 }
 
-const handlePreview = async (row: FileVO) => {
+const previewVisible = ref(false)
+const previewRow = ref<FileVO | null>(null)
+
+const handlePreview = (row: FileVO) => {
+  previewRow.value = row
+  previewVisible.value = true
+}
+
+// ===== 别名编辑（V23：只在文件管理处维护）=====
+const aliasVisible = ref(false)
+const aliasSaving = ref(false)
+const aliasForm = reactive({ id: 0, alias: '' })
+
+const openAliasEditor = (row: FileVO) => {
+  aliasForm.id = row.id
+  aliasForm.alias = row.alias || ''
+  aliasVisible.value = true
+}
+
+const saveAlias = async () => {
+  aliasSaving.value = true
   try {
-    const url = await previewFileUrl(row.id)
-    window.open(url, '_blank')
+    await updateFileAlias(aliasForm.id, aliasForm.alias.trim())
+    ElMessage.success('别名已更新')
+    aliasVisible.value = false
+    await loadFiles()
   } catch (e) {
     ElMessage.error((e as Error).message)
+  } finally {
+    aliasSaving.value = false
   }
 }
+
+// ===== 复制资源链接 =====
+// 2026-10-16 虎哥要求：复制链接操作频次不高，从列表操作列收敛到预览弹窗内
+// （见 components/FilePreviewDialog.vue 的「复制链接」按钮），列表只留高频操作。
 
 const handleDelete = async (row: FileVO) => {
   try {
@@ -191,6 +248,9 @@ onMounted(loadFiles)
       <el-table-column prop="originalName" label="文件名" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">{{ row.originalName || row.fileName || '—' }}</template>
       </el-table-column>
+      <el-table-column label="别名" min-width="140" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.alias || '—' }}</template>
+      </el-table-column>
       <el-table-column prop="fileType" label="类型" width="120">
         <template #default="{ row }">{{ fileTypeLabel(row.fileType) }}</template>
       </el-table-column>
@@ -214,10 +274,11 @@ onMounted(loadFiles)
           <el-tag :type="statusTagType(row.status)" size="small">{{ fileStatusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right" align="center">
+      <el-table-column label="操作" width="260" fixed="right" align="center">
         <template #default="{ row }">
           <el-button link type="primary" size="small" :icon="View" @click="handlePreview(row)">预览</el-button>
           <el-button link type="primary" size="small" :icon="Download" @click="handleDownload(row)">下载</el-button>
+          <el-button link type="primary" size="small" :icon="Edit" @click="openAliasEditor(row)">别名</el-button>
           <el-button link type="danger" size="small" :icon="Delete" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -240,15 +301,20 @@ onMounted(loadFiles)
   <!-- 上传弹窗 -->
   <!-- accept 不设值：EP 拖拽区按 accept 逐项匹配，"*" 无法匹配任何 MIME，
        会导致「点击能传、拖拽全被过滤」（2026-10-16 虎哥实测），留空即放开全部类型 -->
+  <!-- auto-upload=false：选文件只暂存，点「确认上传」才提交——
+       避免选完文件的瞬间就自动上传关窗、来不及填业务/类型/别名 -->
   <el-dialog v-model="uploadVisible" title="上传文件" width="520px">
     <el-upload
       drag
-      :show-file-list="false"
-      :http-request="handleUpload"
+      :auto-upload="false"
+      :show-file-list="true"
+      :file-list="uploadFileList"
+      :on-change="onPickFile"
+      :on-remove="onRemoveFile"
       :disabled="uploading"
     >
       <el-icon class="el-icon--upload"><Upload /></el-icon>
-      <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+      <div class="el-upload__text">将文件拖到此处，或<em>点击选择</em></div>
     </el-upload>
     <el-form :model="uploadForm" label-width="90px" style="margin-top: 16px">
       <el-form-item label="业务类型">
@@ -261,11 +327,38 @@ onMounted(loadFiles)
           <el-option v-for="o in fileTypeOptions" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
       </el-form-item>
+      <el-form-item label="别名">
+        <el-input v-model="uploadForm.alias" placeholder="选填，如「10 月报销发票」；留空显示原始文件名" maxlength="255" clearable />
+      </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="uploadVisible = false">关闭</el-button>
+      <el-button @click="uploadVisible = false">取消</el-button>
+      <el-button type="primary" :loading="uploading" :disabled="uploadFileList.length === 0" @click="submitUpload">
+        确认上传
+      </el-button>
     </template>
   </el-dialog>
+
+  <!-- 别名编辑（V23：别名只在文件管理处维护，上传时填或在这里改） -->
+  <el-dialog v-model="aliasVisible" title="编辑别名" width="480px">
+    <el-form :model="aliasForm" label-width="80px">
+      <el-form-item label="别名">
+        <el-input
+          v-model="aliasForm.alias"
+          placeholder="选填，如「10 月报销发票」；清空则回退显示原始文件名"
+          maxlength="255"
+          clearable
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="aliasVisible = false">取消</el-button>
+      <el-button type="primary" :loading="aliasSaving" @click="saveAlias">保存</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 预览弹窗（③：不再 window.open 新页签；图片 inline / PDF iframe / 其他引导下载） -->
+  <FilePreviewDialog v-model="previewVisible" :file="previewRow" />
 </template>
 
 <style scoped>

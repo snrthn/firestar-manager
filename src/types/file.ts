@@ -15,6 +15,8 @@ export interface FileVO {
   fileName: string | null
   /** 原始文件名（展示用） */
   originalName: string | null
+  /** 文件别名（文件管理处维护，展示/审计用；为空回退 originalName） */
+  alias: string | null
   /** 文件类型（字典 file_type） */
   fileType: string | null
   /** 关联业务类型（invoice/receipt 等，为空归到 common） */
@@ -47,6 +49,8 @@ export interface FileDownloadLogVO {
   fileId: number | null
   /** 文件名（冗余，便于列表直接展示；文件被删后仍能看出下载过什么） */
   fileName: string | null
+  /** 文件别名（V23 随 fileName 一起按 fileId 回查带出；为空回退 fileName） */
+  alias: string | null
   bizType: string | null
   bizId: number | null
   downloaderId: number | null

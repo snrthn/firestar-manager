@@ -28,3 +28,13 @@
 .query-bar .el-tree-select {
   width: 200px;
 }
+
+/* 日期控件宽度收口（虎哥 2026-10-16：上面三条漏了 el-date-editor —— daterange
+   掉回 EP 默认 360px，窄屏下查询区整行换行，观感割裂）。
+   单日期 240px、日期区间 300px：比默认收一截，又保留「至」分隔符的呼吸感。 */
+.query-bar .el-date-editor {
+  width: 240px;
+}
+.query-bar .el-date-editor--daterange {
+  width: 300px;
+}

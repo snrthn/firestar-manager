@@ -14,6 +14,7 @@ import {
   deleteDictData,
 } from '@/api/dict'
 import type { DictDataFormData, DictDataVO } from '@/types/dict'
+import { loadDictOptions, type DictOption } from '@/composables/useDict'
 
 // ===== 上下文：所属字典类型（路由 query typeCode，菜单表里该页 visible=0 不在侧栏显示）=====
 const route = useRoute()
@@ -88,14 +89,13 @@ const dialogTitle = ref('新增字典数据')
 const saving = ref(false)
 const formRef = ref<FormInstance>()
 
-// 样式下拉选项（EP tag class，与后端 DictServiceImpl.DICT_STYLES 白名单一致）
-const styleOptions = [
-  { value: 'primary', label: '主要' },
-  { value: 'success', label: '成功' },
-  { value: 'info', label: '信息' },
-  { value: 'warning', label: '警告' },
-  { value: 'danger', label: '危险' },
-]
+// 样式下拉：字典 dict_style 消费（V22 起字典补齐后端白名单 5 项
+// primary/success/info/warning/danger）——以字典作为唯一数据源，
+// 不再与后端 DictServiceImpl.DICT_STYLES 白名单双轨维护。
+const styleOptions = ref<DictOption[]>([])
+loadDictOptions('dict_style').then((opts) => {
+  styleOptions.value = opts
+})
 
 const emptyForm = (): DictDataFormData => ({
   // typeCode 由页面上下文固定带入；修改时后端忽略请求体中的该字段

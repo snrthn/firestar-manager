@@ -13,6 +13,13 @@ import {
 } from '@/api/permission'
 import type { PermissionFormData, PermissionVO } from '@/types/permission'
 import DictSelect from '@/components/DictSelect.vue'
+import { useDictLabels } from '@/composables/useDict'
+
+// 表格展示标签：资源类型/操作类型/状态全部走字典，不再裸显英文域值或自写硬编码映射。
+// permission_action 自 V22 起对齐真实域值 READ/WRITE/EXECUTE（原 VIEW/CREATE/... 与存量数据对不上）。
+const { label: resourceLabel } = useDictLabels('permission_resource')
+const { label: actionLabel } = useDictLabels('permission_action')
+const { label: statusLabel } = useDictLabels('common_status')
 
 // ===== 查询条件 =====
 const query = reactive({
@@ -201,18 +208,18 @@ onMounted(() => {
       </el-table-column>
       <el-table-column label="资源类型" width="120" align="center">
         <template #default="{ row }">
-          <el-tag size="small" type="info">{{ row.resourceType }}</el-tag>
+          <el-tag size="small" type="info">{{ resourceLabel(row.resourceType) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作类型" width="120" align="center">
         <template #default="{ row }">
-          <el-tag size="small">{{ row.actionType }}</el-tag>
+          <el-tag size="small">{{ actionLabel(row.actionType) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="状态" width="90" align="center">
         <template #default="{ row }">
           <el-tag :type="row.status === 'ENABLED' ? 'success' : 'danger'" size="small">
-            {{ row.status === 'ENABLED' ? '启用' : '停用' }}
+            {{ statusLabel(row.status) }}
           </el-tag>
         </template>
       </el-table-column>
@@ -258,15 +265,9 @@ onMounted(() => {
         <!-- 资源类型：字典 permission_resource（API/MENU/BUTTON，与 V4 权限种子域值一致） -->
         <DictSelect v-model="form.resourceType" type-code="permission_resource" placeholder="请选择资源类型" class="w-full" />
       </el-form-item>
-      <!-- ⚠️ 操作类型暂不切字典：真实域值是 READ/WRITE/EXECUTE（V4 种子实锤），
-           而字典 permission_action 是 VIEW/CREATE/UPDATE/DELETE/EXPORT——数据与字典
-           不一致，切了会让存量权限对不上号。应先修字典种子（需用户拍板），见 2026-10-16 汇报。 -->
+      <!-- 操作类型：字典 permission_action 消费（V22 已将字典对齐真实域值 READ/WRITE/EXECUTE） -->
       <el-form-item label="操作类型" prop="actionType">
-        <el-select v-model="form.actionType" class="w-full">
-          <el-option label="READ 读取" value="READ" />
-          <el-option label="WRITE 写入" value="WRITE" />
-          <el-option label="EXECUTE 执行" value="EXECUTE" />
-        </el-select>
+        <DictSelect v-model="form.actionType" type-code="permission_action" placeholder="请选择操作类型" class="w-full" />
       </el-form-item>
       <el-form-item label="权限状态" prop="status">
         <el-radio-group v-model="form.status">
