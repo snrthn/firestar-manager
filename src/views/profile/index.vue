@@ -244,7 +244,6 @@ async function savePwd() {
    撑得时宽时窄（2026-10-17 虎哥要求，同操作日志详情弹窗口径）；title 兜底全值 */
 .ip-cell {
   display: inline-block;
-  width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
