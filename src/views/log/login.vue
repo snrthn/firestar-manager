@@ -107,7 +107,7 @@ onMounted(loadLogs)
           <el-tag :type="statusTagType(row.loginStatus)" size="small">{{ statusLabel(row.loginStatus) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="ipAddress" label="IP" width="130" align="center" show-overflow-tooltip />
+      <el-table-column prop="ipAddress" label="IP" width="150" align="center" show-overflow-tooltip />
       <el-table-column prop="userAgent" label="浏览器 UA" min-width="340" show-overflow-tooltip>
         <template #default="{ row }">{{ row.userAgent || '—' }}</template>
       </el-table-column>
