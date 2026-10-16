@@ -99,7 +99,7 @@ onMounted(loadLogs)
          账号 admin 内容极短，min-width→width 110 固定；IP 130；UA/失败原因吃弹性剩余；
          时间列 width 固定不参与弹性拉伸——否则 UA 永远吃不饱 -->
     <el-table v-loading="loading" :data="logList" border>
-      <el-table-column prop="username" label="账号" width="110" align="center">
+      <el-table-column prop="username" label="账号" width="160" align="center">
         <template #default="{ row }">{{ row.username || '—' }}</template>
       </el-table-column>
       <el-table-column label="结果" width="120" align="center">

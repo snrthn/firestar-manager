@@ -67,6 +67,15 @@ function connect() {
         scheduleReconnect()
         return
       }
+      // 防御：拿到 200 但不是 SSE 流（如错误壳/网关页）时按连接失败处理。
+      // 2026-10-16 线上事故：后端 401 曾被吞成 HTTP 200 + {"code":500} 壳，
+      // 前端把 200 当流读、壳里没有 event: 行被静默忽略 → 流关闭 → 重连死循环。
+      // 根因已在后端修（ResponseStatusException 保留 401），这里兜底防再发。
+      const contentType = res.headers.get('content-type') || ''
+      if (!contentType.includes('text/event-stream')) {
+        scheduleReconnect()
+        return
+      }
       retryDelay = RETRY_BASE_MS
       void readStream(res.body)
     })

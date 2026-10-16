@@ -138,7 +138,7 @@ onMounted(loadLogs)
          操作人/目标类型/目标 ID/IP 各 +10~20 固定宽；备注 min-width 提到 200 吃弹性；
          操作时间 width 固定不再膨胀（原来 min-width 会把富余全吞了） -->
     <el-table v-loading="loading" :data="logList" border>
-      <el-table-column prop="operatorName" label="操作人" width="180">
+      <el-table-column prop="operatorName" label="操作人" width="160" align="center">
         <template #default="{ row }">{{ row.operatorName || '—' }}</template>
       </el-table-column>
       <el-table-column label="操作" width="100" align="center">

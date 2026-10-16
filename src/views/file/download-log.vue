@@ -73,7 +73,7 @@ onMounted(loadLogs)
       </el-table-column>
       <el-table-column prop="downloaderName" label="下载人" width="140" />
       <el-table-column prop="downloadIp" label="下载 IP" width="150" />
-      <el-table-column prop="downloadedAt" label="下载时间" min-width="170">
+      <el-table-column prop="downloadedAt" label="下载时间" min-width="100">
         <template #default="{ row }">{{ formatDateTime(row.downloadedAt) }}</template>
       </el-table-column>
     </el-table>
