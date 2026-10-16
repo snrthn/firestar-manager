@@ -190,7 +190,6 @@ async function handleCopyLink() {
     </div>
     <template #footer>
       <el-button v-if="mode !== 'unsupported'" :icon="Refresh" @click="reload">重新加载</el-button>
-      <el-button :icon="Download" @click="handleDownload">下载</el-button>
       <el-button :icon="Link" @click="handleCopyLink">复制链接</el-button>
       <!-- 全屏按钮放底部（2026-10-16 虎哥要求：header 图标位置和 × 挨太近容易误点），
            与关闭按钮同排、在其前面；文字常驻，全屏态显示「退出全屏」 -->

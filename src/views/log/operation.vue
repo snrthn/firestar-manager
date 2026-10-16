@@ -150,7 +150,7 @@ onMounted(loadLogs)
         <template #default="{ row }">{{ targetTypeLabel(row.targetType) }}</template>
       </el-table-column>
       <el-table-column prop="targetId" label="目标 ID" width="150" align="center" />
-      <el-table-column prop="ipAddress" label="IP" width="160" align="center" />
+      <el-table-column prop="ipAddress" label="IP" width="160" align="center" show-overflow-tooltip />
       <el-table-column prop="remark" label="备注" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">{{ row.remark || '—' }}</template>
       </el-table-column>
