@@ -22,9 +22,25 @@ const viewModules = import.meta.glob('../views/**/*.vue') as Record<
 // 好处：菜单管理页改 component 即改落地页，路由表不用跟着动。
 // 找到 → 包一层 defineComponent 挂 name（keep-alive include 匹配组件名，见下方注释）；
 // 缺失 → 兜底 PagePlaceholder，不至于白屏。
-const resolveView = (component: string, name: string): Component => {
+//
+// ⚠️ 兜底分支必须把菜单上下文（title/path/perm）传给 PagePlaceholder：
+// 2026-10-16 虎哥报障「新菜单占位页显示 undefined · 页面建设中 且无路由/权限标签」，
+// 根因就是兜底分支裸挂组件、props 全空。旧的占位页（如 approval/list.vue）是
+// 视图文件显式调用 <PagePlaceholder title=... path=... perm=...>，所以显示完整——
+// 同一个组件、两条进入路径，只有兜底这条漏了 props，属于实现遗漏而非风格不统一。
+const resolveView = (
+  component: string,
+  name: string,
+  fallback?: { title: string; path?: string; perm?: string },
+): Component => {
   const loader = viewModules[`../views/${component}.vue`]
-  if (!loader) return PagePlaceholder
+  if (!loader) {
+    const fb = fallback ?? { title: name }
+    return defineComponent({
+      name,
+      setup: () => () => h(PagePlaceholder, fb),
+    })
+  }
   const inner = defineAsyncComponent(loader)
   // keep-alive 的 include 按「组件 name」匹配（不是路由名也不是 path），而 SFC
   // 默认没有 name——包一层 defineComponent 显式挂名，name 与路由名同规则
@@ -71,7 +87,7 @@ const router = createRouter({
         ...builtinPages.map((p) => ({
           path: p.path,
           name: p.name,
-          component: resolveView(p.component, p.name),
+          component: resolveView(p.component, p.name, { title: p.title, path: '/' + p.path }),
           meta: { title: p.title },
         })),
         {
@@ -127,7 +143,11 @@ function syncDynamicRoutes(menus: MenuVO[]) {
     router.addRoute(ADMIN_LAYOUT_NAME, {
       path: path.replace(/^\//, ''), // 子路由相对路径，与静态表一致（'system/user'）
       name,
-      component: resolveView(vo.component, name),
+      component: resolveView(vo.component, name, {
+        title: vo.menuName,
+        path: vo.routePath,
+        perm: vo.permCode ?? undefined,
+      }),
       meta: { title: vo.menuName },
     })
     dynamicRoutes.push({ name, path })
