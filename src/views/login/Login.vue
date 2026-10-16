@@ -22,7 +22,12 @@
           <template #prepend>密码</template>
         </el-input>
       </el-form-item>
-      <el-button type="primary" size="large" :loading="loading" style="width: 100%" @click="onSubmit">
+      <!-- native-type="submit"：el-button 默认渲染 <button type="button">（EP 源码 button.mjs:51-55 实锤），
+           不显式指定则 form 内无 submit 按钮；而浏览器隐式提交规则要求「无 submit 按钮时
+           仅当 form 只有一个输入框」才响应回车——本 form 有两个输入框，回车会死寂。
+           改成 submit 后：点按钮 / 按回车都走原生 submit → @submit.prevent 单通道触发 onSubmit，
+           不再需要 @keyup.enter（加了反而和 submit 双发）。 -->
+      <el-button type="primary" size="large" native-type="submit" :loading="loading" style="width: 100%">
         登录
       </el-button>
       <p v-if="error" class="err">{{ error }}</p>
