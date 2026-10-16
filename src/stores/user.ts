@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { login as apiLogin, logout as apiLogout, getProfile, getMenus } from '@/api/auth'
 import { routeNameFor, flattenMenus } from '@/utils/menuRoute'
+import { useTabsStore } from '@/stores/tabs'
 import type { LoginRequest, ProfileVO, MenuVO } from '@/types/auth'
 
 export const useUserStore = defineStore('user', () => {
@@ -79,6 +80,16 @@ export const useUserStore = defineStore('user', () => {
     permissions.value = []
     menus.value = []
     localStorage.removeItem('token')
+
+    // 页签清场（RuoYi logout 语义 delAllViews + resetAffix，2026-10-16 收口）：
+    // 此前登出只清用户态，页签残留——换账号再登会带着上一账号打开的页面，
+    // 其中越权页面的页签点击即 403/404，且上一账号的查询条件/表单草稿
+    // 也一并「过户」给新账号，属于数据串号风险。
+    // closeAll 保留工作台固定页签并把激活态归位 /dashboard，下次登录即干净起点。
+    // keep-alive 缓存无需手动清：cachedRouteNames 由 menus 计算，menus 已清空，
+    // include 变空时 Vue 自动清空缓存池（AdminLayout <keep-alive :include>）。
+    // 本函数是主动退出与 401 过期守卫（router/index.ts）的共同出口，一处收口全覆盖。
+    useTabsStore().closeAll()
   }
 
   function hasPermission(perm: string) {

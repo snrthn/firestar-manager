@@ -3,7 +3,10 @@ import { onMounted, reactive, ref } from 'vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { listOperationLogs } from '@/api/log'
+import { formatDateTime } from '@/utils/datetime'
 import type { AuditLogVO } from '@/types/log'
+import DictSelect from '@/components/DictSelect.vue'
+import { useDictLabels } from '@/composables/useDict'
 
 // 操作审计：操作人模糊 / 目标类型精确 / 操作类型精确 / 时间区间
 const query = reactive({
@@ -25,6 +28,8 @@ const resetQuery = () => {
   loadLogs()
 }
 
+// 目标类型暂无对应字典类型（USER/ROLE/MENU/...），保持本地枚举；
+// 若后续补 target_type 字典，可换 DictSelect 收口。
 const targetTypeOptions = [
   { label: '用户', value: 'USER' },
   { label: '角色', value: 'ROLE' },
@@ -33,12 +38,9 @@ const targetTypeOptions = [
   { label: '字典数据', value: 'DICT_DATA' },
   { label: '文件', value: 'FILE' },
 ]
-const operationTypeOptions = [
-  { label: '新增', value: 'CREATE' },
-  { label: '修改', value: 'UPDATE' },
-  { label: '删除', value: 'DELETE' },
-  { label: '上传', value: 'UPLOAD' },
-]
+// 操作类型：字典 audit_operation 消费（下拉 + 表格标签同源）。
+// V21 已为字典补 UPLOAD 项（后端 FileServiceImpl @Auditable("UPLOAD") 真实落库值）。
+const { label: opLabel } = useDictLabels('audit_operation')
 
 const loading = ref(false)
 const logList = ref<AuditLogVO[]>([])
@@ -107,14 +109,13 @@ onMounted(loadLogs)
         <el-input v-model="query.operator" placeholder="模糊匹配账号" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="目标类型">
-        <el-select v-model="query.targetType" placeholder="全部" clearable style="width: 140px">
+        <el-select v-model="query.targetType" placeholder="全部" clearable>
           <el-option v-for="o in targetTypeOptions" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
       </el-form-item>
       <el-form-item label="操作类型">
-        <el-select v-model="query.operationType" placeholder="全部" clearable style="width: 140px">
-          <el-option v-for="o in operationTypeOptions" :key="o.value" :label="o.label" :value="o.value" />
-        </el-select>
+        <!-- 操作类型：字典 audit_operation 消费（DictSelect 统一封装），不再硬编码 -->
+        <DictSelect v-model="query.operationType" type-code="audit_operation" placeholder="全部" />
       </el-form-item>
       <el-form-item label="时间区间">
         <el-date-picker
@@ -154,7 +155,7 @@ onMounted(loadLogs)
       </el-table-column>
       <el-table-column label="操作" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="opTagType(row.operationType)" size="small">{{ row.operationType || '—' }}</el-tag>
+          <el-tag :type="opTagType(row.operationType)" size="small">{{ opLabel(row.operationType) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="目标类型" width="120" align="center">
@@ -163,7 +164,7 @@ onMounted(loadLogs)
       <el-table-column prop="targetId" label="目标 ID" width="110" align="center" />
       <el-table-column prop="ipAddress" label="IP" width="150" />
       <el-table-column prop="operatedAt" label="操作时间" min-width="170">
-        <template #default="{ row }">{{ row.operatedAt || '—' }}</template>
+        <template #default="{ row }">{{ formatDateTime(row.operatedAt) }}</template>
       </el-table-column>
       <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ row.remark || '—' }}</template>

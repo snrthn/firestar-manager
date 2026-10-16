@@ -5,6 +5,8 @@ import { Delete, Download, Refresh, Search, Upload, View } from '@element-plus/i
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import { deleteFile, downloadFileUrl, listFiles, previewFileUrl, uploadFile } from '@/api/file'
+import { loadDictOptions, useDictLabels, type DictOption } from '@/composables/useDict'
+import { formatDateTime } from '@/utils/datetime'
 import type { FileVO } from '@/types/file'
 
 // ===== 查询条件 =====
@@ -67,6 +69,13 @@ function formatSize(bytes?: number | null) {
   return `${n.toFixed(2)} ${units[i]}`
 }
 
+// 列表展示标签：类型/业务类型/存储/状态全部走字典（file_type / file_biz_type /
+// storage_type / file_status），不再裸显英文域值；未命中兜底显示原始值。
+const { label: fileTypeLabel } = useDictLabels('file_type')
+const { label: bizTypeLabel } = useDictLabels('file_biz_type')
+const { label: storageTypeLabel } = useDictLabels('storage_type')
+const { label: fileStatusLabel } = useDictLabels('file_status')
+
 function storageTagType(t?: string | null) {
   if (t === 'OSS') return 'success'
   if (t === 'LOCAL') return 'info'
@@ -84,9 +93,21 @@ const uploadVisible = ref(false)
 const uploading = ref(false)
 const uploadForm = reactive({ bizType: '', fileType: '' })
 
+// 业务类型 / 文件类型：字典驱动（useDict 消费样板，同 menu.vue 菜单类型）。
+// 字典不可用时回退内置最小集，保证弹窗永远可传；「不选」即后端默认（common / ATTACHMENT）。
+const bizTypeOptions = ref<DictOption[]>([])
+const fileTypeOptions = ref<DictOption[]>([])
+
+const loadUploadDictOptions = async () => {
+  const [biz, type] = await Promise.all([loadDictOptions('file_biz_type'), loadDictOptions('file_type')])
+  bizTypeOptions.value = biz.length ? biz : [{ value: 'common', label: '通用' }]
+  fileTypeOptions.value = type.length ? type : [{ value: 'ATTACHMENT', label: '附件' }]
+}
+
 const openUpload = () => {
   uploadForm.bizType = ''
   uploadForm.fileType = ''
+  loadUploadDictOptions()
   uploadVisible.value = true
 }
 
@@ -170,25 +191,27 @@ onMounted(loadFiles)
       <el-table-column prop="originalName" label="文件名" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">{{ row.originalName || row.fileName || '—' }}</template>
       </el-table-column>
-      <el-table-column prop="fileType" label="类型" width="120" />
+      <el-table-column prop="fileType" label="类型" width="120">
+        <template #default="{ row }">{{ fileTypeLabel(row.fileType) }}</template>
+      </el-table-column>
       <el-table-column prop="bizType" label="业务类型" width="120">
-        <template #default="{ row }">{{ row.bizType || 'common' }}</template>
+        <template #default="{ row }">{{ bizTypeLabel(row.bizType || 'common') }}</template>
       </el-table-column>
       <el-table-column label="大小" width="120" align="right">
         <template #default="{ row }">{{ formatSize(row.fileSize) }}</template>
       </el-table-column>
       <el-table-column label="存储" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="storageTagType(row.storageType)" size="small">{{ row.storageType || '—' }}</el-tag>
+          <el-tag :type="storageTagType(row.storageType)" size="small">{{ storageTypeLabel(row.storageType) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="uploaderName" label="上传人" width="120" />
       <el-table-column prop="createdAt" label="上传时间" width="170">
-        <template #default="{ row }">{{ row.createdAt || '—' }}</template>
+        <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
       <el-table-column label="状态" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="statusTagType(row.status)" size="small">{{ row.status || '—' }}</el-tag>
+          <el-tag :type="statusTagType(row.status)" size="small">{{ fileStatusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="200" fixed="right" align="center">
@@ -215,23 +238,28 @@ onMounted(loadFiles)
   </el-card>
 
   <!-- 上传弹窗 -->
+  <!-- accept 不设值：EP 拖拽区按 accept 逐项匹配，"*" 无法匹配任何 MIME，
+       会导致「点击能传、拖拽全被过滤」（2026-10-16 虎哥实测），留空即放开全部类型 -->
   <el-dialog v-model="uploadVisible" title="上传文件" width="520px">
     <el-upload
       drag
       :show-file-list="false"
       :http-request="handleUpload"
       :disabled="uploading"
-      accept="*"
     >
       <el-icon class="el-icon--upload"><Upload /></el-icon>
       <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
     </el-upload>
     <el-form :model="uploadForm" label-width="90px" style="margin-top: 16px">
       <el-form-item label="业务类型">
-        <el-input v-model="uploadForm.bizType" placeholder="选填，如 invoice / receipt，空归 common" />
+        <el-select v-model="uploadForm.bizType" placeholder="默认归 common" clearable class="w-full">
+          <el-option v-for="o in bizTypeOptions" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
       </el-form-item>
       <el-form-item label="文件类型">
-        <el-input v-model="uploadForm.fileType" placeholder="选填，字典 file_type，空用 ATTACHMENT" />
+        <el-select v-model="uploadForm.fileType" placeholder="默认 ATTACHMENT（附件）" clearable class="w-full">
+          <el-option v-for="o in fileTypeOptions" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
       </el-form-item>
     </el-form>
     <template #footer>

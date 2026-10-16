@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance } from 'element-plus'
-import { Expand, Fold, Plus, Refresh, Folder } from '@element-plus/icons-vue'
+import { Expand, Fold, Plus, Refresh, Folder, Search } from '@element-plus/icons-vue'
 // 菜单图标注册表（若依 / vue-element-admin 成熟做法：存图标组件名，<component :is> 渲染，空值兜底 Folder）
 import { resolveMenuIcon, ELEMENT_ICON_LIST } from '@/utils/elementIcons'
+import DictSelect from '@/components/DictSelect.vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -137,6 +138,40 @@ const loadMenus = async () => {
     loading.value = false
   }
 }
+
+// ===== 查询条件（树表本地过滤：菜单名称关键字 + 状态；命中节点的子孙整体保留）=====
+const query = reactive({ menuName: '', status: '' })
+const appliedQuery = reactive({ menuName: '', status: '' })
+
+const handleQuery = () => {
+  appliedQuery.menuName = query.menuName
+  appliedQuery.status = query.status
+}
+const resetQuery = () => {
+  query.menuName = ''
+  query.status = ''
+  handleQuery()
+}
+
+const matchMenu = (n: MenuVO) => {
+  const nameHit = !appliedQuery.menuName || (n.menuName || '').includes(appliedQuery.menuName)
+  const statusHit = !appliedQuery.status || n.status === appliedQuery.status
+  return nameHit && statusHit
+}
+
+// 递归过滤：自身命中 → 整棵子树保留；否则保留「子孙有命中」的路径节点
+const filterMenuTree = (nodes: MenuVO[]): MenuVO[] =>
+  nodes
+    .map((n) => {
+      if (matchMenu(n)) return n
+      const children = n.children?.length ? filterMenuTree(n.children) : []
+      return children.length ? { ...n, children } : null
+    })
+    .filter((n): n is MenuVO => n !== null)
+
+const filteredMenuTree = computed(() =>
+  appliedQuery.menuName || appliedQuery.status ? filterMenuTree(menuTree.value) : menuTree.value
+)
 
 // ===== 弹窗表单 =====
 const dialogVisible = ref(false)
@@ -380,6 +415,27 @@ onMounted(() => {
 
 <template>
   <el-card shadow="never">
+    <!-- 查询区（树表本地过滤） -->
+    <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
+      <el-form-item label="菜单名称">
+        <el-input
+          v-model="query.menuName"
+          placeholder="模糊匹配"
+          clearable
+          @keyup.enter="handleQuery"
+          @clear="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="状态">
+        <!-- 状态：字典 common_status 消费（DictSelect 统一封装），不再硬编码 -->
+        <DictSelect v-model="query.status" type-code="common_status" placeholder="全部" @change="handleQuery" />
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>
+        <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
+      </el-form-item>
+    </el-form>
+
     <div class="toolbar">
       <el-button type="primary" :icon="Plus" @click="openCreate(0)">新增顶级菜单</el-button>
       <el-button :icon="allExpanded ? Fold : Expand" @click="toggleExpandAll">
@@ -390,7 +446,7 @@ onMounted(() => {
 
     <el-table
       v-loading="loading"
-      :data="menuTree"
+      :data="filteredMenuTree"
       row-key="id"
       :expand-row-keys="expandRowKeys"
       :tree-props="{ children: 'children' }"
@@ -579,6 +635,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.query-bar {
+  margin-bottom: 4px;
+}
 .toolbar {
   display: flex;
   gap: 0;

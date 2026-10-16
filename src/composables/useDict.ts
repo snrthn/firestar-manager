@@ -1,3 +1,4 @@
+import { ref, type Ref } from 'vue'
 import { listDictData } from '@/api/dict'
 import type { DictDataVO } from '@/types/dict'
 
@@ -79,4 +80,45 @@ export async function loadDictOptions(typeCode: string): Promise<DictOption[]> {
 
   inflight.set(typeCode, task)
   return task
+}
+
+/**
+ * 字典标签映射（表格/详情展示用）：value → 中文 label。
+ *
+ * 背景：下拉选项走了字典，但列表列、Tag 仍在显示原始英文域值
+ * （SUCCESS / NORMAL / LOCAL / CREATE...），或各页自写 statusLabel 硬编码
+ * 中文映射——同样是「字典已有但未消费」。本 composable 复用 loadDictOptions
+ * 的缓存，只加一层 value→label 反查，展示端与字典页一处维护。
+ *
+ * 用法（样板见 views/log/login.vue / views/file/list.vue）：
+ *   const { label: statusLabel } = useDictLabels('login_status')
+ *   <el-tag>{{ statusLabel(row.loginStatus) }}</el-tag>
+ *
+ * 兜底语义：空值 → placeholder（默认 '—'）；未命中 → 显示原始值
+ * （字典被删/漏配时不至于整列空白，且一眼可发现字典缺口）。
+ */
+export interface DictLabeler {
+  /** 字典是否已加载完成（可用于骨架/闪烁控制，一般无需关心） */
+  ready: Ref<boolean>
+  /** value → 字典 label；空值返回 placeholder，未命中返回原始值 */
+  label: (value?: string | null, placeholder?: string) => string
+}
+
+export function useDictLabels(typeCode: string): DictLabeler {
+  const labelMap = ref<Record<string, string>>({})
+  const ready = ref(false)
+
+  loadDictOptions(typeCode).then((opts) => {
+    const map: Record<string, string> = {}
+    for (const o of opts) map[o.value] = o.label
+    labelMap.value = map
+    ready.value = true
+  })
+
+  function label(value?: string | null, placeholder = '—'): string {
+    if (value == null || value === '') return placeholder
+    return labelMap.value[value] || value
+  }
+
+  return { ready, label }
 }

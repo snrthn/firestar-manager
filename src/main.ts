@@ -62,6 +62,12 @@ import ElMenu, { ElSubMenu, ElMenuItem } from 'element-plus/es/components/menu/i
 import ElTabs, { ElTabPane } from 'element-plus/es/components/tabs/index.mjs'
 // 侧栏菜单滚动容器（成熟组件，折叠/展开时比原生 overflow 更顺滑）
 import ElScrollbar from 'element-plus/es/components/scrollbar/index.mjs'
+// 上传（文件列表页上传弹窗）：未注册时 <el-upload> 被当未知元素渲染——
+// 拖拽区塌掉、点击/拖拽全失效、弹窗布局错乱（2026-10-16 虎哥截图实锤）。
+import ElUpload from 'element-plus/es/components/upload/index.mjs'
+// 日期选择器（登录/操作日志「时间区间」查询）：同理必须显式注册，
+// 否则区间控件整个不渲染，查询栏只剩「时间区间」四个裸文字。
+import ElDatePicker from 'element-plus/es/components/date-picker/index.mjs'
 // 与上方组件一一对应的样式（每个组件的 style/css 内部会带入 theme-chalk base 样式）
 import 'element-plus/es/components/alert/style/css'
 import 'element-plus/es/components/button/style/css'
@@ -101,6 +107,8 @@ import 'element-plus/es/components/tree/style/css'
 import 'element-plus/es/components/menu/style/css'
 import 'element-plus/es/components/tabs/style/css'
 import 'element-plus/es/components/scrollbar/style/css'
+import 'element-plus/es/components/upload/style/css'
+import 'element-plus/es/components/date-picker/style/css'
 import '@/styles/reset.css'
 import '@/styles/theme.css'
 import '@/styles/pages.css'
@@ -147,4 +155,6 @@ app.use(ElMenuItem)
 app.use(ElTabs)
 app.use(ElTabPane)
 app.use(ElScrollbar)
+app.use(ElUpload)
+app.use(ElDatePicker)
 app.mount('#app')

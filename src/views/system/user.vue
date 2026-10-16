@@ -10,9 +10,11 @@ import { listOrgs } from '@/api/org'
 import { listRoles } from '@/api/role'
 import { listPostOptions } from '@/api/post'
 import type { UserFormData, UserVO } from '@/types/user'
+import DictSelect from '@/components/DictSelect.vue'
 import type { OrgVO } from '@/types/org'
 import type { RoleManageVO } from '@/types/role'
 import type { PostOptionVO } from '@/types/post'
+import { formatDateTime } from '@/utils/datetime'
 
 // ===== 查询条件 =====
 const query = reactive({
@@ -223,7 +225,8 @@ const handleDelete = async (row: UserVO) => {
 // 编辑态不校验密码（修改不提供改密码，见 openEdit）
 const dynamicRules = computed(() => (form.id ? { ...rules, password: [] } : rules))
 
-const formatTime = (t: string | null) => (t ? t.replace('T', ' ').slice(0, 19) : '—')
+// 时间格式收敛到全局工具（原本地 replace('T',' ').slice 写法与其它页不一致）
+const formatTime = formatDateTime
 
 onMounted(() => {
   loadUsers()
@@ -254,10 +257,8 @@ onMounted(() => {
         />
       </el-form-item>
       <el-form-item label="状态">
-        <el-select v-model="query.status" placeholder="全部" clearable>
-          <el-option label="启用" value="ENABLED" />
-          <el-option label="停用" value="DISABLED" />
-        </el-select>
+        <!-- 状态：字典 common_status 消费（DictSelect 统一封装），不再硬编码 -->
+        <DictSelect v-model="query.status" type-code="common_status" placeholder="全部" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>

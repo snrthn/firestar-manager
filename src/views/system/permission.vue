@@ -12,6 +12,7 @@ import {
   deletePermission,
 } from '@/api/permission'
 import type { PermissionFormData, PermissionVO } from '@/types/permission'
+import DictSelect from '@/components/DictSelect.vue'
 
 // ===== 查询条件 =====
 const query = reactive({
@@ -178,10 +179,8 @@ onMounted(() => {
         <el-input v-model="query.permCode" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="状态">
-        <el-select v-model="query.status" placeholder="全部" clearable>
-          <el-option label="启用" value="ENABLED" />
-          <el-option label="停用" value="DISABLED" />
-        </el-select>
+        <!-- 状态：字典 common_status 消费（DictSelect 统一封装），不再硬编码 -->
+        <DictSelect v-model="query.status" type-code="common_status" placeholder="全部" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>
@@ -256,12 +255,12 @@ onMounted(() => {
         <el-input v-model="form.permName" placeholder="请输入权限名称" maxlength="64" show-word-limit />
       </el-form-item>
       <el-form-item label="资源类型" prop="resourceType">
-        <el-select v-model="form.resourceType" class="w-full">
-          <el-option label="API 接口" value="API" />
-          <el-option label="MENU 菜单" value="MENU" />
-          <el-option label="BUTTON 按钮" value="BUTTON" />
-        </el-select>
+        <!-- 资源类型：字典 permission_resource（API/MENU/BUTTON，与 V4 权限种子域值一致） -->
+        <DictSelect v-model="form.resourceType" type-code="permission_resource" placeholder="请选择资源类型" class="w-full" />
       </el-form-item>
+      <!-- ⚠️ 操作类型暂不切字典：真实域值是 READ/WRITE/EXECUTE（V4 种子实锤），
+           而字典 permission_action 是 VIEW/CREATE/UPDATE/DELETE/EXPORT——数据与字典
+           不一致，切了会让存量权限对不上号。应先修字典种子（需用户拍板），见 2026-10-16 汇报。 -->
       <el-form-item label="操作类型" prop="actionType">
         <el-select v-model="form.actionType" class="w-full">
           <el-option label="READ 读取" value="READ" />

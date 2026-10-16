@@ -3,7 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { updateProfile, changePassword } from '@/api/auth'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
-import dayjs from 'dayjs'
+import { formatDateTime as fmt } from '@/utils/datetime'
 import type { FormRules } from 'element-plus'
 
 // 若依风格个人中心：左侧只读信息卡 + 右侧「基本资料 / 修改密码」两个 Tab。
@@ -21,10 +21,6 @@ const statusText = computed(() =>
   profile.value?.status === 'ENABLED' ? '启用' : '禁用'
 )
 const forceChange = computed(() => profile.value?.forceChangePassword === true)
-
-function fmt(dt: string | null | undefined) {
-  return dt ? dayjs(dt).format('YYYY-MM-DD HH:mm:ss') : '—'
-}
 
 // ===== 基本资料 =====
 const baseForm = reactive({ nickname: '', phone: '', email: '' })

@@ -3,7 +3,10 @@ import { onMounted, reactive, ref } from 'vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { listLoginLogs } from '@/api/log'
+import { formatDateTime } from '@/utils/datetime'
 import type { LoginLogVO } from '@/types/log'
+import DictSelect from '@/components/DictSelect.vue'
+import { useDictLabels } from '@/composables/useDict'
 
 // 登录日志：账号模糊 / 状态精确 / 时间区间
 const query = reactive({
@@ -53,17 +56,14 @@ const handleSizeChange = () => {
   loadLogs()
 }
 
+// 结果标签：字典 login_status 消费（下拉与表格同源，字典页维护即生效）。
+// 兜底：空值 '—'，未命中显示原始值（字典缺口一眼可见）。
+const { label: statusLabel } = useDictLabels('login_status')
 function statusTagType(s?: string | null) {
   if (s === 'SUCCESS') return 'success'
   if (s === 'KICKED_OUT') return 'warning'
   if (s === 'FAIL') return 'danger'
   return 'info'
-}
-function statusLabel(s?: string | null) {
-  if (s === 'SUCCESS') return '成功'
-  if (s === 'KICKED_OUT') return '被顶下线'
-  if (s === 'FAIL') return '失败'
-  return s || '—'
 }
 
 onMounted(loadLogs)
@@ -76,11 +76,8 @@ onMounted(loadLogs)
         <el-input v-model="query.username" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="结果">
-        <el-select v-model="query.status" placeholder="全部" clearable style="width: 140px">
-          <el-option label="成功" value="SUCCESS" />
-          <el-option label="失败" value="FAIL" />
-          <el-option label="被顶下线" value="KICKED_OUT" />
-        </el-select>
+        <!-- 结果：字典 login_status 消费（DictSelect 统一封装），不再硬编码 -->
+        <DictSelect v-model="query.status" type-code="login_status" placeholder="全部" />
       </el-form-item>
       <el-form-item label="时间区间">
         <el-date-picker
@@ -115,7 +112,7 @@ onMounted(loadLogs)
         <template #default="{ row }">{{ row.failReason || '—' }}</template>
       </el-table-column>
       <el-table-column prop="loginAt" label="时间" min-width="170">
-        <template #default="{ row }">{{ row.loginAt || '—' }}</template>
+        <template #default="{ row }">{{ formatDateTime(row.loginAt) }}</template>
       </el-table-column>
     </el-table>
 

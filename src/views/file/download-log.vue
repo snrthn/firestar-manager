@@ -3,6 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { listAllDownloadLogs } from '@/api/file'
+import { formatDateTime } from '@/utils/datetime'
 import type { FileDownloadLogVO } from '@/types/file'
 
 // 下载记录（全局，不按文件过滤；菜单「下载记录」独立入口）
@@ -66,7 +67,7 @@ onMounted(loadLogs)
       <el-table-column prop="downloaderName" label="下载人" width="140" />
       <el-table-column prop="downloadIp" label="下载 IP" width="150" />
       <el-table-column prop="downloadedAt" label="下载时间" min-width="170">
-        <template #default="{ row }">{{ row.downloadedAt || '—' }}</template>
+        <template #default="{ row }">{{ formatDateTime(row.downloadedAt) }}</template>
       </el-table-column>
     </el-table>
 

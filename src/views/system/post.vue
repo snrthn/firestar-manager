@@ -7,6 +7,7 @@ import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import { listPosts, createPost, updatePost, deletePost } from '@/api/post'
 import type { PostFormData, PostVO } from '@/types/post'
+import DictSelect from '@/components/DictSelect.vue'
 
 // ===== 查询条件 =====
 const query = reactive({
@@ -173,10 +174,8 @@ onMounted(loadPosts)
         <el-input v-model="query.postCode" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="状态">
-        <el-select v-model="query.status" placeholder="全部" clearable>
-          <el-option label="启用" value="ENABLED" />
-          <el-option label="停用" value="DISABLED" />
-        </el-select>
+        <!-- 状态：字典 common_status 消费（DictSelect 统一封装），不再硬编码 -->
+        <DictSelect v-model="query.status" type-code="common_status" placeholder="全部" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>

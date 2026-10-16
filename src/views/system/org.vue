@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance } from 'element-plus'
-import { Expand, Fold, Plus, Refresh } from '@element-plus/icons-vue'
+import { Expand, Fold, Plus, Refresh, Search } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -9,6 +9,7 @@ import { listOrgs, createOrg, updateOrg, deleteOrg } from '@/api/org'
 import { listUserOptions } from '@/api/user'
 import type { OrgFormData, OrgVO } from '@/types/org'
 import type { UserOptionVO } from '@/types/user'
+import DictSelect from '@/components/DictSelect.vue'
 
 // ===== 列表数据 =====
 const loading = ref(false)
@@ -94,6 +95,40 @@ const loadLeaderOptions = async () => {
     ElMessage.error((e as Error).message)
   }
 }
+
+// ===== 查询条件（树表本地过滤：部门名称关键字 + 状态；命中节点的子孙整体保留）=====
+const query = reactive({ orgName: '', status: '' })
+const appliedQuery = reactive({ orgName: '', status: '' })
+
+const handleQuery = () => {
+  appliedQuery.orgName = query.orgName
+  appliedQuery.status = query.status
+}
+const resetQuery = () => {
+  query.orgName = ''
+  query.status = ''
+  handleQuery()
+}
+
+const matchOrg = (n: OrgVO) => {
+  const nameHit = !appliedQuery.orgName || (n.orgName || '').includes(appliedQuery.orgName)
+  const statusHit = !appliedQuery.status || n.status === appliedQuery.status
+  return nameHit && statusHit
+}
+
+// 递归过滤：自身命中 → 整棵子树保留；否则保留「子孙有命中」的路径节点
+const filterOrgTree = (nodes: OrgVO[]): OrgVO[] =>
+  nodes
+    .map((n) => {
+      if (matchOrg(n)) return n
+      const children = n.children?.length ? filterOrgTree(n.children) : []
+      return children.length ? { ...n, children } : null
+    })
+    .filter((n): n is OrgVO => n !== null)
+
+const filteredOrgTree = computed(() =>
+  appliedQuery.orgName || appliedQuery.status ? filterOrgTree(orgTree.value) : orgTree.value
+)
 
 // ===== 弹窗表单 =====
 const dialogVisible = ref(false)
@@ -221,6 +256,27 @@ onMounted(() => {
 
 <template>
   <el-card shadow="never">
+    <!-- 查询区（树表本地过滤） -->
+    <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
+      <el-form-item label="部门名称">
+        <el-input
+          v-model="query.orgName"
+          placeholder="模糊匹配"
+          clearable
+          @keyup.enter="handleQuery"
+          @clear="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="状态">
+        <!-- 状态：字典 common_status 消费（DictSelect 统一封装），不再硬编码 -->
+        <DictSelect v-model="query.status" type-code="common_status" placeholder="全部" @change="handleQuery" />
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>
+        <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
+      </el-form-item>
+    </el-form>
+
     <div class="toolbar">
       <el-button type="primary" :icon="Plus" @click="openCreate(0)">新增主部门</el-button>
       <el-button :icon="allExpanded ? Fold : Expand" @click="toggleExpandAll">
@@ -231,7 +287,7 @@ onMounted(() => {
 
     <el-table
       v-loading="loading"
-      :data="orgTree"
+      :data="filteredOrgTree"
       row-key="id"
       :expand-row-keys="expandRowKeys"
       :tree-props="{ children: 'children' }"
@@ -311,6 +367,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.query-bar {
+  margin-bottom: 4px;
+}
 .sort-no {
   display: inline-block;
   min-width: 28px;
