@@ -9,9 +9,15 @@ import { dispatchRealtime } from './realtimeDispatch'
  * 连接建立即代表会话有效；被顶号后后端主动推 FORCE_LOGOUT，前端弹模态框并断开。
  * 重连策略：指数退避，但 token 已被清（被踢流程会清）则立即停止，避免空转。
  */
-// 必须带 /api 前缀：开发期经 vite proxy 转发到后端 2025（proxy 剥离 /api），
-// 与 api/*.ts 的请求同一条链路；直连 /auth/stream 会打到前端 dev server 404
-const ENDPOINT = '/api/auth/stream'
+// SSE 统一前缀（2026-10-19 调整）：纳入全站 /api 体系。
+// 生产由 nginx 的 location /api/sse/ 转发（proxy_pass 带尾 URI .../sse/，把 /api 剥掉，
+// 后端收到 /sse/realtime）；开发期由 vite proxy 的 '/api/sse' 规则（rewrite 剥 /api）
+// 转发到后端 2025，见 vite.config.ts。
+//
+// 为什么带 /api：此前 ENDPOINT 是 /sse/realtime（裸前缀例外），每次新增 SSE 流 nginx
+// 要复制一段 location。现在统一走 /api，nginx 只需 location /api/sse/ 一条，后续
+// /api/sse/xxx 全部自动继承，本常量也不用再动。
+const ENDPOINT = '/api/sse/realtime'
 const RETRY_BASE_MS = 2000
 const RETRY_MAX_MS = 30000
 
