@@ -2,10 +2,6 @@
   <div class="login-container">
     <el-form :model="form" class="login-form" @submit.prevent="onSubmit">
       <h2 class="title">火星财务 · 登录</h2>
-      <!-- 研发阶段临时展示：正式上线前移除 -->
-      <div class="dev-hint">
-        <span>默认账号：<code>admin</code> / 密码：<code>admin123</code></span>
-      </div>
       <el-form-item>
         <el-input v-model="form.username" placeholder="用户名" size="large" clearable>
           <template #prepend>账号</template>
@@ -96,25 +92,6 @@ async function onSubmit() {
   margin: 0 0 24px;
   font-size: 20px;
   color: #1f2937;
-}
-.dev-hint {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin: 0 0 18px;
-  padding: 8px 12px;
-  font-size: 12px;
-  color: #92400e;
-  background: #fef3c7;
-  border: 1px solid #fde68a;
-  border-radius: 6px;
-}
-.dev-hint code {
-  padding: 0 4px;
-  font-family: monospace;
-  background: rgba(0, 0, 0, 0.06);
-  border-radius: 3px;
 }
 .err {
   color: #f56c6c;
