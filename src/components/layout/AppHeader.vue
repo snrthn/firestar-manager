@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Fold,
@@ -9,11 +9,15 @@ import {
   ArrowDown,
   SwitchButton,
   User,
+  InfoFilled,
 } from '@element-plus/icons-vue'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { useUserStore } from '@/stores/user'
+import { getAbout } from '@/api/config'
 import AppBreadcrumb from './AppBreadcrumb.vue'
+import RichView from '@/components/RichView.vue'
+import { useAvatar } from '@/composables/useAvatar'
 
 // props 供模板直接按名使用（script 内不引用，故不接 const 绑定，避免 noUnusedLocals 误伤）
 defineProps<{ collapsed: boolean; compact: boolean }>()
@@ -25,8 +29,10 @@ const router = useRouter()
 const nickname = computed(
   () => userStore.userInfo?.nickname || userStore.userInfo?.username || '管理员'
 )
-// 头像占位：取昵称首字（后续可换真实头像 URL）
+// 头像占位：取昵称首字（有真实头像图时优先显示图，见模板）
 const initial = computed(() => (nickname.value || '管').slice(0, 1))
+// 真实头像：后端存 sys_file_storage.id，经 useAvatar 解析为可渲染地址（OSS 直连 / 本地 blob）
+const avatarSrc = useAvatar(computed(() => userStore.userInfo?.avatarUrl))
 
 const userMenuOpen = ref(false)
 function toggleUserMenu() {
@@ -61,6 +67,40 @@ function toggleFullscreen() {
     document.exitFullscreen?.()
   }
 }
+
+// ===== 关于我们弹窗（数据来自 /system/config/about，登录即可访问） =====
+const aboutVisible = ref(false)
+const aboutLoading = ref(false)
+const aboutData = reactive<{
+  systemName: string
+  icpNo: string
+  supportContact: string
+  aboutUs: string
+  appVersion: string
+}>({
+  systemName: '',
+  icpNo: '',
+  supportContact: '',
+  aboutUs: '',
+  appVersion: '',
+})
+
+// 弹窗标题：关于我们 - {系统名}
+const aboutTitle = computed(() => `关于我们 - ${aboutData.systemName || '火星财务'}`)
+
+async function openAbout() {
+  userMenuOpen.value = false
+  aboutVisible.value = true
+  aboutLoading.value = true
+  try {
+    const d = await getAbout()
+    Object.assign(aboutData, d)
+  } catch {
+    ElMessage.error('加载关于信息失败')
+  } finally {
+    aboutLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -86,7 +126,8 @@ function toggleFullscreen() {
       </button>
 
       <div class="user" @click="toggleUserMenu">
-        <span class="avatar">{{ initial }}</span>
+        <img v-if="avatarSrc" :src="avatarSrc" class="avatar-img" :alt="nickname" />
+        <span v-else class="avatar">{{ initial }}</span>
         <span class="uname">{{ nickname }}</span>
         <el-icon :size="14" class="caret"><ArrowDown /></el-icon>
 
@@ -94,6 +135,10 @@ function toggleFullscreen() {
           <div class="user-menu-item" @click.stop="goProfile">
             <el-icon :size="15"><User /></el-icon>
             <span>个人中心</span>
+          </div>
+          <div class="user-menu-item" @click.stop="openAbout">
+            <el-icon :size="15"><InfoFilled /></el-icon>
+            <span>关于我们</span>
           </div>
           <div class="user-menu-item" @click.stop="handleLogout">
             <el-icon :size="15"><SwitchButton /></el-icon>
@@ -106,6 +151,23 @@ function toggleFullscreen() {
     <!-- 点击空白关闭用户菜单 -->
     <div v-if="userMenuOpen" class="user-menu-mask" @click="userMenuOpen = false" />
   </header>
+
+  <!-- 关于我们弹窗 -->
+  <el-dialog v-model="aboutVisible" :title="aboutTitle" width="480px" append-to-body>
+    <div v-loading="aboutLoading" class="about-body">
+      <div class="about-meta">
+        <p v-if="aboutData.supportContact" class="about-row">
+          技术支持：{{ aboutData.supportContact }}
+        </p>
+        <p v-if="aboutData.appVersion" class="about-row">版本：{{ aboutData.appVersion }}</p>
+      </div>
+      <p v-if="aboutData.icpNo" class="about-row">ICP 备案号：{{ aboutData.icpNo }}</p>
+      <RichView v-if="aboutData.aboutUs" :html="aboutData.aboutUs" class="about-notice" />
+    </div>
+    <template #footer>
+      <el-button type="primary" @click="aboutVisible = false">知道了</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <style scoped>
@@ -192,6 +254,13 @@ function toggleFullscreen() {
   font-size: 14px;
   font-weight: 600;
 }
+.avatar-img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--el-fill-color-light, #f5f7fa);
+}
 .uname {
   font-size: 14px;
   color: #303133;
@@ -233,5 +302,31 @@ function toggleFullscreen() {
   position: fixed;
   inset: 0;
   z-index: 10;
+}
+.about-body {
+  min-height: 80px;
+}
+/* 技术支持 / 版本一行两端对齐 */
+.about-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.about-meta .about-row {
+  margin: 0;
+}
+.about-row {
+  margin: 6px 0;
+  font-size: 14px;
+  color: #606266;
+}
+.about-notice {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #ebeef5;
+  font-size: 13px;
+  color: #909399;
+  line-height: 1.7;
 }
 </style>

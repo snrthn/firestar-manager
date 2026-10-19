@@ -47,6 +47,8 @@ export interface ProfileVO {
   lastLoginIp: string | null
   /** 直属上级名称（后端按 parentId 回填） */
   parentName: string | null
+  /** 头像文件ID（sys_file_storage.id）；为空则前端昵称首字兜底 */
+  avatarUrl: string | null
 }
 
 /** 当前用户自助更新资料请求体（昵称 / 手机号 / 邮箱） */

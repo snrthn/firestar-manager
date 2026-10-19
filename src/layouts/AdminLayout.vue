@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, provide, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, provide, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useTabsStore } from '@/stores/tabs'
 import { useUserStore } from '@/stores/user'
 import { useBreakpoint } from '@/composables/useBreakpoint'
+import { listPending, consent } from '@/api/agreement'
+import type { AgreementVO } from '@/types/agreement'
+import RichView from '@/components/RichView.vue'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import AppTabs from '@/components/layout/AppTabs.vue'
@@ -14,6 +17,7 @@ const tabsStore = useTabsStore()
 const userStore = useUserStore()
 const { isCompact } = useBreakpoint()
 const route = useRoute()
+const router = useRouter()
 
 // 页签右键「刷新当前页」：自增 reloadKey 强制 router-view 下的组件重新挂载。
 // AdminLayout provide 出去，AppTabs 的「刷新」菜单项 inject 调用。
@@ -51,6 +55,53 @@ watch(
   },
   { immediate: true }
 )
+
+// ===== 协议强制确认弹层（P1） =====
+// 钉死：不放 router.beforeEach；放 AdminLayout onMounted；不可绕过（modal 遮罩挡内容区）。
+// 队列式确认：pending 多条时逐条展示，全部同意后才放行进站。
+const pendingList = ref<AgreementVO[]>([])
+const agreeIdx = ref(0)
+const agreeing = ref(false)
+
+const currentAgree = computed<AgreementVO | null>(
+  () => pendingList.value[agreeIdx.value] ?? null
+)
+// el-dialog 用单向 model-value：遮罩/ESC/关闭按钮全部禁用，用户无法绕过
+const showAgree = computed(
+  () => pendingList.value.length > 0 && agreeIdx.value < pendingList.value.length
+)
+
+async function checkPending() {
+  try {
+    const list = await listPending()
+    pendingList.value = Array.isArray(list) ? list : []
+    agreeIdx.value = 0
+  } catch {
+    // 拉取失败不影响主流程进站（协议弹层是增强项，不是进站闸门）
+    pendingList.value = []
+  }
+}
+
+async function agreeCurrent() {
+  const cur = currentAgree.value
+  if (!cur) return
+  agreeing.value = true
+  try {
+    await consent(cur.agreementId, { versionId: cur.versionId, channel: 'LOGIN' })
+    agreeIdx.value++
+  } catch {
+    // 同意失败则停留当前条，等待用户重试
+  } finally {
+    agreeing.value = false
+  }
+}
+
+async function refuseAll() {
+  await userStore.logout()
+  router.push('/login')
+}
+
+onMounted(checkPending)
 </script>
 
 <template>
@@ -104,6 +155,39 @@ watch(
     >
       <AppSidebar :collapsed="false" />
     </aside>
+
+    <!-- 协议强制确认弹层：不可绕过（modal 遮罩挡内容区，禁止点遮罩/ESC/关闭按钮关） -->
+    <el-dialog
+      :model-value="showAgree"
+      :title="currentAgree?.needReconsent ? '协议已更新，请重新确认' : '请阅读并同意用户协议'"
+      width="720px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      append-to-body
+      class="agree-dialog"
+    >
+      <div v-if="currentAgree" class="agree-body">
+        <div class="agree-name">
+          {{ currentAgree.name }}
+          <el-tag size="small" effect="plain" class="agree-ver">{{ currentAgree.version }}</el-tag>
+        </div>
+        <div v-if="currentAgree.changeSummary" class="agree-summary">
+          变更摘要：{{ currentAgree.changeSummary }}
+        </div>
+        <RichView
+          v-if="currentAgree.content"
+          :html="currentAgree.content"
+          class="agree-content"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="refuseAll">不同意，退出登录</el-button>
+        <el-button type="primary" :loading="agreeing" @click="agreeCurrent">
+          同意并继续
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -169,5 +253,33 @@ watch(
 }
 .drawer.show {
   transform: translateX(0);
+}
+
+/* 协议弹层 */
+.agree-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.agree-ver {
+  font-weight: 400;
+}
+.agree-summary {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #909399;
+}
+.agree-content {
+  margin-top: 12px;
+  max-height: 50vh;
+  overflow: auto;
+  word-break: break-word;
+  color: #303133;
+  background: var(--el-fill-color-light, #f5f7fa);
+  border-radius: 6px;
+  padding: 12px;
 }
 </style>

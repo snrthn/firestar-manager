@@ -68,6 +68,12 @@ import ElUpload from 'element-plus/es/components/upload/index.mjs'
 // 日期选择器（登录/操作日志「时间区间」查询）：同理必须显式注册，
 // 否则区间控件整个不渲染，查询栏只剩「时间区间」四个裸文字。
 import ElDatePicker from 'element-plus/es/components/date-picker/index.mjs'
+// 栅格布局（协议管理页双栏：当前正文 14 / 版本历史 10）：
+// row 和 col 是两个独立包目录（es/components/row、es/components/col），各自注册。
+// 未注册时 Vue 把 <el-row>/<el-col> 当未知自定义元素渲染，控制台
+// "Failed to resolve component" 警告且双栏布局塌成纵向堆叠（2026-10-19 实锤）。
+import ElRow from 'element-plus/es/components/row/index.mjs'
+import ElCol from 'element-plus/es/components/col/index.mjs'
 // 与上方组件一一对应的样式（每个组件的 style/css 内部会带入 theme-chalk base 样式）
 import 'element-plus/es/components/alert/style/css'
 import 'element-plus/es/components/button/style/css'
@@ -109,6 +115,9 @@ import 'element-plus/es/components/tabs/style/css'
 import 'element-plus/es/components/scrollbar/style/css'
 import 'element-plus/es/components/upload/style/css'
 import 'element-plus/es/components/date-picker/style/css'
+// 栅格 row/col 样式（col 的 width 百分比、row 的 flex/gutter 负 margin 都在这两个包内）
+import 'element-plus/es/components/row/style/css'
+import 'element-plus/es/components/col/style/css'
 import '@/styles/reset.css'
 import '@/styles/theme.css'
 import '@/styles/pages.css'
@@ -152,6 +161,9 @@ app.use(ElTree)
 app.use(ElMenu)
 app.use(ElSubMenu)
 app.use(ElMenuItem)
+// 栅格布局（协议管理页双栏）
+app.use(ElRow)
+app.use(ElCol)
 app.use(ElTabs)
 app.use(ElTabPane)
 app.use(ElScrollbar)

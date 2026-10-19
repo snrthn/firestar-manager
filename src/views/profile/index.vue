@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import { Camera } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { updateProfile, changePassword } from '@/api/auth'
+import { listConsents, withdraw } from '@/api/agreement'
+import { updateAvatar } from '@/api/profile'
+import { useAvatar } from '@/composables/useAvatar'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
+import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import { formatDateTime as fmt } from '@/utils/datetime'
 import type { FormRules } from 'element-plus'
+import type { AgreementVO } from '@/types/agreement'
 
-// 若依风格个人中心：左侧只读信息卡 + 右侧「基本资料 / 修改密码」两个 Tab。
+// 若依风格个人中心：左侧只读信息卡 + 右侧「基本资料 / 修改密码 / 隐私与协议」三个 Tab。
 // 数据直接读登录后已就绪的 userInfo（ProfileVO），无需额外拉取。
 const userStore = useUserStore()
 const profile = computed(() => userStore.userInfo)
@@ -14,6 +20,8 @@ const profile = computed(() => userStore.userInfo)
 const initial = computed(
   () => (profile.value?.nickname || profile.value?.username || '管').slice(0, 1)
 )
+// 真实头像：后端存 sys_file_storage.id，经 useAvatar 解析为可渲染地址
+const avatarSrc = useAvatar(computed(() => profile.value?.avatarUrl))
 const statusType = computed(() =>
   profile.value?.status === 'ENABLED' ? 'success' : 'danger'
 )
@@ -111,6 +119,74 @@ async function savePwd() {
     pwdSaving.value = false
   }
 }
+
+// ===== 头像上传（免 file:manage，走 /system/profile/avatar） =====
+async function uploadAvatar(options: { file: File }) {
+  const form = new FormData()
+  form.append('file', options.file)
+  try {
+    await updateAvatar(form)
+    // 回写 userInfo.avatarUrl，让 header 头像同步刷新
+    await userStore.fetchProfile()
+    ElMessage.success('头像已更新')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '头像上传失败')
+  }
+}
+
+function beforeAvatar(file: File) {
+  const okType =
+    file.type === 'image/jpeg' ||
+    file.type === 'image/png' ||
+    file.type === 'image/gif' ||
+    file.type === 'image/webp'
+  if (!okType) {
+    ElMessage.error('头像仅支持 JPG / PNG / GIF / WEBP 图片')
+    return false
+  }
+  const max = 2 * 1024 * 1024
+  if (file.size > max) {
+    ElMessage.error('头像大小不能超过 2MB')
+    return false
+  }
+  return true
+}
+
+// ===== 隐私与协议（个人中心：已同意列表 + 撤回） =====
+const consents = ref<AgreementVO[]>([])
+const consentLoading = ref(false)
+
+async function loadConsents() {
+  consentLoading.value = true
+  try {
+    consents.value = await listConsents()
+  } catch {
+    ElMessage.error('加载协议同意记录失败')
+  } finally {
+    consentLoading.value = false
+  }
+}
+// 切到该 Tab 时加载（初始进入个人中心不一定在该 Tab，故 onMounted 先拉一次）
+loadConsents()
+
+async function withdrawAgreement(item: AgreementVO) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要撤回对《${item.name}》的同意吗？撤回后相关功能可能受限。`,
+      '撤回确认',
+      { type: 'warning', confirmButtonText: '撤回', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await withdraw(item.agreementId, { versionId: item.versionId })
+    ElMessage.success('已撤回同意')
+    await loadConsents()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '撤回失败')
+  }
+}
 </script>
 
 <template>
@@ -118,7 +194,22 @@ async function savePwd() {
     <!-- 左侧：只读信息卡（若依个人中心左侧栏） -->
     <el-card class="info-card" shadow="hover">
       <div class="info-head">
-        <span class="avatar">{{ initial }}</span>
+        <el-upload
+          class="avatar-uploader"
+          :show-file-list="false"
+          :http-request="uploadAvatar"
+          accept="image/*"
+          :before-upload="beforeAvatar"
+        >
+          <div class="avatar-wrap">
+            <img v-if="avatarSrc" :src="avatarSrc" class="avatar-img" :alt="profile?.nickname" />
+            <span v-else class="avatar">{{ initial }}</span>
+            <div class="avatar-mask">
+              <el-icon :size="18"><Camera /></el-icon>
+              <span>更换</span>
+            </div>
+          </div>
+        </el-upload>
         <div class="info-name">{{ profile?.nickname || profile?.username }}</div>
         <div class="info-roles">
           <el-tag
@@ -155,7 +246,7 @@ async function savePwd() {
       </el-descriptions>
     </el-card>
 
-    <!-- 右侧：基本资料 / 修改密码 -->
+    <!-- 右侧：基本资料 / 修改密码 / 隐私与协议 -->
     <el-card class="main-card" shadow="hover">
       <el-tabs>
         <el-tab-pane label="基本资料">
@@ -224,6 +315,44 @@ async function savePwd() {
             </el-form-item>
           </el-form>
         </el-tab-pane>
+
+        <!-- 隐私与协议：当前用户对各协议的同意记录，可撤回 -->
+        <el-tab-pane label="隐私与协议">
+          <div v-loading="consentLoading" class="consent-list">
+            <el-empty v-if="!consentLoading && consents.length === 0" description="暂无协议记录" />
+            <div v-for="item in consents" :key="item.agreementId" class="consent-item">
+              <div class="consent-info">
+                <div class="consent-name">
+                  {{ item.name }}
+                  <el-tag size="small" effect="plain" class="consent-ver">{{ item.version }}</el-tag>
+                </div>
+                <div class="consent-meta">
+                  <span>
+                    状态：
+                    <el-tag
+                      :type="item.lastAction === 'AGREE' ? 'success' : 'info'"
+                      size="small"
+                      effect="light"
+                    >
+                      {{ item.lastAction === 'AGREE' ? '已同意' : item.lastAction === 'WITHDRAW' ? '已撤回' : '未处理' }}
+                    </el-tag>
+                  </span>
+                  <span v-if="item.consentedAt" class="consent-time">
+                    同意时间：{{ fmt(item.consentedAt) }}
+                  </span>
+                </div>
+              </div>
+              <el-button
+                v-if="item.lastAction === 'AGREE'"
+                size="small"
+                type="danger"
+                plain
+                @click="withdrawAgreement(item)"
+              >撤回同意</el-button>
+              <el-tag v-else size="small" type="info" effect="plain">不可撤回</el-tag>
+            </div>
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </el-card>
   </div>
@@ -276,6 +405,42 @@ async function savePwd() {
   font-size: 26px;
   font-weight: 600;
 }
+/* 头像上传包裹层：hover 显示「更换」遮罩，点击触发 el-upload */
+.avatar-uploader {
+  line-height: 0;
+}
+.avatar-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  cursor: pointer;
+}
+.avatar-wrap .avatar-img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  background: var(--el-fill-color-light, #f5f7fa);
+}
+.avatar-mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.avatar-wrap:hover .avatar-mask {
+  opacity: 1;
+}
 .info-name {
   margin-top: 12px;
   font-size: 16px;
@@ -316,5 +481,39 @@ async function savePwd() {
 .profile-form {
   max-width: 480px;
   padding-top: 8px;
+}
+
+/* 隐私与协议列表 */
+.consent-list {
+  min-height: 120px;
+}
+.consent-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+}
+.consent-item:last-child {
+  border-bottom: none;
+}
+.consent-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.consent-ver {
+  font-weight: 400;
+}
+.consent-meta {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  color: #909399;
 }
 </style>

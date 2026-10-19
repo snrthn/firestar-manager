@@ -11,7 +11,7 @@ dist-ssr/
 # dist_v11 / dist_v12 就是这么被误提交进 73e0d95 的——当时只挡了 dist/。
 # 版本化产物本质和 dist/ 一样是构建垃圾，不该进历史，否则仓库被几 MB 的
 # 前端 bundle 污染，且同样有"某天产物里夹了不该出的东西"的泄露风险。
-dist_v*/
+dist*/
 # 临时验证构建目录（如 `vite build --outDir .pb_tmp` 的产物），非生产输出，不入库
 .pb_tmp*/
 
