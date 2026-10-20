@@ -49,8 +49,8 @@ watch(
     :placeholder="placeholder"
     :clearable="clearable"
     :disabled="disabled"
-    @update:model-value="emit('update:modelValue', $event as string)"
-    @change="emit('change', $event as string)"
+    @update:model-value="emit('update:modelValue', ($event ?? '') as string)"
+    @change="emit('change', ($event ?? '') as string)"
   >
     <el-option v-for="o in options" :key="o.value" :label="o.label" :value="o.value" />
   </el-select>

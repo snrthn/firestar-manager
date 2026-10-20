@@ -18,6 +18,10 @@ import ElCard from 'element-plus/es/components/card/index.mjs'
 // provide zh-cn，el-pagination 等内置文案即恢复中文。
 // 注意：config-provider 是纯逻辑组件（只 provide context），无独立样式文件。
 import ElConfigProvider from 'element-plus/es/components/config-provider/index.mjs'
+// 帮助中心 FAQ 折叠（V32）：collapse / collapse-item 无独立包目录的 item 从入口具名导出
+import ElCollapse, { ElCollapseItem } from 'element-plus/es/components/collapse/index.mjs'
+// 问题反馈详情抽屉（V32）
+import ElDrawer from 'element-plus/es/components/drawer/index.mjs'
 // 注意：ElDescriptionsItem / ElFormItem 没有独立 index.mjs（子组件从父入口导出），
 // 从 descriptions / form 的入口具名 import；该入口是叶节点，只拉自身 src 依赖。
 import ElDescriptions, { ElDescriptionsItem } from 'element-plus/es/components/descriptions/index.mjs'
@@ -128,6 +132,10 @@ import 'element-plus/es/components/date-picker/style/css'
 // 栅格 row/col 样式（col 的 width 百分比、row 的 flex/gutter 负 margin 都在这两个包内）
 import 'element-plus/es/components/row/style/css'
 import 'element-plus/es/components/col/style/css'
+// 帮助中心折叠 + 反馈抽屉样式（V32；drawer 浮层同 dialog 依赖 overlay，已在上方引入）
+import 'element-plus/es/components/collapse/style/css'
+import 'element-plus/es/components/collapse-item/style/css'
+import 'element-plus/es/components/drawer/style/css'
 import '@/styles/reset.css'
 import '@/styles/theme.css'
 import '@/styles/pages.css'
@@ -143,6 +151,10 @@ app.use(ElAlert)
 app.use(ElButton)
 app.use(ElCard)
 app.use(ElConfigProvider)
+// 帮助中心折叠 + 问题反馈抽屉（V32）
+app.use(ElCollapse)
+app.use(ElCollapseItem)
+app.use(ElDrawer)
 app.use(ElDescriptions)
 app.use(ElDescriptionsItem)
 app.use(ElDialog)

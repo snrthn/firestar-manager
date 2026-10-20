@@ -11,6 +11,8 @@ import {
   User,
   InfoFilled,
   Bell,
+  QuestionFilled,
+  ChatDotRound,
 } from '@element-plus/icons-vue'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
@@ -54,6 +56,19 @@ function goProfile() {
   router.push('/profile')
 }
 
+// 帮助中心 / 问题反馈（V32，虎哥 2026-10-21 拍板：帮助中心挪到 header 图标区
+// （铃铛与全屏之间）；问题反馈留在头像下拉。均为隐藏菜单 + 路由跳页，
+// 问题反馈页挂载了 window.__feedbackRefresh 钩子做 SSE 联动刷新）
+function goHelp() {
+  userMenuOpen.value = false
+  router.push('/help')
+}
+
+function goFeedback() {
+  userMenuOpen.value = false
+  router.push('/system/feedback')
+}
+
 async function handleLogout() {
   userMenuOpen.value = false
   try {
@@ -94,12 +109,12 @@ async function onNotifyClick(n: NotificationVO) {
   detailVisible.value = true
 }
 
-/** 详情弹窗内跳转：站内相对路径走 router，http(s):// 外链新标签打开（2026-10-20 虎哥要求双支持） */
+/** 详情弹窗内跳转：站内相对路径走 router，http(s):// 外链新标签打开（2026-10-20 虎哥要求双支持）。
+ *  无 linkUrl 的通知兜底跳问题反馈页（2026-10-21 虎哥要求：详情弹窗必给「查看详情」出口） */
 function goDetailLink() {
-  const link = detailItem.value?.linkUrl
+  const link = detailItem.value?.linkUrl || '/system/feedback'
   detailVisible.value = false
   notify.closePanel()
-  if (!link) return
   if (link.startsWith('/')) {
     router.push(link)
   } else {
@@ -179,7 +194,12 @@ async function openAbout() {
     </div>
 
     <div class="header-right">
-      <!-- 通知铃铛：全屏按钮旁、头像左边（用户侧功能，无权限点） -->
+      <!-- 帮助中心：铃铛与全屏之间（V32，虎哥 2026-10-21 拍板） -->
+      <button class="icon-btn" type="button" title="帮助中心" @click="goHelp">
+        <el-icon :size="16"><QuestionFilled /></el-icon>
+      </button>
+
+      <!-- 通知铃铛：用户侧功能，无权限点 -->
       <el-badge
         :value="notify.unreadCount"
         :max="99"
@@ -205,6 +225,10 @@ async function openAbout() {
           <div class="user-menu-item" @click.stop="goProfile">
             <el-icon :size="15"><User /></el-icon>
             <span>个人中心</span>
+          </div>
+          <div class="user-menu-item" @click.stop="goFeedback">
+            <el-icon :size="15"><ChatDotRound /></el-icon>
+            <span>问题反馈</span>
           </div>
           <div class="user-menu-item" @click.stop="openAbout">
             <el-icon :size="15"><InfoFilled /></el-icon>
@@ -290,7 +314,8 @@ async function openAbout() {
     </div>
     <template #footer>
       <el-button @click="detailVisible = false">关闭</el-button>
-      <el-button v-if="detailItem?.linkUrl" type="primary" @click="goDetailLink">查看详情</el-button>
+      <!-- 查看详情：有 linkUrl 跳链接，无则兜底问题反馈页（2026-10-21 虎哥要求常显） -->
+      <el-button type="primary" @click="goDetailLink">查看详情</el-button>
     </template>
   </el-dialog>
 </template>

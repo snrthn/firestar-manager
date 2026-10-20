@@ -41,8 +41,23 @@ export function dispatchRealtime(type: string, data: unknown) {
           })
         }
       }
+      // 问题反馈页若挂载中，联动刷新列表/详情（反馈事件已并入通知中枢，2026-10-21）
+      refreshFeedbackPage()
+      break
+    // ===== 问题反馈（V32 遗留事件名）：后端已并入通知中枢（NOTIFY），保留 case 防未知警告，
+    // 只做页内刷新不再弹提醒（避免与 NOTIFY 的轻提醒重复，2026-10-21） =====
+    case 'FEEDBACK_CREATED':
+    case 'FEEDBACK_MESSAGE':
+    case 'FEEDBACK_STATUS':
+      refreshFeedbackPage()
       break
     default:
       console.warn('[realtime] unknown event type:', type, payload)
   }
+}
+
+/** 问题反馈页挂载时注册的刷新钩子（feedback.vue 写入 window.__feedbackRefresh） */
+function refreshFeedbackPage() {
+  const refresh = (window as unknown as Record<string, unknown>).__feedbackRefresh
+  if (typeof refresh === 'function') refresh()
 }
