@@ -61,7 +61,7 @@
 
       <!-- 键值管理：独立 Tab，不再共享在所有 Tab 下 -->
       <el-tab-pane label="键值管理" name="adv">
-        <div class="pt-adv-tip">全部配置项的原始键值（仅运营明确需要时在此调整）。</div>
+        <div class="pt-adv-tip">系统级原始键值（基本信息 / 关于我们 Tab 中维护的项已不在此表，请到对应 Tab 修改）。</div>
         <el-table :data="advRows" size="default" border stripe>
           <el-table-column prop="configKey" label="键" width="280" />
           <el-table-column prop="remark" label="说明" min-width="260" show-overflow-tooltip />
@@ -112,11 +112,27 @@ const savingAbout = ref(false)
 const advRows = ref<ConfigItemVO[]>([])
 const savingAdv = ref(false)
 
-/** 把后端分组 config 拍平，并按 key 回填到结构化表单 + 键值表 */
+/**
+ * 已在基本信息 / 关于我们 Tab 结构化维护的 key（2026-10-20 虎哥要求去重）：
+ * 这些项此前在键值表里重复出现——同一处数据两个入口可改，容易改串。
+ * 键值表只保留剩余的系统级原始键值。
+ */
+const STRUCTURED_KEYS = new Set([
+  'system_name',
+  'logo_url',
+  'icp_no',
+  'support_contact',
+  'app_version',
+  'login_notice',
+  'notify_global_switch',
+  'about_us',
+])
+
+/** 把后端分组 config 拍平，按 key 回填结构化表单；键值表剔除已结构化维护的 key */
 function applyGroup(group: Record<string, ConfigItemVO[]>) {
   const flat: ConfigItemVO[] = []
   Object.values(group).forEach((list) => flat.push(...list))
-  advRows.value = flat.map((c) => ({ ...c }))
+  advRows.value = flat.filter((c) => !STRUCTURED_KEYS.has(c.configKey)).map((c) => ({ ...c }))
 
   const get = (key: string) => flat.find((c) => c.configKey === key)?.configValue ?? ''
   basicForm.system_name = get('system_name')

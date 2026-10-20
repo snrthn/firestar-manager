@@ -173,12 +173,15 @@ async function handleCopyLink() {
     :fullscreen="fullscreen"
     append-to-body
   >
-    <!-- is-media：PDF/视频给稳定最小高度（加载中容器不塌）；
-         图片/音频 hug 内容——全局 min-height 会让宽扁图片下方一片留白（2026-10-16 虎哥实测） -->
+    <!-- is-media：PDF/视频常驻稳定最小高度（加载中容器不塌）；
+         is-img：图片仅在加载中（mode 就绪但 src 为空、loading=true，容器零子元素）
+         占位防塌陷，加载完成后撤掉 hug 内容——
+         2026-10-20 虎哥要求补图片加载中塌陷；2026-10-16 否掉的「全局 min-height
+         宽扁发票图下方留白」是全屏场景，本次不涉及 -->
     <div
       v-loading="loading"
       class="preview-body"
-      :class="{ 'is-full': fullscreen, 'is-media': mode === 'pdf' || mode === 'video' }"
+      :class="{ 'is-full': fullscreen, 'is-media': mode === 'pdf' || mode === 'video', 'is-img': mode === 'image' && loading }"
     >
       <img v-if="mode === 'image' && src" :src="src" :alt="displayName" class="preview-img" />
       <iframe v-else-if="mode === 'pdf' && src" :src="src" class="preview-pdf" frameborder="0" />
@@ -225,10 +228,15 @@ async function handleCopyLink() {
   align-items: center;
   justify-content: center;
 }
-/* PDF/视频保留稳定最小高度（加载中容器不塌陷）；图片/音频 hug 内容。
+/* PDF/视频保留稳定最小高度（加载中容器不塌陷）；图片/音频加载完成后 hug 内容。
    2026-10-16 虎哥实测：min-height 320px 挂在全局时，宽扁图片（如发票扫描件）
-   被 flex 居中后下方一片留白——故只给需要占位的媒体模式 */
+   被 flex 居中后下方一片留白——故只给需要占位的媒体模式常驻；
+   2026-10-20 虎哥要求：图片补加载中防塌陷。is-img 仅在 loading 期间生效
+   （mode='image' 且 src 未就绪，flex 容器零子元素高度=0），图片渲染后即撤，零留白 */
 .preview-body.is-media {
+  min-height: 320px;
+}
+.preview-body.is-img {
   min-height: 320px;
 }
 .preview-img {
