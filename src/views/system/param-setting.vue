@@ -87,11 +87,13 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getGroup, updateValues } from '../../api/config'
+import { useAppStore } from '@/stores/app'
 import AgreementManage from './agreement-manage.vue'
 import RichEditor from '@/components/RichEditor.vue'
 import type { ConfigItemVO } from '../../types/agreement'
 
 const activeTab = ref('basic')
+const appStore = useAppStore()
 
 // 基本信息 / 关于我们 表单
 const basicForm = reactive({
@@ -150,6 +152,8 @@ async function saveBasic() {
   try {
     await updateValues({ ...basicForm })
     ElMessage.success('基本信息已保存')
+    // 保存即生效：系统名 / Logo 变了，侧栏品牌标识立刻跟着变（force 重拉一次）
+    appStore.loadBrand(true)
   } finally {
     savingBasic.value = false
   }

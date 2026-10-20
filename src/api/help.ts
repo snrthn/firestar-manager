@@ -19,6 +19,7 @@ export function pageHelpArticles(params: {
   pageNum?: number
   pageSize?: number
   keyword?: string
+  category?: string
 }) {
   return request
     .get('/system/help/page', { params })

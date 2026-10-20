@@ -19,10 +19,24 @@ const activePath = computed(() => route.path)
 
 <template>
   <aside class="app-sidebar" :class="{ collapsed }">
-    <!-- 侧栏通顶：顶部 logo 条（折叠态只保留「火」） -->
+    <!-- 侧栏通顶：顶部 logo 条。
+         虎哥 2026-10-21：参数配置里填了 logo_url 就优先用链接显示图片（折叠态也留小图）；
+         未配置或图片加载失败（坏链/跨域拒绝）时回落「火」字块 + 系统名 -->
     <div class="logo">
-      <span class="logo-mark">火</span>
-      <span v-if="!collapsed" class="logo-text">{{ appStore.title }}</span>
+      <template v-if="appStore.logoUrl">
+        <img
+          :src="appStore.logoUrl"
+          class="logo-img"
+          :class="{ 'logo-img-sm': collapsed }"
+          :alt="appStore.title"
+          @error="appStore.markLogoBroken()"
+        />
+        <span v-if="!collapsed" class="logo-text">{{ appStore.title }}</span>
+      </template>
+      <template v-else>
+        <span class="logo-mark">火</span>
+        <span v-if="!collapsed" class="logo-text">{{ appStore.title }}</span>
+      </template>
     </div>
 
     <!-- 菜单区：el-menu 接管激活/折叠/层级，el-scrollbar 负责滚动 -->
@@ -76,6 +90,18 @@ const activePath = computed(() => route.path)
   font-size: 15px;
   font-weight: 700;
   flex-shrink: 0;
+}
+/* 自定义 Logo：contain 保持比例不裁切，30px 与「火」字块同高 */
+.logo-img {
+  height: 30px;
+  max-width: 120px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 6px;
+}
+/* 折叠态收窄，避免长图把侧栏撑宽 */
+.logo-img-sm {
+  max-width: 30px;
 }
 .logo-text {
   font-size: 16px;

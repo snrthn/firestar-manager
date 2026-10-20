@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import {
@@ -24,7 +25,7 @@ const { label: categoryLabel } = useDictLabels('help_category')
 const rows = ref<HelpArticle[]>([])
 const total = ref(0)
 const loading = ref(false)
-const query = reactive({ pageNum: 1, pageSize: 10, keyword: '' })
+const query = reactive({ pageNum: 1, pageSize: 10, keyword: '', category: '' })
 
 async function load() {
   loading.value = true
@@ -33,6 +34,7 @@ async function load() {
       pageNum: query.pageNum,
       pageSize: query.pageSize,
       keyword: query.keyword || undefined,
+      category: query.category || undefined,
     })
     rows.value = page.records || []
     total.value = Number(page.total || 0)
@@ -47,6 +49,19 @@ onMounted(load)
 
 // 切换每页条数回到第一页（同 user.vue 口径，否则可能停在不存在的页码上）
 function handleSizeChange() {
+  query.pageNum = 1
+  load()
+}
+
+// 查询 / 重置（与 user.vue 等列表页同款查询区，虎哥 2026-10-21 统一）
+function handleQuery() {
+  query.pageNum = 1
+  load()
+}
+
+function resetQuery() {
+  query.keyword = ''
+  query.category = ''
   query.pageNum = 1
   load()
 }
@@ -157,17 +172,28 @@ async function remove(row: HelpArticle) {
 
 <template>
   <div class="help-manage">
+    <!-- 查询区：与 user.vue 等列表页同款 query-bar（label + 统一 200px 宽度 + 查询/重置，
+         宽度由全局 pages.css 的 .query-bar 规则收口） -->
+    <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
+      <el-form-item label="标题">
+        <el-input
+          v-model="query.keyword"
+          placeholder="模糊匹配"
+          clearable
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <!-- 分类筛选：字典 help_category（V35），与新建弹窗同一个字典 -->
+      <el-form-item label="分类">
+        <DictSelect v-model="query.category" type-code="help_category" placeholder="全部分类" />
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>
+        <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
+      </el-form-item>
+    </el-form>
+
     <div class="toolbar">
-      <el-input
-        v-model="query.keyword"
-        placeholder="按标题搜索"
-        clearable
-        style="width: 220px"
-        @keyup.enter="((query.pageNum = 1), load())"
-        @clear="((query.pageNum = 1), load())"
-      />
-      <el-button @click="((query.pageNum = 1), load())">查询</el-button>
-      <div class="spacer" />
       <el-button type="primary" @click="openCreate">新建条目</el-button>
     </div>
 
@@ -265,12 +291,9 @@ async function remove(row: HelpArticle) {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
   margin-bottom: 14px;
 }
-.spacer {
-  flex: 1;
-}
+/* 查询控件宽度已由全局 pages.css 统一为 200px（.query-bar .el-input/.el-select） */
 /* 分页条：与 user/role/dict 等列表页同款 */
 .pagination-bar {
   display: flex;

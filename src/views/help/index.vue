@@ -132,7 +132,7 @@ function scrollToCategory(cat: string) {
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-  min-height: calc(100vh - var(--fs-header-height, 56px) - 48px);
+  min-height: calc(100vh - var(--fs-header-height, 56px) - 68px);
 }
 .help-head {
   text-align: center;

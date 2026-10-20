@@ -101,7 +101,11 @@ async function refuseAll() {
   router.push('/login')
 }
 
-onMounted(checkPending)
+onMounted(() => {
+  checkPending()
+  // 品牌标识（系统名 + Logo 链接）：进站拉一次，侧栏据此决定「图片 or 默认标识」
+  appStore.loadBrand()
+})
 </script>
 
 <template>

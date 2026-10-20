@@ -56,6 +56,8 @@ export interface AboutVO {
   /** 关于我们（富文本 HTML） */
   aboutUs: string
   appVersion: string
+  /** 系统 Logo 地址（config: logo_url）；空串=未配置，侧栏回落默认标识 */
+  logoUrl: string
 }
 
 /** 同意请求体（后端 ConsentRequest） */
