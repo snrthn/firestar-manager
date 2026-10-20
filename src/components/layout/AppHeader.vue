@@ -10,14 +10,18 @@ import {
   SwitchButton,
   User,
   InfoFilled,
+  Bell,
 } from '@element-plus/icons-vue'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
+import { onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { useNotifyStore } from '@/stores/notify'
 import { getAbout } from '@/api/config'
 import AppBreadcrumb from './AppBreadcrumb.vue'
 import RichView from '@/components/RichView.vue'
 import { useAvatar } from '@/composables/useAvatar'
+import type { NotificationVO } from '@/types/notification'
 
 // props 供模板直接按名使用（script 内不引用，故不接 const 绑定，避免 noUnusedLocals 误伤）
 defineProps<{ collapsed: boolean; compact: boolean }>()
@@ -25,6 +29,12 @@ const emit = defineEmits<{ (e: 'toggle'): void }>()
 
 const userStore = useUserStore()
 const router = useRouter()
+const notify = useNotifyStore()
+
+// 登录后立即拉一次未读数（SSE 重连后的校正由 realtimeClient 侧调用 store.refreshUnread）
+onMounted(() => {
+  notify.init()
+})
 
 const nickname = computed(
   () => userStore.userInfo?.nickname || userStore.userInfo?.username || '管理员'
@@ -66,6 +76,54 @@ function toggleFullscreen() {
   } else {
     document.exitFullscreen?.()
   }
+}
+
+// ===== 通知铃铛（用户侧全登录功能，不走系统管理菜单，见 P2 方案 4.4） =====
+function onNotifyScroll(e: Event) {
+  const el = e.target as HTMLElement
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 10) {
+    notify.loadMore()
+  }
+}
+
+/** 点击某条：先标记已读（接口成功才动本地态），再弹详情看正文；有链接走「查看详情」跳转 */
+async function onNotifyClick(n: NotificationVO) {
+  const ok = await notify.readOne(n.id)
+  if (!ok) return
+  detailItem.value = n
+  detailVisible.value = true
+}
+
+/** 详情弹窗内跳转：站内相对路径走 router，http(s):// 外链新标签打开（2026-10-20 虎哥要求双支持） */
+function goDetailLink() {
+  const link = detailItem.value?.linkUrl
+  detailVisible.value = false
+  notify.closePanel()
+  if (!link) return
+  if (link.startsWith('/')) {
+    router.push(link)
+  } else {
+    window.open(link, '_blank')
+  }
+}
+
+// ===== 通知详情弹窗（点击面板条目弹出正文，2026-10-20 虎哥要求：不能一点就只剩已读） =====
+const detailVisible = ref(false)
+const detailItem = ref<NotificationVO | null>(null)
+
+/** 通知时间：今天 → HH:mm；本年 → MM-DD；跨年 → YYYY-MM-DD */
+function formatNotifyTime(ts: string): string {
+  if (!ts) return ''
+  const d = new Date(ts.replace(' ', 'T'))
+  if (Number.isNaN(d.getTime())) return ts
+  const now = new Date()
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  if (d.toDateString() === now.toDateString()) return `${hh}:${mm}`
+  const sameYear = d.getFullYear() === now.getFullYear()
+  const MM = String(d.getMonth() + 1).padStart(2, '0')
+  const DD = String(d.getDate()).padStart(2, '0')
+  return sameYear ? `${MM}-${DD}` : `${d.getFullYear()}-${MM}-${DD}`
 }
 
 // ===== 关于我们弹窗（数据来自 /system/config/about，登录即可访问） =====
@@ -121,6 +179,18 @@ async function openAbout() {
     </div>
 
     <div class="header-right">
+      <!-- 通知铃铛：全屏按钮旁、头像左边（用户侧功能，无权限点） -->
+      <el-badge
+        :value="notify.unreadCount"
+        :max="99"
+        :hidden="notify.unreadCount === 0"
+        class="notify-badge"
+      >
+        <button class="icon-btn" type="button" title="通知" @click="notify.openPanel()">
+          <el-icon :size="16"><Bell /></el-icon>
+        </button>
+      </el-badge>
+
       <button class="icon-btn" type="button" title="全屏切换" @click="toggleFullscreen">
         <el-icon :size="16"><FullScreen /></el-icon>
       </button>
@@ -150,6 +220,43 @@ async function openAbout() {
 
     <!-- 点击空白关闭用户菜单 -->
     <div v-if="userMenuOpen" class="user-menu-mask" @click="userMenuOpen = false" />
+
+    <!-- 通知面板：不分 Tab、不做独立页（P2 方案 4.1/10.5 收窄） -->
+    <div v-if="notify.panelOpen" class="notify-mask" @click="notify.closePanel()" />
+    <div v-if="notify.panelOpen" class="notify-panel">
+      <div class="notify-panel-head">
+        <span class="notify-panel-title">通知</span>
+        <el-button
+          v-if="notify.unreadCount > 0"
+          link
+          type="primary"
+          size="small"
+          @click="notify.readAll()"
+        >
+          全部已读
+        </el-button>
+      </div>
+      <div class="notify-list" @scroll="onNotifyScroll">
+        <div
+          v-for="n in notify.items"
+          :key="n.id"
+          class="notify-item"
+          :class="{ unread: !n.read }"
+          @click="onNotifyClick(n)"
+        >
+          <div class="notify-item-title">
+            <span v-if="!n.read" class="notify-dot" />
+            <span class="notify-item-text">{{ n.title }}</span>
+          </div>
+          <div class="notify-item-time">{{ formatNotifyTime(n.createdAt) }}</div>
+        </div>
+        <div v-if="notify.loading" class="notify-empty">加载中…</div>
+        <div v-else-if="notify.loadedAll && notify.items.length > 0" class="notify-empty">
+          已加载全部
+        </div>
+        <div v-else-if="notify.items.length === 0" class="notify-empty">暂无通知</div>
+      </div>
+    </div>
   </header>
 
   <!-- 关于我们弹窗 -->
@@ -166,6 +273,24 @@ async function openAbout() {
     </div>
     <template #footer>
       <el-button type="primary" @click="aboutVisible = false">知道了</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 通知详情弹窗：标题拼接「通知详情 - {通知标题}」，时间移末尾（2026-10-20 虎哥要求） -->
+  <el-dialog
+    v-model="detailVisible"
+    :title="detailItem ? `通知详情 - ${detailItem.title}` : '通知详情'"
+    width="480px"
+    append-to-body
+  >
+    <div v-if="detailItem" class="notify-detail">
+      <h4 class="detail-title">{{ detailItem.title }}</h4>
+      <div class="detail-content">{{ detailItem.content || '（暂无正文）' }}</div>
+      <div class="detail-time">{{ formatNotifyTime(detailItem.createdAt) }}</div>
+    </div>
+    <template #footer>
+      <el-button @click="detailVisible = false">关闭</el-button>
+      <el-button v-if="detailItem?.linkUrl" type="primary" @click="goDetailLink">查看详情</el-button>
     </template>
   </el-dialog>
 </template>
@@ -302,6 +427,108 @@ async function openAbout() {
   position: fixed;
   inset: 0;
   z-index: 10;
+}
+/* ===== 通知面板 ===== */
+.notify-badge :deep(.el-badge__content) {
+  top: 6px;
+  right: 10px;
+}
+.notify-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+}
+.notify-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 16px;
+  width: 320px;
+  background: #fff;
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  z-index: 30;
+  overflow: hidden;
+}
+.notify-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+}
+.notify-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.notify-list {
+  max-height: 380px;
+  overflow-y: auto;
+}
+.notify-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f2f3f5;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.notify-item:hover {
+  background: var(--el-color-primary-light-9, #ecf5ff);
+}
+.notify-item-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #606266;
+}
+.notify-item.unread .notify-item-title {
+  color: #303133;
+  font-weight: 600;
+}
+.notify-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--el-color-danger, #f56c6c);
+}
+.notify-item-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.notify-item-time {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
+}
+.notify-empty {
+  padding: 20px 0;
+  text-align: center;
+  font-size: 13px;
+  color: #909399;
+}
+/* ===== 通知详情弹窗 ===== */
+.notify-detail .detail-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+/* 时间移末尾（2026-10-20）：与正文块同款 12px 间距 */
+.notify-detail .detail-time {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #909399;
+}
+.notify-detail .detail-content {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .about-body {
   min-height: 80px;

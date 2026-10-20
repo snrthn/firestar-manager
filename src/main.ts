@@ -5,6 +5,10 @@ import { createPinia } from 'pinia'
 // `_Xxx.install = ...` 赋值副作用，rollup 判定有副作用不敢 tree-shaking，
 // 结果 import 任何一个组件都会把整个 element-plus（JS+CSS 约 1MB）拖进首包，
 // 弱网首屏干等 6s+。深层 import 每个组件只拉它自己的 src 依赖。
+// 通知铃铛角标（AppHeader 头部）：未注册时 Vue 把 <el-badge> 当未解析组件，
+// 整个子树（含铃铛按钮）渲染成注释节点——铃铛直接消失、控制台
+// "Failed to resolve component: el-badge"（2026-10-20 虎哥截图实锤）。
+import ElBadge from 'element-plus/es/components/badge/index.mjs'
 import ElAlert from 'element-plus/es/components/alert/index.mjs'
 import ElButton from 'element-plus/es/components/button/index.mjs'
 import ElCard from 'element-plus/es/components/card/index.mjs'
@@ -29,6 +33,10 @@ import ElInputNumber from 'element-plus/es/components/input-number/index.mjs'
 import ElLoading from 'element-plus/es/components/loading/index.mjs'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
+// 通知右下角轻提醒（SSE 推送时铃铛徽标之外的第二反馈，2026-10-20 虎哥要求）：
+// 函数式 ElNotification(options) 调用前必须 app.use 注册（安装时注入 app context），
+// 漏注册时调用会静默无弹窗（与 el-badge subtree 变注释节点同族的坑）
+import ElNotification from 'element-plus/es/components/notification/index.mjs'
 // ElPopover：菜单管理页「菜单图标」选择浮层（点击按钮弹出，省表单空间）。
 // 未注册时 Vue 把 <el-popover> 当未知元素渲染——浮层内容直接内联摊进表单，
 // 参考按钮被淹没、点选/回显交互全废（2026-10-14 虎哥截图实锤）。
@@ -75,6 +83,7 @@ import ElDatePicker from 'element-plus/es/components/date-picker/index.mjs'
 import ElRow from 'element-plus/es/components/row/index.mjs'
 import ElCol from 'element-plus/es/components/col/index.mjs'
 // 与上方组件一一对应的样式（每个组件的 style/css 内部会带入 theme-chalk base 样式）
+import 'element-plus/es/components/badge/style/css'
 import 'element-plus/es/components/alert/style/css'
 import 'element-plus/es/components/button/style/css'
 import 'element-plus/es/components/card/style/css'
@@ -94,6 +103,7 @@ import 'element-plus/es/components/input-number/style/css'
 import 'element-plus/es/components/loading/style/css'
 import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
+import 'element-plus/es/components/notification/style/css'
 import 'element-plus/es/components/pagination/style/css'
 import 'element-plus/es/components/popover/style/css'
 // popover 浮层由 ElTooltip 渲染（定位/箭头在 tooltip 包内），缺它浮层错位无箭头
@@ -128,6 +138,7 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 // 组件注册（ElMessage / ElMessageBox 为函数式组件，同样按需注册）
+app.use(ElBadge)
 app.use(ElAlert)
 app.use(ElButton)
 app.use(ElCard)
@@ -144,6 +155,7 @@ app.use(ElInputNumber)
 app.use(ElLoading)
 app.use(ElMessage)
 app.use(ElMessageBox)
+app.use(ElNotification)
 app.use(ElPagination)
 app.use(ElPopover)
 app.use(ElSelect)
