@@ -60,6 +60,29 @@ const editor = useEditor({
     SizeableImage,
     RichTextStyle,
   ],
+  editorProps: {
+    // 粘贴剪贴板图片（2026-10-21 需求①）：从 clipboardData 捞 image/* 文件
+    // （截图粘出来是 PNG，走此通道）→ 复用 uploadFile 上传 → setImage 插入，
+    // 多张按序全插。非图片粘贴返回 false 交回浏览器默认行为。
+    handlePaste: (_view, event) => {
+      const items = event.clipboardData?.items
+      if (!items) return false
+      const files: File[] = []
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i]
+        if (it.kind === 'file' && it.type.startsWith('image/')) {
+          const f = it.getAsFile()
+          if (f) files.push(f)
+        }
+      }
+      if (!files.length) return false
+      // 有图片：阻止默认粘贴（浏览器默认会把图片丢掉/只粘位图数据），
+      // 异步上传成功后按序插入编辑器
+      event.preventDefault()
+      void insertPastedImages(files)
+      return true
+    },
+  },
   onUpdate: ({ editor }) => emit('update:modelValue', editor.getHTML()),
 })
 
@@ -133,6 +156,30 @@ async function onUploadImage(option: { file: File }) {
     ElMessage.error((e as Error).message || '上传失败')
   } finally {
     uploading.value = false
+  }
+}
+
+// ===== 粘贴图片上传（需求①）=====
+const pasting = ref(false)
+/**
+ * 剪贴板多图按序上传并插入（全插，2026-10-21 虎哥拍板）。
+ * 与 onUploadImage 同链路：存进文件管理 → 插 /files/{id}/raw 相对路径，
+ * observeImages 自动带 token 拉 blob 渲染。
+ */
+async function insertPastedImages(files: File[]) {
+  if (!editor.value) return
+  pasting.value = true
+  try {
+    for (const file of files) {
+      const fd = new FormData()
+      fd.append('file', file)
+      const vo = await uploadFile(fd)
+      editor.value.chain().focus().setImage({ src: `/files/${vo.id}/raw` }).run()
+    }
+  } catch (e) {
+    ElMessage.error((e as Error).message || '粘贴图片上传失败')
+  } finally {
+    pasting.value = false
   }
 }
 
@@ -285,6 +332,8 @@ onBeforeUnmount(() => {
 
     <div ref="contentRef" class="re-content">
       <editor-content :editor="editor" />
+      <!-- 粘贴图片上传中的遮罩提示（多图按序上传期间） -->
+      <div v-if="pasting" class="re-paste-mask">图片上传中…</div>
     </div>
 
     <!-- 链接弹窗（需求③）-->
@@ -395,6 +444,9 @@ onBeforeUnmount(() => {
   margin: 0 4px;
 }
 /* ProseMirror 编辑区 */
+.re-content {
+  position: relative;
+}
 .re-content :deep(.ProseMirror) {
   min-height: 220px;
   max-height: 420px;
@@ -412,6 +464,20 @@ onBeforeUnmount(() => {
 }
 .re-content :deep(.ProseMirror:focus) {
   border: none;
+}
+/* 粘贴图片上传遮罩（需求①）：半透明居中提示，不阻塞 ProseMirror 事件 */
+.re-paste-mask {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 10;
 }
 /* ===== 图片尺寸气泡（BubbleMenu，2026-10-20 需求④）===== */
 .re-bubble {

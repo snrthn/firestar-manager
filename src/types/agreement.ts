@@ -48,6 +48,13 @@ export interface ConfigItemVO {
   remark: string | null
 }
 
+/** 新建键值对请求（后端 ConfigCreateRequest） */
+export interface ConfigCreateRequest {
+  configKey: string
+  configValue: string
+  remark?: string
+}
+
 /** 关于我们弹窗聚合数据（后端 AboutVO） */
 export interface AboutVO {
   systemName: string

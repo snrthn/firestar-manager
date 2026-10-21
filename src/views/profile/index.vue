@@ -5,6 +5,7 @@ import { useUserStore } from '@/stores/user'
 import { updateProfile, changePassword } from '@/api/auth'
 import { listConsents, withdraw } from '@/api/agreement'
 import { updateAvatar } from '@/api/profile'
+import AvatarCropper from '@/components/AvatarCropper.vue'
 import { useAvatar } from '@/composables/useAvatar'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -120,15 +121,27 @@ async function savePwd() {
   }
 }
 
-// ===== 头像上传（免 file:manage，走 /system/profile/avatar） =====
-async function uploadAvatar(options: { file: File }) {
+// ===== 头像上传（免 file:manage，走 /system/profile/avatar）=====
+// 2026-10-21 需求②：选图后先过裁切弹窗，确认导出 256×256 才真正上传，
+// 落库头像必为裁切产物（正方形）。el-upload 只承担「选文件 + beforeAvatar 校验」。
+const cropFile = ref<File | null>(null)
+const cropperVisible = ref(false)
+
+function onAvatarPicked(options: { file: File }) {
+  cropFile.value = options.file
+  cropperVisible.value = true
+}
+
+async function onCropConfirm(blob: Blob) {
   const form = new FormData()
-  form.append('file', options.file)
+  // 裁切产物统一 PNG 命名；后端按 multipart 字段名 file 接收
+  form.append('file', blob, 'avatar.png')
   try {
     await updateAvatar(form)
     // 回写 userInfo.avatarUrl，让 header 头像同步刷新
     await userStore.fetchProfile()
     ElMessage.success('头像已更新')
+    cropperVisible.value = false
   } catch (e: any) {
     ElMessage.error(e?.message || '头像上传失败')
   }
@@ -197,7 +210,7 @@ async function withdrawAgreement(item: AgreementVO) {
         <el-upload
           class="avatar-uploader"
           :show-file-list="false"
-          :http-request="uploadAvatar"
+          :http-request="onAvatarPicked"
           accept="image/*"
           :before-upload="beforeAvatar"
         >
@@ -355,6 +368,13 @@ async function withdrawAgreement(item: AgreementVO) {
         </el-tab-pane>
       </el-tabs>
     </el-card>
+
+    <!-- 头像裁切弹窗（需求②）：选图 → 裁切 → 确认上传 -->
+    <avatar-cropper
+      v-model="cropperVisible"
+      :file="cropFile"
+      @confirm="onCropConfirm"
+    />
   </div>
 </template>
 

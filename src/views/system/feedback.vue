@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import {
   listMyFeedback,
@@ -80,7 +81,22 @@ function switchTab(tab: string) {
   load()
 }
 
-onMounted(load)
+// ===== 通知跳转落位（2026-10-21 需求：从反馈类通知跳进来时自动切对应 Tab）=====
+// 后端 linkUrl 按收件人与反馈的关系带 ?tab=my|received；挂载时读一次决定初始 Tab。
+// watch 覆盖「已停留在本页、又点一条通知跳同一路由」的场景——vue-router 同路由
+// 只更新 query 不重建组件，不监听的话 Tab 不会跟着变。
+const route = useRoute()
+function applyTabFromQuery(tab: unknown) {
+  if (tab === 'received' || tab === 'my') switchTab(tab)
+}
+
+onMounted(() => {
+  // 有 tab 参数时 switchTab 内部自带 load（且重置筛选），否则走默认 my 列表
+  const q = route.query.tab
+  if (q === 'received' || q === 'my') switchTab(q)
+  else load()
+})
+watch(() => route.query.tab, applyTabFromQuery)
 
 // ===== 详情抽屉 =====
 const drawer = ref(false)
@@ -111,6 +127,12 @@ async function sendMessage() {
     await addFeedbackMessage(detail.value.id, messageInput.value)
     messageInput.value = ''
     messages.value = await listFeedbackMessages(detail.value.id)
+    // 留言可能触发后端状态跃迁（PENDING → PROCESSING，见 FeedbackServiceImpl.addMessage：
+    // 接收人首条留言即推进状态），且通知只发给对方、自己前端收不到 SSE 事件——
+    // 必须重拉 detail 让抽屉的状态标签/操作按钮与后端同步，否则按旧状态渲染的
+    // 按钮会踩后端状态机 400（典型：点「开始处理」→「不允许从 处理中 流转到 处理中」）。
+    detail.value = await getFeedback(detail.value.id)
+    load()
   } catch (e) {
     ElMessage.error(extractMsg(e) || '留言失败')
   } finally {

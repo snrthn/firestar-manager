@@ -300,10 +300,12 @@ async function openAbout() {
     </template>
   </el-dialog>
 
-  <!-- 通知详情弹窗：标题拼接「通知详情 - {通知标题}」，时间移末尾（2026-10-20 虎哥要求） -->
+  <!-- 通知详情弹窗：标题栏只保留「通知详情」，不再拼接通知标题
+       （2026-10-21 虎哥要求移除拼接——原标题栏/内容区/正文首行三处重复同一文本，
+       数字多的时候可读性极差；标题文本由内容区 detail-title 单独展示） -->
   <el-dialog
     v-model="detailVisible"
-    :title="detailItem ? `通知详情 - ${detailItem.title}` : '通知详情'"
+    title="通知详情"
     width="480px"
     append-to-body
   >

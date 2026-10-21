@@ -3,6 +3,7 @@ import { defineAsyncComponent, defineComponent, h } from 'vue'
 import type { Component } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { startRealtime, stopRealtime } from '@/utils/realtimeClient'
+import { getInitStatus } from '@/api/system'
 import { routeNameFor, flattenMenus } from '@/utils/menuRoute'
 import type { MenuVO } from '@/types/auth'
 import PagePlaceholder from '@/components/PagePlaceholder.vue'
@@ -72,6 +73,14 @@ const router = createRouter({
       name: 'login',
       component: () => import('../views/login/Login.vue'),
       meta: { title: '登录' },
+    },
+    {
+      // 安装向导：独立全屏，不套后台布局壳。未初始化时由路由守卫接管 /login 至此。
+      // 初始化完成后访问本路由会被守卫打回 /dashboard（或 /login），即「安装页关闭」。
+      path: '/install',
+      name: 'install',
+      component: () => import('../views/install/index.vue'),
+      meta: { title: '系统安装' },
     },
     {
       // 后台布局壳：所有登录后页面挂在其下。
@@ -172,6 +181,51 @@ function isTokenAlive(token: string): boolean {
   }
 }
 
+// 系统初始化状态缓存：未登录分支据此决定去 /login 还是 /install。
+// 用 Awaited<ReturnType> 推断返回类型，避免额外引入类型 import。
+// ⚠️ 只缓存 initialized=true 的确定态：false 是「安装向导生命周期内的临时态」，
+// 缓存它会让初始化完成后的跳转被旧值打回（2026-10-21 实测：倒计时/按钮均不跳，
+// 仅刷新页面因模块状态重置而恢复）。false 不缓存，每次导航现场探测——未初始化
+// 场景只有安装相关访问，多一次 GET 无感；初始化后缓存 true，零额外请求。
+let cachedInitState: Awaited<ReturnType<typeof getInitStatus>> | null = null
+// 最近一次探测结果（不区分是否缓存）：守卫每轮未登录导航都会刷新它。
+// 供安装页 onMounted 复用——否则守卫探测一次 + 页面自己再调一次，
+// /system/init/status 会被触发两回（2026-10-21 虎哥实测）。
+let lastInitState: Awaited<ReturnType<typeof getInitStatus>> | null = null
+/** 取守卫最近一次探测到的初始化状态（无则 null，调用方需自行兜底请求） */
+export function getLastInitState() {
+  return lastInitState
+}
+async function ensureInitState() {
+  if (cachedInitState) return cachedInitState
+  try {
+    const st = await getInitStatus()
+    lastInitState = st
+    if (st.initialized) cachedInitState = st
+    return st
+  } catch {
+    // 探测失败时保守兜底：假设已初始化，引导去登录，避免安装页因接口故障卡死
+    cachedInitState = { initialized: true, trialMode: false, canReset: false, adminExists: true }
+    return cachedInitState
+  }
+}
+
+/** 作废初始化状态缓存并重新探测：安装页初始化成功后必须调用。
+ *  背景：cachedInitState 是模块级缓存，用户进安装页前守卫已写过 initialized=false
+ *  的旧值；初始化完成后若不刷新，倒计时跳 /login 时守卫拿旧状态判定"未初始化"，
+ *  会把导航打回 /install——表现为倒计时结束不跳转（2026-10-21 虎哥实测）。
+ *  失败时与 ensureInitState 同样保守兜底为已初始化，保证跳登录链路不被卡死。 */
+export async function refreshInitState() {
+  try {
+    cachedInitState = await getInitStatus()
+    lastInitState = cachedInitState
+  } catch {
+    cachedInitState = { initialized: true, trialMode: false, canReset: false, adminExists: true }
+    lastInitState = cachedInitState
+  }
+  return cachedInitState
+}
+
 // 路由守卫：
 // - 未登录（无 token，或 token 已过期）：直接跳登录页，绝不触发 /auth/profile；
 //   过期残留 token 顺手清掉，避免后续请求再吃 401。
@@ -188,14 +242,33 @@ router.beforeEach(async (to, _from, next) => {
   if (!token || !isTokenAlive(token)) {
     if (token) localStorage.removeItem('token')
     stopRealtime()
-    if (to.path === '/login') {
-      next()
+    // 未登录：先判断系统是否已初始化，决定去登录还是安装向导
+    const sysState = await ensureInitState()
+    if (sysState.initialized) {
+      // 系统已初始化：未登录一律去登录（即便敲 /install 也接管回登录）
+      if (to.path === '/install') {
+        next('/login')
+      } else if (to.path === '/login') {
+        next()
+      } else {
+        next('/login')
+      }
     } else {
-      next('/login')
+      // 系统未初始化：未登录一律去安装向导（/login 也被接管）
+      if (to.path === '/install') {
+        next()
+      } else {
+        next('/install')
+      }
     }
     return
   }
   if (to.path === '/login') {
+    next('/dashboard')
+    return
+  }
+  // 已登录不应再访问安装向导，打回工作台
+  if (to.path === '/install') {
     next('/dashboard')
     return
   }

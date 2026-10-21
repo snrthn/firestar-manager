@@ -64,7 +64,9 @@ npm run build:prod    # --mode production
 
 与后端保持一致：`develop → test →（人工确认）→ master → main → develop`。
 
-## 当前进度（截至 2026-10-12）
+## 当前进度（截至 2026-10-21）
 
 - 脚手架已就绪（Vue3 + Vite5 + Element Plus + Pinia + Router4 + Axios），`Home.vue` 演示页可联调后端 DB 自检端点。
-- 业务页面 / API 请求模块 / 业务 Store 均**待开发**，需随后端接口逐步补齐。
+- **平台 / 系统类页面已随后端接口补齐**：登录与鉴权态、RBAC 权限、字典、参数设置、协议 / 通知 / 反馈 / 帮助、文件管理，以及**系统初始化与重置向导**（`src/views/system/init-reset.vue`，随后端 InitReset 接口 + V36 菜单种子自动上动态路由，按钮显隐走 `userStore.hasPermission('system:reset')`）。
+- **财务业务域页面（立项 / 发货 / 应收 / 收款 / 开票 / 核销 / 退货 / 看板）待开发**，需随后端 `fin_*` 业务接口逐步补齐；当前已有对应 API 请求模块骨架（如 `src/api/*`），随业务接口落地填充。
+- ⚠️ **路径前缀约定**：本文档 / 代码里出现的 `/api` 仅为前端 vite proxy 与生产 nginx 的**代理层**，开发与生产请求均被剥离；浏览器实际请求到后端的真实路径**不含 `/api`**（如 `/system/init/status`）。联调以「后端真实路径」为准。

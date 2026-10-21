@@ -84,6 +84,12 @@ body { font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; backg
     <span><strong>错误码：</strong>统一 Response{ code, msg, data }</span>
 </div>
 
+<div class="note-box">
+    <strong>① 路径前缀约定：</strong>本文档路径均带 <code>/api</code> 前缀，但 <code>/api</code> 仅是前端 vite proxy / 生产 nginx 的<strong>代理层</strong>，开发与生产请求均被剥离该前缀；后端真实接收路径<strong>不含 /api</strong>（例如 <code>/system/init/status</code> 而非 <code>/api/system/init/status</code>）。前后端联调以「后端真实路径」为准。
+    <br><br>
+    <strong>② 实现状态（截至 2026-10-21）：</strong>平台 / 基础设施类模块（认证、RBAC、字典、文件、参数、协议、通知、反馈、帮助、系统管理<strong>含初始化与重置向导</strong>、SSE、审计、DB 自检）已随后端落地；<strong>财务业务域（立项 / 发货 / 应收 / 收款 / 开票 / 核销 / 退货 / 看板）仅有表结构与空壳，待开发</strong>。其中通知 / 协议 / 反馈 / 帮助为原设计 15 模块之外的补充实现模块。
+</div>
+
 <div class="toc-bar">
     <a href="#summary">总览</a>
     <a href="#auth">1. 认证</a>

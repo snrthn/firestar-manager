@@ -593,6 +593,17 @@
 
 <div class="container">
 
+    <!-- 实现状态同步（2026-10-21） -->
+    <div class="section" style="border-left:4px solid #e17055; background:#fff8e1;">
+        <div class="section-title"><span class="num">★</span> 实现状态同步（截至 2026-10-21）</div>
+        <div class="text-block">
+            <strong>① 路径前缀约定：</strong>本文档与接口文档中出现的 <code>/api</code> 仅为前端 vite proxy / 生产 nginx 的<strong>代理层</strong>，开发与生产请求均被剥离该前缀；后端真实接收路径<strong>不含 /api</strong>（例如 <code>/system/init/status</code> 而非 <code>/api/system/init/status</code>）。前后端联调以「后端真实路径」为准。
+        </div>
+        <div class="text-block">
+            <strong>② 实现状态：</strong>平台 / 基础设施类模块（认证、RBAC、字典、文件、参数、协议、通知、反馈、帮助、系统管理<strong>含初始化与重置向导</strong>、SSE、审计、DB 自检）已随后端落地；<strong>财务业务域（立项 / 发货 / 应收 / 收款 / 开票 / 核销 / 退货 / 看板）仅有表结构与空壳，待开发</strong>。其中通知 / 协议 / 反馈 / 帮助为原设计 15 模块之外的补充实现模块。第 16 节「初始化与重置」已在后端 InitResetController / InitResetServiceImpl + V36 菜单种子落地，前端对应 <code>views/system/init-reset.vue</code>。
+        </div>
+    </div>
+
     <!-- 版本信息 -->
     <div class="version-info">
         <span><strong>设计原则：</strong>业财一体化，应收为核心，核销为闭环</span>

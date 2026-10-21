@@ -74,12 +74,20 @@ import ElMenu, { ElSubMenu, ElMenuItem } from 'element-plus/es/components/menu/i
 import ElTabs, { ElTabPane } from 'element-plus/es/components/tabs/index.mjs'
 // 侧栏菜单滚动容器（成熟组件，折叠/展开时比原生 overflow 更顺滑）
 import ElScrollbar from 'element-plus/es/components/scrollbar/index.mjs'
+// 骨架屏（安装向导 / 系统重置页预检加载态）：漏注册时 <el-skeleton> 被当未知元素，
+// 控制台 "Failed to resolve component: el-skeleton"（2026-10-21 虎哥截图实锤）。
+// ElSkeletonItem 没有独立包目录的 install，从 skeleton 入口具名导出。
+import ElSkeleton, { ElSkeletonItem } from 'element-plus/es/components/skeleton/index.mjs'
 // 上传（文件列表页上传弹窗）：未注册时 <el-upload> 被当未知元素渲染——
 // 拖拽区塌掉、点击/拖拽全失效、弹窗布局错乱（2026-10-16 虎哥截图实锤）。
 import ElUpload from 'element-plus/es/components/upload/index.mjs'
 // 日期选择器（登录/操作日志「时间区间」查询）：同理必须显式注册，
 // 否则区间控件整个不渲染，查询栏只剩「时间区间」四个裸文字。
 import ElDatePicker from 'element-plus/es/components/date-picker/index.mjs'
+// 图片预览大图（RichView 展示端点击富文本内图片弹出）：漏注册时
+// <el-image-viewer> 被当未知元素，点击图片无任何反应、控制台
+// "Failed to resolve component: el-image-viewer"（同 el-badge 族坑）。
+import ElImageViewer from 'element-plus/es/components/image-viewer/index.mjs'
 // 栅格布局（协议管理页双栏：当前正文 14 / 版本历史 10）：
 // row 和 col 是两个独立包目录（es/components/row、es/components/col），各自注册。
 // 未注册时 Vue 把 <el-row>/<el-col> 当未知自定义元素渲染，控制台
@@ -127,8 +135,15 @@ import 'element-plus/es/components/tree/style/css'
 import 'element-plus/es/components/menu/style/css'
 import 'element-plus/es/components/tabs/style/css'
 import 'element-plus/es/components/scrollbar/style/css'
+// 骨架屏样式：skeleton 的 rows 占位块由 skeleton-item 渲染，其样式在 skeleton-item 包内，
+// 缺这一行骨架条无灰底色（skeleton/style/css 只含容器布局）
+import 'element-plus/es/components/skeleton/style/css'
+import 'element-plus/es/components/skeleton-item/style/css'
 import 'element-plus/es/components/upload/style/css'
+// 日期选择器样式（下拉面板由 popper 定位，依赖 overlay 已引入）
 import 'element-plus/es/components/date-picker/style/css'
+// 图片预览大图样式（viewer 全屏遮罩 + 箭头/计数工具栏）
+import 'element-plus/es/components/image-viewer/style/css'
 // 栅格 row/col 样式（col 的 width 百分比、row 的 flex/gutter 负 margin 都在这两个包内）
 import 'element-plus/es/components/row/style/css'
 import 'element-plus/es/components/col/style/css'
@@ -191,6 +206,11 @@ app.use(ElCol)
 app.use(ElTabs)
 app.use(ElTabPane)
 app.use(ElScrollbar)
+// 骨架屏（安装向导 / 系统重置页预检加载态）
+app.use(ElSkeleton)
+app.use(ElSkeletonItem)
 app.use(ElUpload)
 app.use(ElDatePicker)
+// 图片预览大图（RichView 富文本图片点击预览）
+app.use(ElImageViewer)
 app.mount('#app')

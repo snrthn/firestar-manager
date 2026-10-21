@@ -99,7 +99,15 @@
   const STORE_KEY = 'firestar_checklist_state_v1';
 
   // 已完成模块的基线种子（代码已收口，运行时验证见本地 mvn/npm；localStorage 一旦写入即由用户状态覆盖）
-  const DEFAULT_STATE = { '0|认证模块': 2 };
+  // 2026-10-21 同步：平台/基础设施类模块已随后端落地 —— 认证、RBAC、字典、系统管理（含初始化与重置向导）、文件管理。
+  // 财务业务域（立项/发货/应收/收款/开票/核销/退货/看板）仍待开发，保持待开发状态。
+  const DEFAULT_STATE = {
+    '0|认证模块': 2,
+    '0|RBAC 权限管理': 2,
+    '0|字典管理': 2,
+    '3|系统管理': 2,
+    '3|文件管理': 2
+  };
   function loadState() {
     try { return Object.assign({}, DEFAULT_STATE, JSON.parse(localStorage.getItem(STORE_KEY)) || {}); }
     catch (e) { return Object.assign({}, DEFAULT_STATE); }

@@ -25,9 +25,36 @@ watch(
     tracked.forEach((u) => URL.revokeObjectURL(u))
     tracked = []
     await resolveImagesIn(rootRef.value, tracked)
+    // 图片解析完成后再绑点击预览（此时 src 已是 blob URL，viewer 直接可用）
+    bindImagePreview()
   },
   { immediate: true }
 )
+
+// ===== 图片点击预览大图（2026-10-21 需求③）=====
+// 展示端交互：点击富文本内图片弹 ElImageViewer（url-list 取当前 DOM 里所有 img.src，
+// blob URL 会话内有效）。编辑器端不加此交互（保持编辑行为）。
+const viewerVisible = ref(false)
+const viewerUrls = ref<string[]>([])
+const viewerIndex = ref(0)
+
+function bindImagePreview() {
+  const root = rootRef.value
+  if (!root) return
+  const imgs = Array.from(root.querySelectorAll('img')) as HTMLImageElement[]
+  imgs.forEach((img, i) => {
+    img.style.cursor = 'zoom-in'
+    img.title = '点击查看大图'
+    img.onclick = () => {
+      // 点击时现取 src 列表：异步解析可能刚换过 blob，现取保证与视觉一致
+      viewerUrls.value = Array.from(root.querySelectorAll('img')).map(
+        (im) => (im as HTMLImageElement).src
+      )
+      viewerIndex.value = i
+      viewerVisible.value = true
+    }
+  })
+}
 
 onBeforeUnmount(() => {
   tracked.forEach((u) => URL.revokeObjectURL(u))
@@ -37,6 +64,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="rootRef" class="rich-view" :class="className" v-html="clean" />
+  <!-- 图片预览大图（需求③）：全局注册于 main.ts，url-list 为点击时现取的 img.src -->
+  <el-image-viewer
+    v-if="viewerVisible"
+    :url-list="viewerUrls"
+    :initial-index="viewerIndex"
+    teleported
+    @close="viewerVisible = false"
+  />
 </template>
 
 <style scoped>
@@ -49,6 +84,11 @@ onBeforeUnmount(() => {
 .rich-view :deep(img) {
   max-width: 100%;
   border-radius: 4px;
+  cursor: zoom-in;
+  transition: opacity 0.15s;
+}
+.rich-view :deep(img:hover) {
+  opacity: 0.85;
 }
 .rich-view :deep(a) {
   color: var(--el-color-primary);
