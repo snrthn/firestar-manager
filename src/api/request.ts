@@ -38,6 +38,15 @@ request.interceptors.response.use(
       handleSessionExpired(error.response.data?.message)
       return hangSilently()
     }
+    // 其它非 2xx（如安装向导关闭后的真 403、db-check 的 503）：
+    // 把后端响应体里的中文 message 提到 error.message，否则页面 catch 只能看到
+    // axios 默认的 "Request failed with status code 403" 英文串。
+    // 只改 message、不动 error.response 结构——dashboard 的 db-check 诊断要读
+    // e.response.data.errors，不能换成裸 Error。
+    const msg = error.response?.data?.message
+    if (msg && error.message !== msg) {
+      error.message = msg
+    }
     return Promise.reject(error)
   },
 )
