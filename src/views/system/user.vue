@@ -9,11 +9,13 @@ import { listUsers, createUser, updateUser, deleteUser } from '@/api/user'
 import { listOrgs } from '@/api/org'
 import { listRoles } from '@/api/role'
 import { listPostOptions } from '@/api/post'
+import { listLevelOptions } from '@/api/level'
 import type { UserFormData, UserVO } from '@/types/user'
 import DictSelect from '@/components/DictSelect.vue'
 import type { OrgVO } from '@/types/org'
 import type { RoleManageVO } from '@/types/role'
 import type { PostOptionVO } from '@/types/post'
+import type { LevelOptionVO } from '@/types/level'
 import { formatDateTime } from '@/utils/datetime'
 
 // ===== 查询条件 =====
@@ -87,12 +89,16 @@ const roleOptions = ref<RoleManageVO[]>([])
 // ===== 岗位下拉（新增/修改弹窗用；轻量 /options 接口）=====
 const postOptions = ref<PostOptionVO[]>([])
 
+// ===== 职级下拉（新增/修改弹窗用；轻量 /options 接口；V39 新增）=====
+const levelOptions = ref<LevelOptionVO[]>([])
+
 const loadOptions = async () => {
   try {
     orgTree.value = await listOrgs()
     const page = await listRoles(1, 500)
     roleOptions.value = page.records
     postOptions.value = await listPostOptions()
+    levelOptions.value = await listLevelOptions()
   } catch (e) {
     ElMessage.error((e as Error).message)
   }
@@ -114,6 +120,7 @@ const emptyForm = (): UserFormData => ({
   phone: '',
   email: '',
   postId: null,
+  levelCode: null,
 })
 
 const form = reactive<UserFormData>(emptyForm())
@@ -174,6 +181,7 @@ const openEdit = (row: UserVO) => {
   form.phone = row.phone || ''
   form.email = row.email || ''
   form.postId = row.postId
+  form.levelCode = row.levelCode
   dialogTitle.value = `修改用户 - ${row.nickname}`
   dialogVisible.value = true
   nextTick(() => formRef.value?.clearValidate())
@@ -290,6 +298,9 @@ onMounted(() => {
       <el-table-column label="岗位" min-width="120">
         <template #default="{ row }">{{ row.postName || '—' }}</template>
       </el-table-column>
+      <el-table-column label="职级" min-width="120">
+        <template #default="{ row }">{{ row.levelName || '—' }}</template>
+      </el-table-column>
       <el-table-column label="手机号" min-width="140">
         <template #default="{ row }">{{ row.phone || '—' }}</template>
       </el-table-column>
@@ -367,6 +378,11 @@ onMounted(() => {
       <el-form-item label="岗位" prop="postId">
         <el-select v-model="form.postId" clearable filterable placeholder="选择岗位（可空）" class="w-full">
           <el-option v-for="p in postOptions" :key="p.id" :label="p.postName" :value="p.id" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="职级" prop="levelCode">
+        <el-select v-model="form.levelCode" clearable filterable placeholder="选择职级（可空）" class="w-full">
+          <el-option v-for="l in levelOptions" :key="l.id" :label="`${l.levelName}（${l.levelCode}）`" :value="l.levelCode" />
         </el-select>
       </el-form-item>
       <el-form-item label="手机号" prop="phone">

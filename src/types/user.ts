@@ -43,6 +43,10 @@ export interface UserVO {
   postId: number | null
   /** 岗位名称（服务层回填） */
   postName: string | null
+  /** 职级编码 → sys_level.level_code（null = 未分配；V39 新增） */
+  levelCode: string | null
+  /** 职级名称（服务层回填；V39 新增） */
+  levelName: string | null
 }
 
 // 用户表单（新增 / 修改共用，与后端 UserRequest 对齐）
@@ -62,4 +66,6 @@ export interface UserFormData {
   email: string
   /** 岗位 ID → sys_post.id（null = 未分配；创建/修改非必填） */
   postId: number | null
+  /** 职级编码 → sys_level.level_code（null = 未分配；创建/修改非必填；V39 新增） */
+  levelCode: string | null
 }

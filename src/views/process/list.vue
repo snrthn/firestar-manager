@@ -113,7 +113,7 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="审批人 / 候选" min-width="160">
+          <el-table-column label="审批人 / 候选" min-width="150">
             <template #default="{ row }">
               <el-select
                 v-if="row.type === 'USER'" v-model="row.assignee" size="small"
@@ -127,7 +127,15 @@
               >
                 <el-option v-for="r in roleOptions" :key="r.roleCode" :label="r.roleName" :value="r.roleCode" />
               </el-select>
-              <el-input v-else v-model="row.assignee" size="small" placeholder="职级编码，如 L3" />
+              <el-select
+                v-else-if="row.type === 'LEVEL'" v-model="row.assignee" size="small"
+                filterable placeholder="选择职级" style="width: 100%"
+              >
+                <el-option
+                  v-for="l in levelOptions" :key="l.levelCode"
+                  :label="`${l.levelName}（${l.levelCode}）`" :value="l.levelCode"
+                />
+              </el-select>
             </template>
           </el-table-column>
           <el-table-column label="可驳回" width="70" align="center">
@@ -135,7 +143,7 @@
               <el-checkbox v-model="row.rejectable" />
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="150" align="center">
+          <el-table-column label="操作" width="140" align="center">
             <template #default="{ $index }">
               <el-button link type="primary" size="small" :disabled="$index === 0" @click="move($index, -1)">上移</el-button>
               <el-button link type="primary" size="small" :disabled="$index === editingNodes.length - 1" @click="move($index, 1)">下移</el-button>
@@ -180,9 +188,11 @@ import {
 } from '@/api/process'
 import { listUserOptions } from '@/api/user'
 import { listRoles } from '@/api/role'
+import { listLevelOptions } from '@/api/level'
 import type { ProcessDef, NodeCfg, ProcessDefVersionVO } from '@/types/process'
 import type { UserOptionVO } from '@/types/user'
 import type { RoleManageVO } from '@/types/role'
+import type { LevelOptionVO } from '@/types/level'
 
 // ===== 查询条件 =====
 const query = reactive({
@@ -258,6 +268,7 @@ const versionLoading = ref(false)
 
 const userOptions = ref<UserOptionVO[]>([])
 const roleOptions = ref<RoleManageVO[]>([])
+const levelOptions = ref<LevelOptionVO[]>([])
 
 async function ensureOptions() {
   if (userOptions.value.length === 0) userOptions.value = await listUserOptions()
@@ -265,6 +276,7 @@ async function ensureOptions() {
     const r = await listRoles(1, 9999)
     roleOptions.value = r.records
   }
+  if (levelOptions.value.length === 0) levelOptions.value = await listLevelOptions()
 }
 
 function openCreate() {
