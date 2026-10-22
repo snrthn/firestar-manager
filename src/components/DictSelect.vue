@@ -17,10 +17,20 @@ import { loadDictOptions, type DictOption } from '@/composables/useDict'
  *
  * 注意：仅当字典 value 与库中真实域值一致时才允许切换（useDict 约定 4）；
  * 字典与数据不符的（如 permission_action vs READ/WRITE/EXECUTE）必须先修字典。
+ *
+ * ⚠️ modelValue 必须声明为可选（2026-10-22 虎哥截图实锤）：
+ * 业务页 v-model 绑定的表单字段初始值普遍是 undefined（如 project/list.vue
+ * 的 contractStatus）。Vue 3.5 validateProp 对「必填 prop + 值 == null」
+ * 不走豁免直接类型校验（`if (value == null && !required) return`），
+ * 必填 String 收到 undefined 会刷
+ * 「Invalid prop: type check failed for prop "modelValue".
+ *  Expected String with value "undefined"」警告。改可选后
+ * undefined/null 均豁免；透传给 ElSelect 时其 modelValue 为
+ * [Array,String,Number,Boolean,Object] 非必填，同样不 warn。
  */
 const props = withDefaults(
   defineProps<{
-    modelValue: string
+    modelValue?: string | null
     typeCode: string
     placeholder?: string
     clearable?: boolean

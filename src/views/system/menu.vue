@@ -30,10 +30,10 @@ const loadMenuTypeOptions = async () => {
   menuTypeOptions.value = options.length
     ? options
     : [
-        { value: 'CATALOG', label: '目录' },
-        { value: 'MENU', label: '菜单' },
-        { value: 'BUTTON', label: '按钮' },
-        { value: 'LINK', label: '外链' },
+        { value: 'CATALOG', label: '目录', style: null },
+        { value: 'MENU', label: '菜单', style: null },
+        { value: 'BUTTON', label: '按钮', style: null },
+        { value: 'LINK', label: '外链', style: null },
       ]
 }
 

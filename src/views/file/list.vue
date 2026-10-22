@@ -107,8 +107,8 @@ const fileTypeOptions = ref<DictOption[]>([])
 
 const loadUploadDictOptions = async () => {
   const [biz, type] = await Promise.all([loadDictOptions('file_biz_type'), loadDictOptions('file_type')])
-  bizTypeOptions.value = biz.length ? biz : [{ value: 'common', label: '通用' }]
-  fileTypeOptions.value = type.length ? type : [{ value: 'ATTACHMENT', label: '附件' }]
+  bizTypeOptions.value = biz.length ? biz : [{ value: 'common', label: '通用', style: null }]
+  fileTypeOptions.value = type.length ? type : [{ value: 'ATTACHMENT', label: '附件', style: null }]
 }
 
 const openUpload = () => {

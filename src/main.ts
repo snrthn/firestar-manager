@@ -10,6 +10,10 @@ import { createPinia } from 'pinia'
 // "Failed to resolve component: el-badge"（2026-10-20 虎哥截图实锤）。
 import ElBadge from 'element-plus/es/components/badge/index.mjs'
 import ElAlert from 'element-plus/es/components/alert/index.mjs'
+// 流程定义页「配置节点」抽屉的可驳回列勾选（V43）：漏注册时 Vue 把
+// <el-checkbox> 当未解析组件，该列渲染成注释节点、控制台
+// "Failed to resolve component: el-checkbox"（2026-10-22 虎哥截图实锤）。
+import ElCheckbox from 'element-plus/es/components/checkbox/index.mjs'
 import ElButton from 'element-plus/es/components/button/index.mjs'
 import ElCard from 'element-plus/es/components/card/index.mjs'
 // ElConfigProvider：全局语言/尺寸等配置的提供者。本项目全程 deep-import，
@@ -22,6 +26,11 @@ import ElConfigProvider from 'element-plus/es/components/config-provider/index.m
 import ElCollapse, { ElCollapseItem } from 'element-plus/es/components/collapse/index.mjs'
 // 问题反馈详情抽屉（V32）
 import ElDrawer from 'element-plus/es/components/drawer/index.mjs'
+// 审批进度时间线（2026-10-22 虎哥拍板：进度窗用时间线替代 Tab，立项/审批中心共用）。
+// ElTimelineItem 没有独立包目录，从 timeline 入口具名导出（同 collapse-item 套路）；
+// 漏注册时 Vue 把 <el-timeline> 当未知元素，进度弹窗只剩裸文字节点、
+// 控制台 "Failed to resolve component: el-timeline"。
+import ElTimeline, { ElTimelineItem } from 'element-plus/es/components/timeline/index.mjs'
 // 注意：ElDescriptionsItem / ElFormItem 没有独立 index.mjs（子组件从父入口导出），
 // 从 descriptions / form 的入口具名 import；该入口是叶节点，只拉自身 src 依赖。
 import ElDescriptions, { ElDescriptionsItem } from 'element-plus/es/components/descriptions/index.mjs'
@@ -97,6 +106,7 @@ import ElCol from 'element-plus/es/components/col/index.mjs'
 // 与上方组件一一对应的样式（每个组件的 style/css 内部会带入 theme-chalk base 样式）
 import 'element-plus/es/components/badge/style/css'
 import 'element-plus/es/components/alert/style/css'
+import 'element-plus/es/components/checkbox/style/css'
 import 'element-plus/es/components/button/style/css'
 import 'element-plus/es/components/card/style/css'
 import 'element-plus/es/components/descriptions/style/css'
@@ -151,6 +161,8 @@ import 'element-plus/es/components/col/style/css'
 import 'element-plus/es/components/collapse/style/css'
 import 'element-plus/es/components/collapse-item/style/css'
 import 'element-plus/es/components/drawer/style/css'
+// 时间线样式（节点圆点/竖线/时间戳排版都在 timeline 包内）
+import 'element-plus/es/components/timeline/style/css'
 import '@/styles/reset.css'
 import '@/styles/theme.css'
 import '@/styles/pages.css'
@@ -163,6 +175,7 @@ app.use(router)
 // 组件注册（ElMessage / ElMessageBox 为函数式组件，同样按需注册）
 app.use(ElBadge)
 app.use(ElAlert)
+app.use(ElCheckbox)
 app.use(ElButton)
 app.use(ElCard)
 app.use(ElConfigProvider)
@@ -170,6 +183,9 @@ app.use(ElConfigProvider)
 app.use(ElCollapse)
 app.use(ElCollapseItem)
 app.use(ElDrawer)
+// 审批进度时间线（项目立项进度弹窗 + 审批中心，2026-10-22）
+app.use(ElTimeline)
+app.use(ElTimelineItem)
 app.use(ElDescriptions)
 app.use(ElDescriptionsItem)
 app.use(ElDialog)

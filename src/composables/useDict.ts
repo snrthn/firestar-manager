@@ -31,6 +31,11 @@ import type { DictDataVO } from '@/types/dict'
 export interface DictOption {
   value: string
   label: string
+  /**
+   * 字典样式（sys_dict_data.style，字典 dict_style：primary/success/warning/danger/info），
+   * 供 el-tag 等标签组件取色；null = 字典未配置（调用方兜底，如 'info'）。
+   */
+  style: string | null
 }
 
 /** typeCode → 已过滤排序的选项；会话级缓存，invalidateDictCache 失效 */
@@ -67,7 +72,7 @@ export async function loadDictOptions(typeCode: string): Promise<DictOption[]> {
       const options: DictOption[] = (page.records || [])
         .filter((item: DictDataVO) => item.status === 'ENABLED')
         .sort((a: DictDataVO, b: DictDataVO) => a.sortNo - b.sortNo || a.id - b.id)
-        .map((item: DictDataVO) => ({ value: item.dictValue, label: item.dictLabel }))
+        .map((item: DictDataVO) => ({ value: item.dictValue, label: item.dictLabel, style: item.style ?? null }))
       optionCache.set(typeCode, options)
       return options
     } catch (e) {
@@ -102,16 +107,24 @@ export interface DictLabeler {
   ready: Ref<boolean>
   /** value → 字典 label；空值返回 placeholder，未命中返回原始值 */
   label: (value?: string | null, placeholder?: string) => string
+  /** value → 字典 style（el-tag 取色用）；空值/未命中/字典未配置返回 null，由调用方兜底 */
+  style: (value?: string | null) => string | null
 }
 
 export function useDictLabels(typeCode: string): DictLabeler {
   const labelMap = ref<Record<string, string>>({})
+  const styleMap = ref<Record<string, string | null>>({})
   const ready = ref(false)
 
   loadDictOptions(typeCode).then((opts) => {
     const map: Record<string, string> = {}
-    for (const o of opts) map[o.value] = o.label
+    const styles: Record<string, string | null> = {}
+    for (const o of opts) {
+      map[o.value] = o.label
+      styles[o.value] = o.style
+    }
     labelMap.value = map
+    styleMap.value = styles
     ready.value = true
   })
 
@@ -120,5 +133,10 @@ export function useDictLabels(typeCode: string): DictLabeler {
     return labelMap.value[value] || value
   }
 
-  return { ready, label }
+  function style(value?: string | null): string | null {
+    if (value == null || value === '') return null
+    return styleMap.value[value] ?? null
+  }
+
+  return { ready, label, style }
 }

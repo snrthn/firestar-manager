@@ -159,7 +159,7 @@
       <el-table :data="versions" v-loading="versionLoading" border empty-text="暂无部署版本">
         <el-table-column prop="version" label="版本" width="55" />
         <el-table-column prop="name" label="名称" min-width="120" />
-        <el-table-column label="状态" width="100">
+        <el-table-column label="状态" width="70">
           <template #default="{ row }">
             <el-tag :type="row.suspended ? 'info' : 'success'">{{ row.suspended ? '挂起' : '激活' }}</el-tag>
           </template>
