@@ -157,15 +157,15 @@
     <!-- 版本抽屉 -->
     <el-drawer v-model="versionDrawer" title="历史版本" size="600px">
       <el-table :data="versions" v-loading="versionLoading" border empty-text="暂无部署版本">
-        <el-table-column prop="version" label="版本" width="80" />
-        <el-table-column prop="name" label="名称" min-width="140" />
+        <el-table-column prop="version" label="版本" width="55" />
+        <el-table-column prop="name" label="名称" min-width="120" />
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.suspended ? 'info' : 'success'">{{ row.suspended ? '挂起' : '激活' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="deploymentId" label="部署ID" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="deploymentTime" label="部署时间" min-width="160" />
+        <el-table-column prop="deploymentId" label="部署ID" min-width="130" show-overflow-tooltip />
+        <el-table-column prop="deploymentTime" label="部署时间" min-width="150" />
       </el-table>
     </el-drawer>
   </el-card>
