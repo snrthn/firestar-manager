@@ -426,14 +426,15 @@ async function submitCreate() {
   gap: 10px;
   padding-bottom: 8px;
 }
-/* 状态筛选下拉：不给定宽度时 el-select 在 flex 容器里塌陷成最小宽（2026-10-21 实锤） */
 /* 类别/状态筛选下拉：不给定宽度时 el-select 在 flex 容器里塌陷成最小宽（2026-10-21 实锤）。
-   DictSelect 的根元素就是 el-select，class 直接落在它身上即可定宽 */
+   DictSelect 的根元素就是 el-select，class 直接落在它身上即可定宽。
+   2026-10-23 虎哥：统一拉齐到全站规范 200px（原 150px 与 .filter-select 并存，
+   同权重靠先后顺序才勉强生效，容易踩坑——两处一并改为 200px）。 */
 .toolbar-right :deep(.el-select) {
-  width: 150px;
+  width: 200px;
 }
 .filter-select {
-  width: 150px;
+  width: 200px;
 }
 .pager {
   margin-top: 14px;

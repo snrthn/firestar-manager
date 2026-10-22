@@ -100,17 +100,38 @@
 
   // 已完成模块的基线种子（代码已收口，运行时验证见本地 mvn/npm；localStorage 一旦写入即由用户状态覆盖）
   // 2026-10-21 同步：平台/基础设施类模块已随后端落地 —— 认证、RBAC、字典、系统管理（含初始化与重置向导）、文件管理。
-  // 财务业务域（立项/发货/应收/收款/开票/核销/退货/看板）仍待开发，保持待开发状态。
+  // 2026-10-23 同步（立项闭环）：①项目立项（8 接口）全链路收口并可演示——草稿 CRUD / 提交审批
+  //   (submit，含重新提交先终结旧实例) / 审批通过 / 驳回退回到指定节点 / 签约(sign) / 审批时间线
+  //   (timeline) / 已设计模式化引擎门面(WorkflowEngineService)；2026-10-22 经云效 run#55 上生产。
+  // ②审批管理（立项部分）：待我审批 / 我发起的 / 我审批的 三 Tab 齐备，claim 补处理人、
+  //   驳回 moveTo、通知去重(dedup_key)、操作审计均已落地。
+  // ③同日补强：发起类数据行级隔离（非 ROLE_ADMIN 只看自己发起的，admin 无条件放行）、
+  //   立项列表新增「项目编号」模糊查询、顶栏铃铛/帮助图标调序、全站查询区下拉宽度收编至 200px 规范。
+  // ⚠️ 已知遗留（不影响主线，待排期）：BPMN 网关化 skipNodeIds 未做（驳回后重审会重走已批节点）；
+  //   ROLE 候选组的通知 receivers 未按角色解析到具体用户。
+  // 财务业务域其余（发货/应收/收款/开票/核销/退货/看板/货物明细）仍待开发，保持待开发状态。
   const DEFAULT_STATE = {
     '0|认证模块': 2,
     '0|RBAC 权限管理': 2,
     '0|字典管理': 2,
     '3|系统管理': 2,
-    '3|文件管理': 2
+    '3|文件管理': 2,
+    '1|项目立项': 2,
+    '1|审批管理（立项部分）': 2
   };
+  // ⚠️ 基线更新必须登记的 key：localStorage 一旦写入就由用户状态优先，DEFAULT_STATE 的增量不会自动显现。
+  //    每次往 DEFAULT_STATE 里新增/改写「已完成」模块，务必把对应 key 加到这里，否则已点过本页的用户
+  //    刷新后仍看到旧值。（只覆盖这里列出的 key，用户手工调过的其余模块状态不受影响）
+  const FORCE_KEYS = [
+    '1|项目立项',
+    '1|审批管理（立项部分）'
+  ];
   function loadState() {
-    try { return Object.assign({}, DEFAULT_STATE, JSON.parse(localStorage.getItem(STORE_KEY)) || {}); }
-    catch (e) { return Object.assign({}, DEFAULT_STATE); }
+    let stored = {};
+    try { stored = JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch (e) { stored = {}; }
+    const s = Object.assign({}, DEFAULT_STATE, stored);
+    FORCE_KEYS.forEach(k => { s[k] = DEFAULT_STATE[k]; });
+    return s;
   }
   function saveState(s) { localStorage.setItem(STORE_KEY, JSON.stringify(s)); }
 

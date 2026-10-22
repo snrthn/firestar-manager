@@ -260,7 +260,8 @@ onMounted(loadList)
         <el-input v-model="query.projectName" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="审批状态">
-        <DictSelect v-model="query.approvalStatus" type-code="project_approval_status" placeholder="全部" style="width: 160px" />
+        <!-- 宽度走 pages.css 的 .query-bar 统一规范（200px），不再内联绕过 -->
+        <DictSelect v-model="query.approvalStatus" type-code="project_approval_status" placeholder="全部" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>
