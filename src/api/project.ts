@@ -4,11 +4,11 @@ import type { ProjectPageVO, ProjectFormData, ProjectSignFormData, ProjectVO, Ti
 
 // 立项管理接口（后端 /project/**）
 
-/** 分页立项列表（projectName 模糊、approvalStatus 精确；默认每页 10 条） */
+/** 分页立项列表（projectNo / projectName 模糊、approvalStatus 精确；默认每页 10 条） */
 export function projectPage(
   pageNum = 1,
   pageSize = 10,
-  params: { projectName?: string; approvalStatus?: string } = {},
+  params: { projectNo?: string; projectName?: string; approvalStatus?: string } = {},
 ) {
   return request
     .get<ApiResult<ProjectPageVO>>('/project/page', { params: { pageNum, pageSize, ...params } })

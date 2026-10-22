@@ -16,6 +16,7 @@ import { useDictLabels } from '@/composables/useDict'
 
 // ===== 查询条件 =====
 const query = reactive({
+  projectNo: '',
   projectName: '',
   approvalStatus: '',
 })
@@ -26,6 +27,7 @@ const handleQuery = () => {
 }
 
 const resetQuery = () => {
+  query.projectNo = ''
   query.projectName = ''
   query.approvalStatus = ''
   pageNum.value = 1
@@ -43,6 +45,7 @@ const loadList = async () => {
   loading.value = true
   try {
     const page = await projectPage(pageNum.value, pageSize.value, {
+      projectNo: query.projectNo || undefined,
       projectName: query.projectName || undefined,
       approvalStatus: query.approvalStatus || undefined,
     })
@@ -250,6 +253,9 @@ onMounted(loadList)
   <el-card shadow="never">
     <!-- 查询区 -->
     <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
+      <el-form-item label="项目编号">
+        <el-input v-model="query.projectNo" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
+      </el-form-item>
       <el-form-item label="项目名称">
         <el-input v-model="query.projectName" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>

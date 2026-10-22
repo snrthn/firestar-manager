@@ -194,12 +194,8 @@ async function openAbout() {
     </div>
 
     <div class="header-right">
-      <!-- 帮助中心：铃铛与全屏之间（V32，虎哥 2026-10-21 拍板） -->
-      <button class="icon-btn" type="button" title="帮助中心" @click="goHelp">
-        <el-icon :size="16"><QuestionFilled /></el-icon>
-      </button>
-
-      <!-- 通知铃铛：用户侧功能，无权限点 -->
+      <!-- 通知铃铛：用户侧功能，无权限点（2026-10-23 虎哥：调到帮助前面，铃铛点击频次高、
+           原顺序容易误点帮助图标） -->
       <el-badge
         :value="notify.unreadCount"
         :max="99"
@@ -210,6 +206,11 @@ async function openAbout() {
           <el-icon :size="16"><Bell /></el-icon>
         </button>
       </el-badge>
+
+      <!-- 帮助中心：铃铛之后（2026-10-23 调换，原 V32 顺序为帮助在前） -->
+      <button class="icon-btn" type="button" title="帮助中心" @click="goHelp">
+        <el-icon :size="16"><QuestionFilled /></el-icon>
+      </button>
 
       <button class="icon-btn" type="button" title="全屏切换" @click="toggleFullscreen">
         <el-icon :size="16"><FullScreen /></el-icon>
@@ -456,9 +457,16 @@ async function openAbout() {
   z-index: 10;
 }
 /* ===== 通知面板 ===== */
+/* 徽标小巧化（2026-10-23 虎哥：位置保持不动，只缩小视觉体积）。
+   EP 默认 height 18px / font-size 12px / padding 6px，等比缩到 14/10/3，
+   圆角同步 7px 保持胶囊形；top/right 维持原值不动。 */
 .notify-badge :deep(.el-badge__content) {
   top: 6px;
   right: 10px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 10px;
+  border-radius: 7px;
 }
 .notify-mask {
   position: fixed;
