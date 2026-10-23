@@ -359,7 +359,7 @@ onMounted(loadList)
     <el-form label-width="90px" @submit.prevent>
       <el-form-item label="合同金额">
         <el-input-number v-model="signForm.contractAmount" :min="0" :precision="2" :step="1000"
-                         controls-position="right" style="width: 100%" placeholder="最终合同金额" />
+                         class="amount-left" controls-position="right" style="width: 100%" placeholder="最终合同金额" />
       </el-form-item>
       <el-form-item label="签约描述">
         <el-input v-model="signForm.contractDesc" type="textarea" :rows="3" maxlength="500"
@@ -388,7 +388,7 @@ onMounted(loadList)
       </el-form-item>
       <el-form-item label="合同金额">
         <el-input-number v-model="form.contractAmount" :min="0" :precision="2" :step="1000"
-                         controls-position="right" style="width: 100%" />
+                         class="amount-left" controls-position="right" style="width: 100%" />
       </el-form-item>
     </el-form>
     <template #footer>
@@ -413,4 +413,9 @@ onMounted(loadList)
   margin-top: 16px;
 }
 /* ===== 审批进度时间线样式已移至 components/ApprovalProgressDialog.vue（卡片化，两页共用） ===== */
+
+/* 2026-10-23 虎哥：合同金额输入框内容左对齐（el-input-number 默认偏右/居中，强制内部 input 左对齐） */
+.amount-left :deep(.el-input__inner) {
+  text-align: left;
+}
 </style>
