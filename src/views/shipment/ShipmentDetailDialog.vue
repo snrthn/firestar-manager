@@ -339,7 +339,10 @@ const reload = async () => {
 //       节点样式判定全部收归组件内，本文件不再保留副本）=====
 
 // 操作区展示判定（2026-10-23 虎哥：审批动作收归审批中心，本弹窗只做业务推进 + 撤回）
-const canMarkShipped = () => detail.value?.shipmentStatus === 'PENDING'
+// 标记已发货必须审批通过（2026-10-24 虎哥补洞）：PENDING 同时覆盖审批中/已通过待发货，
+// 只判状态会让「审批没批完就发货」的按钮亮着，与后端 approval_status 闸门对齐双保险
+const canMarkShipped = () =>
+  detail.value?.shipmentStatus === 'PENDING' && detail.value?.approvalStatus === 'APPROVED'
 // 部分收货（PARTIAL_RECEIVED）也可续收剩余量（2026-10-24 虎哥：玻璃水收 0 后剩余的还要再收）
 const canReceive = () =>
   detail.value?.shipmentStatus === 'SHIPPED' || detail.value?.shipmentStatus === 'PARTIAL_RECEIVED'
