@@ -97,6 +97,10 @@ import ElDatePicker from 'element-plus/es/components/date-picker/index.mjs'
 // <el-image-viewer> 被当未知元素，点击图片无任何反应、控制台
 // "Failed to resolve component: el-image-viewer"（同 el-badge 族坑）。
 import ElImageViewer from 'element-plus/es/components/image-viewer/index.mjs'
+// 图片缩略图 + 点击预览（发货详情签收证据，2026-10-23 虎哥：图片点击弹窗预览不跳新页）：
+// el-image 的 preview 能力内部复用 ElImageViewer（上方已注册），此处只需注册 image 本体。
+// 漏注册时 <el-image> 渲染成未知自定义元素，证据区只剩裸文件名。
+import ElImage from 'element-plus/es/components/image/index.mjs'
 // 栅格布局（协议管理页双栏：当前正文 14 / 版本历史 10）：
 // row 和 col 是两个独立包目录（es/components/row、es/components/col），各自注册。
 // 未注册时 Vue 把 <el-row>/<el-col> 当未知自定义元素渲染，控制台
@@ -154,6 +158,8 @@ import 'element-plus/es/components/upload/style/css'
 import 'element-plus/es/components/date-picker/style/css'
 // 图片预览大图样式（viewer 全屏遮罩 + 箭头/计数工具栏）
 import 'element-plus/es/components/image-viewer/style/css'
+// el-image 样式（缩略图容器、加载/错误占位、hover 放大镜提示）
+import 'element-plus/es/components/image/style/css'
 // 栅格 row/col 样式（col 的 width 百分比、row 的 flex/gutter 负 margin 都在这两个包内）
 import 'element-plus/es/components/row/style/css'
 import 'element-plus/es/components/col/style/css'
@@ -229,4 +235,6 @@ app.use(ElUpload)
 app.use(ElDatePicker)
 // 图片预览大图（RichView 富文本图片点击预览）
 app.use(ElImageViewer)
+// 图片缩略图 + 点击预览（发货详情签收证据，2026-10-23）
+app.use(ElImage)
 app.mount('#app')

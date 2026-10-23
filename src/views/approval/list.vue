@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { Refresh, Search } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import DictSelect from '@/components/DictSelect.vue'
 import ApprovalProgressDialog from '@/components/ApprovalProgressDialog.vue'
 import { myTasksPage, myStartedPage, myApprovedHistoryPage, completeTask, rejectTask } from '@/api/approval'
+import { completeShipmentTask, rejectShipmentTask } from '@/api/shipment'
 import { formatDateTime } from '@/utils/datetime'
 import type { ApprovalHistoryVO, TaskInfoVO } from '@/types/approval'
 import type { ProjectVO } from '@/types/project'
+
+const router = useRouter()
+
+/** 发货审批任务标识（2026-10-23 通用化：待办 enrich 按流程 key 分发，前端审批动作同样按 key 路由） */
+const SHIPMENT_PROCESS_CODE = 'shipment_approval'
+const isShipmentTask = (row: TaskInfoVO | ApprovalHistoryVO) =>
+  row.processDefinitionKey === SHIPMENT_PROCESS_CODE
 
 // ===== 顶部 Tab（2026-10-22 虎哥：审批中心按标准页面改造，我发起的 / 我审批的）=====
 const activeTab = ref('approval')
@@ -172,8 +181,10 @@ const openDialog = (row: TaskInfoVO, act: 'approve' | 'reject') => {
 
 const handleSubmit = async () => {
   if (!currentTask.value) return
+  const shipment = isShipmentTask(currentTask.value)
   if (action.value === 'reject') {
-    if (!rejectTarget.value) {
+    // 发货流程单节点无退回目标（rejectTargets 恒空），仅校验理由；立项多节点需选退回节点
+    if (!shipment && !rejectTarget.value) {
       ElMessage.warning('请选择退回节点')
       return
     }
@@ -186,10 +197,18 @@ const handleSubmit = async () => {
   try {
     if (action.value === 'approve') {
       // 留言选填：空串后端不落评论（complete 内 comment blank 才 addComment）
-      await completeTask(currentTask.value.taskId, { comment: comment.value.trim() })
+      if (shipment) {
+        await completeShipmentTask(currentTask.value.taskId, { comment: comment.value.trim() })
+      } else {
+        await completeTask(currentTask.value.taskId, { comment: comment.value.trim() })
+      }
       ElMessage.success('已通过')
     } else {
-      await rejectTask(currentTask.value.taskId, rejectTarget.value, comment.value.trim())
+      if (shipment) {
+        await rejectShipmentTask(currentTask.value.taskId, comment.value.trim())
+      } else {
+        await rejectTask(currentTask.value.taskId, rejectTarget.value, comment.value.trim())
+      }
       ElMessage.success('已驳回')
     }
     dialogVisible.value = false
@@ -270,8 +289,17 @@ onMounted(loadApprovals)
           <el-table-column label="到达时间" min-width="170">
             <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="160" fixed="right" align="center">
+          <el-table-column label="操作" width="250" fixed="right" align="center">
             <template #default="{ row }">
+              <el-button
+                v-if="isShipmentTask(row)"
+                link
+                type="primary"
+                size="small"
+                :disabled="!row.bizKey"
+                @click="router.push(`/shipment?detail=${row.bizKey}`)"
+              >查看详情</el-button>
+              <el-button v-else link type="primary" size="small" @click="openProgress(Number(row.bizKey), row.bizTitle || '')">查看进度</el-button>
               <el-button link type="primary" size="small" @click="openDialog(row, 'approve')">通过</el-button>
               <el-button link type="danger" size="small" @click="openDialog(row, 'reject')">驳回</el-button>
             </template>
@@ -350,9 +378,18 @@ onMounted(loadApprovals)
           <el-table-column label="处理时间" min-width="170">
             <template #default="{ row }">{{ formatDateTime(row.endTime) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right" align="center">
+          <el-table-column label="操作" width="250" fixed="right" align="center">
             <template #default="{ row }">
               <el-button
+                v-if="isShipmentTask(row)"
+                link
+                type="primary"
+                size="small"
+                :disabled="!row.bizKey"
+                @click="router.push(`/shipment?detail=${row.bizKey}`)"
+              >查看详情</el-button>
+              <el-button
+                v-else
                 link
                 type="primary"
                 size="small"
@@ -389,7 +426,7 @@ onMounted(loadApprovals)
             <el-radio label="reject">驳回</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item v-if="action === 'reject'" label="退回节点" required>
+        <el-form-item v-if="action === 'reject' && currentTask && !isShipmentTask(currentTask)" label="退回节点" required>
           <el-select v-model="rejectTarget" placeholder="请选择退回节点" style="width: 100%">
             <el-option
               v-for="n in currentTask?.rejectTargets || []"

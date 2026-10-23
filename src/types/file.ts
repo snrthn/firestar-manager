@@ -21,6 +21,8 @@ export interface FileVO {
   fileType: string | null
   /** 关联业务类型（invoice/receipt 等，为空归到 common） */
   bizType: string | null
+  /** 关联业务 ID（按 bizType+bizId 关联业务单据，如发货单签收证据 bizType=shipment_receive_proof） */
+  bizId: number | null
   /** 文件大小（字节） */
   fileSize: number | null
   mimeType: string | null

@@ -1,11 +1,22 @@
 <script setup lang="ts">
-import { computed, ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { computed, ref, useAttrs, watch, nextTick, onBeforeUnmount } from 'vue'
 import DOMPurify from 'dompurify'
 import { resolveImagesIn } from '@/utils/richImage'
 
 // 富文本展示组件：对后端返回的 HTML（Tiptap 产出）做 DOMPurify 净化后再 v-html，
 // 阻断 XSS（协议/关于我们等内容由运营录入，必须经净化，绝对不能直接 v-html 原始串）。
 // 净化后解析内网文件图片（带 token 转 blob），使其正确显示。
+//
+// ⚠️ inheritAttrs:false + 手动 v-bind="attrs"（2026-10-23 虎哥截图实锤的修复）：
+// 本组件模板根是 Fragment（内容 div + 图片查看器两个根），Vue 的自动 attr 继承
+// 对 Fragment 根无效——调用方传的 class 会被静默丢弃并刷
+// "Extraneous non-props attributes (class) ... Fragment or text or teleport root nodes" 警告。
+// 该问题自 10-21 图片预览功能（新增 el-image-viewer 第二根）引入，六个调用方
+// （about-notice / a-content / agree-content / agr-content / d-content / msg-content）
+// 传的 class 全部没生效。关自动继承、把 attrs 全量绑到内容 div 上，恢复单根时代行为。
+defineOptions({ inheritAttrs: false })
+const attrs = useAttrs()
+
 const props = defineProps<{
   /** 后端返回的富文本 HTML（可能为 null/空） */
   html?: string | null
@@ -63,13 +74,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="rootRef" class="rich-view" :class="className" v-html="clean" />
-  <!-- 图片预览大图（需求③）：全局注册于 main.ts，url-list 为点击时现取的 img.src -->
+  <!-- attrs 手动绑到内容 div（inheritAttrs:false，见 script 注释）：调用方 class 恢复落到
+       内容节点上——与 10-21 图片预览功能引入第二根之前的单根行为一致 -->
+  <div ref="rootRef" class="rich-view" :class="className" v-html="clean" v-bind="attrs" />
+  <!-- 图片预览大图（需求③）：全局注册于 main.ts，url-list 为点击时现取的 img.src；
+       hide-on-click-modal：点击遮罩即关（2026-10-23 虎哥要求，与其它图片预览交互一致） -->
   <el-image-viewer
     v-if="viewerVisible"
     :url-list="viewerUrls"
     :initial-index="viewerIndex"
     teleported
+    hide-on-click-modal
     @close="viewerVisible = false"
   />
 </template>

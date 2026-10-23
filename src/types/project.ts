@@ -1,4 +1,5 @@
 // 立项模块前后端共享类型（与后端 com.firestar.dto.ProjectVO / ProjectRequest 对齐）
+import type { ItemVO } from './shipment'
 
 /** 分页结果（与后端 MyBatis-Plus IPage 序列化字段对齐：records/total/size/current/pages） */
 export interface ProjectPageVO {
@@ -24,6 +25,12 @@ export interface ProjectVO {
   contractStatus: string | null
   /** 合同总金额（BigDecimal，序列化为数值） */
   contractAmount: number | null
+  /** 累计发货金额（Σ fin_shipment.shipment_amount，按项目聚合，发货流程起有数） */
+  shippedAmount: number | null
+  /** 累计已收金额（Σ fin_shipment.received_amount） */
+  receivedAmount: number | null
+  /** 累计退货金额（Σ fin_shipment.returned_amount） */
+  returnedAmount: number | null
   /** 签约描述/签约留言（签约时补录，非必填；V46） */
   contractDesc: string | null
   /** 签约时间（V46） */
@@ -41,6 +48,8 @@ export interface ProjectVO {
   /** Flowable 流程实例 ID（提交审批后非空） */
   processInstanceId: string | null
   createdAt: string | null
+  /** 货物明细列表（方案2：立项带行；仅详情返回，列表页为空） */
+  items?: ItemVO[]
 }
 
 // 立项表单（新增 / 编辑共用，与后端 ProjectRequest 对齐）
@@ -52,6 +61,17 @@ export interface ProjectFormData {
   customerName?: string
   salesManagerId?: number
   contractAmount?: number
+  /** 货物明细（方案2：立项带行） */
+  items?: ProjectItemForm[]
+}
+
+/** 立项货物明细行（与后端 ProjectItemReq 对齐） */
+export interface ProjectItemForm {
+  itemName: string
+  specModel?: string
+  unit?: string
+  quantity?: number
+  unitPrice?: number
 }
 
 /** 签约表单（审批通过后的独立动作；金额可修正为最终合同额，描述非必填） */

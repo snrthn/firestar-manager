@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import type { FormInstance } from 'element-plus'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Delete, Plus, Refresh, Search } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import { projectPage, createProject, submitProject, projectDetail, updateProject, signProject } from '@/api/project'
-import type { ProjectFormData, ProjectSignFormData, ProjectVO } from '@/types/project'
+import type { ProjectFormData, ProjectItemForm, ProjectSignFormData, ProjectVO } from '@/types/project'
 import ApprovalProgressDialog from '@/components/ApprovalProgressDialog.vue'
 import { formatDateTime } from '@/utils/datetime'
 import { listUserOptions } from '@/api/user'
@@ -82,7 +82,27 @@ const emptyForm = (): ProjectFormData => ({
   customerName: '',
   salesManagerId: undefined,
   contractAmount: undefined,
+  items: [],
 })
+
+/** 新建一行空白货物明细（方案2：立项带行） */
+const newItem = (): ProjectItemForm => ({ itemName: '', specModel: '', unit: '', quantity: 1, unitPrice: undefined })
+const addItem = () => {
+  if (!form.items) form.items = []
+  form.items.push(newItem())
+}
+const removeItem = (idx: number) => {
+  form.items?.splice(idx, 1)
+}
+/** 单行金额 = 数量 × 单价 */
+const itemLineAmount = (it: ProjectItemForm) =>
+  Number(((it.quantity ?? 0) * (it.unitPrice ?? 0)).toFixed(2))
+/** 明细合计（作为合同金额的推荐值） */
+const itemsTotal = () => (form.items ?? []).reduce((s, it) => s + itemLineAmount(it), 0)
+/** 一键把明细合计带入合同金额（提交前可由签约阶段再覆盖） */
+const bringAmount = () => {
+  form.contractAmount = Number(itemsTotal().toFixed(2))
+}
 
 const form = reactive<ProjectFormData>(emptyForm())
 
@@ -112,6 +132,14 @@ const openEdit = async (row: ProjectVO) => {
       customerName: detail.customerName ?? undefined,
       salesManagerId: detail.salesManagerId ?? undefined,
       contractAmount: detail.contractAmount ?? undefined,
+      // 方案2：立项带行 —— 编辑回填货物明细（detail.items → 表单行）
+      items: (detail.items ?? []).map((it) => ({
+        itemName: it.itemName ?? '',
+        specModel: it.specModel ?? '',
+        unit: it.unit ?? '',
+        quantity: it.quantity,
+        unitPrice: it.unitPrice ?? undefined,
+      })),
     })
     dialogTitle.value = '编辑立项'
     dialogVisible.value = true
@@ -299,6 +327,15 @@ onMounted(loadList)
       <el-table-column label="合同金额" width="150" align="right">
         <template #default="{ row }">{{ formatAmount(row.contractAmount) }}</template>
       </el-table-column>
+      <el-table-column label="已发金额" width="130" align="right">
+        <template #default="{ row }">{{ formatAmount(row.shippedAmount) }}</template>
+      </el-table-column>
+      <el-table-column label="已收金额" width="130" align="right">
+        <template #default="{ row }">{{ formatAmount(row.receivedAmount) }}</template>
+      </el-table-column>
+      <el-table-column label="退货金额" width="130" align="right">
+        <template #default="{ row }">{{ formatAmount(row.returnedAmount) }}</template>
+      </el-table-column>
       <el-table-column label="审批状态" width="110" align="center">
         <template #default="{ row }">
           <el-tag :type="row.approvalStatusStyle || 'info'" size="small">
@@ -373,7 +410,7 @@ onMounted(loadList)
   </el-dialog>
 
   <!-- 新建立项弹窗 -->
-  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px">
+  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="920px">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
       <el-form-item label="项目名称" prop="projectName">
         <el-input v-model="form.projectName" placeholder="请输入项目名称" maxlength="128" show-word-limit />
@@ -390,6 +427,56 @@ onMounted(loadList)
         <el-input-number v-model="form.contractAmount" :min="0" :precision="2" :step="1000"
                          class="amount-left" controls-position="right" style="width: 100%" />
       </el-form-item>
+
+      <!-- 方案2：立项带行 —— 货物明细表（标题栏用 div 实现，规避 el-divider 按需注册缺失） -->
+      <div class="items-section-title">
+        <span class="items-section-title-text">货物明细（合同标的，发货按行校验超发）</span>
+      </div>
+      <div class="item-table">
+        <el-table :data="form.items || []" border>
+          <el-table-column type="index" label="#" width="44" align="center" />
+          <el-table-column label="货物名称" min-width="160">
+            <template #default="{ row }">
+              <el-input v-model="row.itemName" placeholder="必填" />
+            </template>
+          </el-table-column>
+          <el-table-column label="规格" min-width="120">
+            <template #default="{ row }">
+              <el-input v-model="row.specModel" placeholder="选填" />
+            </template>
+          </el-table-column>
+          <el-table-column label="单位" width="80">
+            <template #default="{ row }">
+              <el-input v-model="row.unit" placeholder="选填" />
+            </template>
+          </el-table-column>
+          <el-table-column label="数量" width="110">
+            <template #default="{ row }">
+              <el-input-number v-model="row.quantity" :min="1" :precision="0" :controls-position="'right'" style="width: 100%" />
+            </template>
+          </el-table-column>
+          <el-table-column label="单价" width="130">
+            <template #default="{ row }">
+              <el-input-number v-model="row.unitPrice" :min="0" :precision="2" :controls-position="'right'" style="width: 100%" />
+            </template>
+          </el-table-column>
+          <el-table-column label="行金额" width="110" align="right">
+            <template #default="{ row }">
+              <b>{{ formatAmount(itemLineAmount(row)) }}</b>
+            </template>
+          </el-table-column>
+          <el-table-column label="" width="50" align="center">
+            <template #default="{ $index }">
+              <el-button type="danger" link :icon="Delete" @click="removeItem($index)" />
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="item-actions">
+          <el-button type="primary" plain :icon="Plus" @click="addItem">添加货物</el-button>
+          <span class="muted">明细合计：<b>{{ formatAmount(itemsTotal()) }}</b></span>
+          <el-button link type="primary" @click="bringAmount">带入合同金额</el-button>
+        </div>
+      </div>
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
@@ -417,5 +504,31 @@ onMounted(loadList)
 /* 2026-10-23 虎哥：合同金额输入框内容左对齐（el-input-number 默认偏右/居中，强制内部 input 左对齐） */
 .amount-left :deep(.el-input__inner) {
   text-align: left;
+}
+/* 方案2 立项带行：明细标题栏、操作区与 muted 文本 */
+.items-section-title {
+  margin: 20px 0 14px;
+  padding-left: 10px;
+  border-left: 3px solid var(--el-color-primary);
+  line-height: 20px;
+}
+.items-section-title-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.item-table :deep(.el-table th .cell),
+.item-table :deep(.el-table td .cell) {
+  padding: 0 8px;
+}
+.item-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+}
+.muted {
+  color: #909399;
+  font-size: 13px;
 }
 </style>

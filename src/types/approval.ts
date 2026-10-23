@@ -27,6 +27,8 @@ export interface TaskInfoVO {
   processInstanceId: string
   /** 业务单据标识（如项目 ID） */
   bizKey: string | null
+  /** 流程定义 key（project_initiate / shipment_approval；前端按此分发审批动作路由，2026-10-23） */
+  processDefinitionKey: string | null
   /** 业务标题（如项目名称，由后端 enrich） */
   bizTitle: string | null
   /** 可驳回目标节点列表 */
@@ -64,6 +66,8 @@ export interface ApprovalHistoryVO {
   processInstanceId: string
   /** 业务单据标识（项目 ID，前端据此调进度接口） */
   bizKey: string | null
+  /** 流程定义 key（project_initiate / shipment_approval；前端按此分发查看入口，2026-10-23） */
+  processDefinitionKey: string | null
   /** 业务标题（项目名称，后端 enrich） */
   bizTitle: string | null
   /** 实际操作人展示名 */
