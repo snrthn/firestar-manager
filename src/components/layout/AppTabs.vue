@@ -117,8 +117,11 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
         v-if="t.fullPath !== AFFIX_TAB_PATH"
         class="tab-close"
         @click="closeTab(t.fullPath, $event)"
-        >×</span
       >
+        <!-- 2026-10-23 虎哥反馈：文本 × 在不同浏览器倍率下垂直位置漂移（字体度量+亚像素取整所致），
+             换 SVG 图标（Close）几何居中，与字体彻底脱钩 -->
+        <el-icon :size="10"><Close /></el-icon>
+      </span>
     </div>
 
     <!-- 右键浮层菜单（工作台为固定页签：不可关闭） -->
@@ -168,6 +171,8 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   color: #606266;
   white-space: nowrap;
   cursor: pointer;
+  /* 2026-10-23 虎哥：禁用页签鼠标拖动选中（标题文字不可被选中拖蓝） */
+  user-select: none;
   transition: all 0.15s;
 }
 .tab:hover {
@@ -189,8 +194,6 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  font-size: 12px;
-  line-height: 1;
   color: #909399;
   transition: all 0.15s;
 }
