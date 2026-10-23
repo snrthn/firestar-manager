@@ -38,9 +38,10 @@
       <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
       <el-table-column label="操作" width="300" fixed="right" align="center">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openNodes(row)">配置节点</el-button>
+          <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
+          <el-button link type="warning" size="small" @click="openNodes(row)">配置节点</el-button>
           <el-button link type="success" size="small" @click="onDeploy(row)">部署</el-button>
-          <el-button link type="warning" size="small" @click="onToggle(row)">
+          <el-button link :type="row.status === 'ENABLED' ? 'danger' : 'success'" size="small" @click="onToggle(row)">
             {{ row.status === 'ENABLED' ? '停用' : '启用' }}
           </el-button>
           <el-button link type="info" size="small" @click="openVersions(row)">版本</el-button>
@@ -78,6 +79,25 @@
       <template #footer>
         <el-button @click="createVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="onCreate">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑流程：仅改名称/备注，不动节点、不重新部署，对在跑业务零影响 -->
+    <el-dialog v-model="editVisible" title="编辑流程" width="480px">
+      <el-form :model="editForm" label-width="90px">
+        <el-form-item label="流程编码">
+          <el-input :model-value="editForm.processCode" disabled />
+        </el-form-item>
+        <el-form-item label="流程名称" required>
+          <el-input v-model="editForm.processName" placeholder="如 项目立项审批" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="editForm.remark" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="onEdit">确定</el-button>
       </template>
     </el-dialog>
 
@@ -259,6 +279,9 @@ const deploying = ref(false)
 const createVisible = ref(false)
 const form = ref<Partial<ProcessDef>>({ processCode: '', processName: '', remark: '' })
 
+const editVisible = ref(false)
+const editForm = ref<Partial<ProcessDef>>({ processCode: '', processName: '', remark: '' })
+
 const nodeDrawer = ref(false)
 const versionDrawer = ref(false)
 const current = ref<ProcessDef | null>(null)
@@ -282,6 +305,40 @@ async function ensureOptions() {
 function openCreate() {
   form.value = { processCode: '', processName: '', remark: '' }
   createVisible.value = true
+}
+
+function openEdit(row: ProcessDef) {
+  editForm.value = {
+    id: row.id,
+    processCode: row.processCode,
+    processName: row.processName,
+    remark: row.remark,
+  }
+  editVisible.value = true
+}
+
+async function onEdit() {
+  const id = editForm.value.id
+  if (!id || !editForm.value.processName) {
+    ElMessage.warning('流程名称必填')
+    return
+  }
+  saving.value = true
+  try {
+    // 只传 processName / remark：后端 update 仅在 nodeList 非空时才覆盖节点，
+    // 这里不传 nodeList，故在跑流程的节点配置与 Flowable 部署版本均不受影响
+    await updateProcessDef(id, {
+      processName: editForm.value.processName,
+      remark: editForm.value.remark,
+    })
+    ElMessage.success('保存成功')
+    editVisible.value = false
+    await loadList()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || '保存失败')
+  } finally {
+    saving.value = false
+  }
 }
 
 async function onCreate() {
@@ -401,6 +458,16 @@ async function onDeploy(row: ProcessDef) {
 }
 
 async function onToggle(row: ProcessDef) {
+  const action = row.status === 'ENABLED' ? '停用' : '启用'
+  const tip =
+    row.status === 'ENABLED'
+      ? `停用后新单据将无法发起该流程，已在审批中的单据不受影响。确认停用「${row.processName}」？`
+      : `确认启用流程「${row.processName}」？`
+  try {
+    await ElMessageBox.confirm(tip, `${action}确认`, { type: 'warning' })
+  } catch {
+    return
+  }
   try {
     await toggleProcessDef(row.id!)
     ElMessage.success('操作成功')
