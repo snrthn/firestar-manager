@@ -40,6 +40,16 @@ export function createShipment(data: ShipmentCreateForm) {
   return request.post<ApiResult<number>>('/shipment', data).then((r) => r.data.data!)
 }
 
+/** 编辑发货单（2026-10-23 虎哥要求补入口）：仅 PENDING 可改，项目不可更换 */
+export function updateShipment(id: number, data: ShipmentCreateForm) {
+  return request.put<ApiResult<null>>(`/shipment/${id}`, data).then((r) => r.data)
+}
+
+/** 申请人撤回发货申请（方案 B：流程未结束即可撤回 → CANCELLED + 退还货物额度） */
+export function withdrawShipment(id: number) {
+  return request.post<ApiResult<null>>(`/shipment/${id}/withdraw`).then((r) => r.data)
+}
+
 /** 标记已发货（审批通过后；shippedById = 当前操作人，决策#2；后端端点 /shipment/{id}/ship） */
 export function markShipped(id: number) {
   return request.post<ApiResult<null>>(`/shipment/${id}/ship`).then((r) => r.data)

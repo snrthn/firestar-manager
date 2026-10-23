@@ -102,7 +102,7 @@
     </el-dialog>
 
     <!-- 配置节点抽屉 -->
-    <el-drawer v-model="nodeDrawer" title="配置节点" size="680px" @open="onNodeDrawerOpen">
+    <el-drawer v-model="nodeDrawer" title="配置节点" size="640px" @open="onNodeDrawerOpen">
       <template v-if="current">
         <el-alert
           :title="`当前流程：${current.processName}（${current.processCode}）`"
@@ -175,7 +175,7 @@
     </el-drawer>
 
     <!-- 版本抽屉 -->
-    <el-drawer v-model="versionDrawer" title="历史版本" size="600px">
+    <el-drawer v-model="versionDrawer" title="历史版本" size="640px">
       <el-table :data="versions" v-loading="versionLoading" border empty-text="暂无部署版本">
         <el-table-column prop="version" label="版本" width="55" />
         <el-table-column prop="name" label="名称" min-width="120" />

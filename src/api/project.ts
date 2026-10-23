@@ -38,6 +38,11 @@ export function updateProject(id: number, data: ProjectFormData) {
 }
 
 /** 审批进度：某立项单据的完整审批时间线（ACT_HI_TASKINST 单源，无流程实例时返回空数组） */
+/** 申请人撤回立项审批（方案 B：流程未结束即可撤回 → CANCELLED 终态；仅发起人可撤） */
+export function withdrawProject(id: number) {
+  return request.post<ApiResult<null>>(`/project/${id}/withdraw`).then((r) => r.data)
+}
+
 export function projectTimeline(id: number) {
   return request
     .get<ApiResult<TimelineNodeVO[]>>(`/project/${id}/timeline`)

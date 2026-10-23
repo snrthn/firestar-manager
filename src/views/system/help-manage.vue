@@ -241,7 +241,7 @@ async function remove(row: HelpArticle) {
     <el-dialog
       v-model="dialog"
       :title="editingId == null ? '新建帮助条目' : '编辑帮助条目'"
-      width="680px"
+      width="640px"
       append-to-body
     >
       <el-form label-width="70px">

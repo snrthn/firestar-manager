@@ -531,7 +531,7 @@ onMounted(() => {
   </el-card>
 
   <!-- 新增 / 修改弹窗 -->
-  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px">
+  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="640px">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
       <el-form-item label="菜单类型" prop="menuType">
         <!-- 选项来自字典 menu_type（启用中、按 sort_no 升序）：

@@ -67,7 +67,7 @@
     <el-dialog
       v-model="resetVisible"
       :title="resetType === 'full' ? '完整重置确认' : '轻度重置确认'"
-      width="520px"
+      width="480px"
       @closed="onResetClosed"
     >
       <el-alert :type="resetType === 'full' ? 'error' : 'warning'" :closable="false" :title="resetWarnText" class="ir-tip" />

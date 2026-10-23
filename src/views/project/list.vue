@@ -7,7 +7,7 @@ import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import { projectPage, createProject, submitProject, projectDetail, updateProject, signProject } from '@/api/project'
 import type { ProjectFormData, ProjectItemForm, ProjectSignFormData, ProjectVO } from '@/types/project'
-import ApprovalProgressDialog from '@/components/ApprovalProgressDialog.vue'
+import ProjectDetailDialog from './ProjectDetailDialog.vue'
 import { formatDateTime } from '@/utils/datetime'
 import { listUserOptions } from '@/api/user'
 import type { UserOptionVO } from '@/types/user'
@@ -91,7 +91,17 @@ const addItem = () => {
   if (!form.items) form.items = []
   form.items.push(newItem())
 }
-const removeItem = (idx: number) => {
+const removeItem = async (idx: number) => {
+  // 二次确认（虎哥 2026-10-24）：误删一行明细会让合同金额/发货校验都跟着错，必须拦一下
+  try {
+    await ElMessageBox.confirm('确认删除这一行货物明细？删除后合同金额不会自动回算，请留意下方合计。', '删除明细', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
   form.items?.splice(idx, 1)
 }
 /** 单行金额 = 数量 × 单价 */
@@ -157,6 +167,11 @@ const ensureUserOptions = async () => {
 const handleSubmit = async () => {
   if (!formRef.value) return
   await formRef.value.validate()
+  // 合同金额自动带入（虎哥 2026-10-24）：明细有值、但合同金额没填（空/0）时，
+  // 自动取明细合计兜底，避免漏填被后端校验打回。用户已显式填过（>0）则尊重其输入。
+  if ((form.contractAmount == null || form.contractAmount === 0) && itemsTotal() > 0) {
+    form.contractAmount = Number(itemsTotal().toFixed(2))
+  }
   saving.value = true
   try {
     const { id, ...payload } = form
@@ -193,6 +208,9 @@ const handleSubmitApproval = async (row: ProjectVO) => {
   try {
     await submitProject(row.id)
     ElMessage.success('已提交审批')
+    // 详情弹窗入口也会走这里（handleDetailSubmit），提交即离开详情（2026-10-24 虎哥：窗口要关）。
+    // 列表入口触发时 detailVisible 本就是 false，无副作用。
+    detailVisible.value = false
     await reloadAfterMutation()
   } catch (e) {
     ElMessage.error((e as Error).message)
@@ -201,16 +219,25 @@ const handleSubmitApproval = async (row: ProjectVO) => {
   }
 }
 
-// ===== 审批进度弹窗（卡片化时间线组件：2026-10-22 虎哥拍板不用 Tab，一条线走完；
-//       与审批中心「我发起的」共用 ApprovalProgressDialog，加载逻辑收在组件内） =====
-const progressVisible = ref(false)
-const progressProjectId = ref<number | null>(null)
-const progressProjectName = ref('')
+// ===== 立项详情（2026-10-23：业务动作与审批进度收进详情弹窗，列表只留编辑+详情） =====
+const detailVisible = ref(false)
+const detailId = ref<number | null>(null)
 
-const openProgress = (row: ProjectVO) => {
-  progressProjectId.value = row.id
-  progressProjectName.value = row.projectName
-  progressVisible.value = true
+const openDetail = (row: ProjectVO) => {
+  detailId.value = row.id
+  detailVisible.value = true
+}
+
+/** 详情弹窗内「提交审批」：复用列表既有逻辑（同一份校验/提示，不复制第二份） */
+const handleDetailSubmit = (id: number) => {
+  const row = list.value.find((r) => r.id === id)
+  if (row) handleSubmitApproval(row)
+}
+
+/** 详情弹窗内「签约」：复用列表的签约弹窗 */
+const handleDetailSign = (row: ProjectVO) => {
+  detailVisible.value = false
+  openSign(row)
 }
 
 // ===== 签约（2026-10-22 虎哥拍板：审批通过后的独立动作，终态不可撤销） =====
@@ -219,9 +246,8 @@ const signSaving = ref(false)
 const signForm = ref<ProjectSignFormData>({ contractAmount: undefined, contractDesc: '' })
 const signRow = ref<ProjectVO | null>(null)
 
-// 仅 APPROVED + UNSIGNED 行有入口（后端同语义把关）
-const canSign = (row: ProjectVO) => row.approvalStatus === 'APPROVED' && row.contractStatus === 'UNSIGNED'
-
+// 签约入口判定 APPROVED + UNSIGNED 已迁至 ProjectDetailDialog（详情弹窗底部动作区）；
+// 列表侧不再需要，避免同一判定在两处漂移。
 const openSign = (row: ProjectVO) => {
   signRow.value = row
   // 金额初始带现值（预估额），允许修正为最终合同额（b 拍板）
@@ -346,24 +372,16 @@ onMounted(loadList)
       <el-table-column label="创建时间" min-width="170">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="260" fixed="right" align="center">
+      <!-- 操作列收敛（2026-10-23 虎哥：编辑/详情留外面，其余业务操作收进详情弹窗）。
+           按钮位置固定两位、含义恒定，不再随审批状态漂移成三套组合 -->
+      <el-table-column label="操作" width="140" fixed="right" align="center">
         <template #default="{ row }">
-          <template v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'">
-            <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button
-              link type="primary" size="small"
-              :loading="submitting" @click="handleSubmitApproval(row)"
-            >提交审批</el-button>
-          </template>
-          <template v-else-if="canSign(row)">
-            <el-button link type="primary" size="small" @click="openSign(row)">签约</el-button>
-            <el-button link type="primary" size="small" @click="openProgress(row)">查看进度</el-button>
-          </template>
           <el-button
-            v-else
+            v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
             link type="primary" size="small"
-            @click="openProgress(row)"
-          >查看进度</el-button>
+            @click="openEdit(row)"
+          >编辑</el-button>
+          <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -383,13 +401,17 @@ onMounted(loadList)
     </div>
   </el-card>
 
-  <!-- 审批进度弹窗（卡片化时间线组件：与审批中心「我发起的」共用；
-       进行中节点高亮，其之前都是历史（含审批留言），后端 ACT_HI_TASKINST 单源） -->
-  <ApprovalProgressDialog
-    v-model:visible="progressVisible"
-    :project-id="progressProjectId"
-    :project-name="progressProjectName"
+  <!-- 立项详情弹窗（Tab：基本信息/货物明细/审批进度；底部动作按状态显示） -->
+  <ProjectDetailDialog
+    v-model:visible="detailVisible"
+    :project-id="detailId"
+    @updated="loadList"
+    @submit="handleDetailSubmit"
+    @sign="handleDetailSign"
   />
+
+  <!-- 审批进度弹窗已移除：进度合并进立项详情弹窗（2026-10-23 虎哥拍板）。
+       组件本体保留给审批中心「我发起的」使用（views/approval/list.vue）。 -->
 
   <!-- 签约弹窗（2026-10-22 虎哥拍板：审批通过后的独立动作；金额可修正为最终合同额，描述非必填） -->
   <el-dialog v-model="signVisible" :title="`签约 - ${signRow?.projectName ?? ''}`" width="480px">
@@ -409,24 +431,30 @@ onMounted(loadList)
     </template>
   </el-dialog>
 
-  <!-- 新建立项弹窗 -->
-  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="920px">
+  <!-- 新建立项弹窗：top+内层限高与详情弹窗同口径（2026-10-24 虎哥），
+       明细表长时不至于把 footer 顶出屏幕 -->
+  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="1000px" top="7vh">
+    <div class="dialog-scroll">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
-      <el-form-item label="项目名称" prop="projectName">
-        <el-input v-model="form.projectName" placeholder="请输入项目名称" maxlength="128" show-word-limit />
-      </el-form-item>
-      <el-form-item label="客户名称">
-        <el-input v-model="form.customerName" placeholder="选填" maxlength="128" />
-      </el-form-item>
-      <el-form-item label="销售经理">
-        <el-select v-model="form.salesManagerId" filterable placeholder="选择销售经理" style="width: 100%">
-          <el-option v-for="u in userOptions" :key="u.id" :label="u.nickname" :value="u.id" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="合同金额">
-        <el-input-number v-model="form.contractAmount" :min="0" :precision="2" :step="1000"
-                         class="amount-left" controls-position="right" style="width: 100%" />
-      </el-form-item>
+      <!-- 顶部 4 项两列布局（2026-10-24 虎哥）：CSS grid 而非 el-row/el-col，
+           少一层组件注册依赖；列间距 24px 与 EP 表单行距对齐 -->
+      <div class="form-grid">
+        <el-form-item label="项目名称" prop="projectName">
+          <el-input v-model="form.projectName" placeholder="请输入项目名称" maxlength="128" show-word-limit />
+        </el-form-item>
+        <el-form-item label="客户名称">
+          <el-input v-model="form.customerName" placeholder="选填" maxlength="128" />
+        </el-form-item>
+        <el-form-item label="销售经理">
+          <el-select v-model="form.salesManagerId" filterable placeholder="选择销售经理" style="width: 100%">
+            <el-option v-for="u in userOptions" :key="u.id" :label="u.nickname" :value="u.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="合同金额">
+          <el-input-number v-model="form.contractAmount" :min="0" :precision="2" :step="1000"
+                           class="amount-left" controls-position="right" style="width: 100%" />
+        </el-form-item>
+      </div>
 
       <!-- 方案2：立项带行 —— 货物明细表（标题栏用 div 实现，规避 el-divider 按需注册缺失） -->
       <div class="items-section-title">
@@ -478,6 +506,7 @@ onMounted(loadList)
         </div>
       </div>
     </el-form>
+    </div>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
       <el-button type="primary" :loading="saving" @click="handleSubmit">保存</el-button>
@@ -499,7 +528,7 @@ onMounted(loadList)
   justify-content: flex-end;
   margin-top: 16px;
 }
-/* ===== 审批进度时间线样式已移至 components/ApprovalProgressDialog.vue（卡片化，两页共用） ===== */
+/* ===== 审批进度时间线样式在 components/ApprovalTimeline.vue（详情弹窗内联复用） ===== */
 
 /* 2026-10-23 虎哥：合同金额输入框内容左对齐（el-input-number 默认偏右/居中，强制内部 input 左对齐） */
 .amount-left :deep(.el-input__inner) {
@@ -530,5 +559,34 @@ onMounted(loadList)
 .muted {
   color: #909399;
   font-size: 13px;
+}
+
+/* ===== 新建立项弹窗（2026-10-24 虎哥） ===== */
+/* 顶部 4 项两列布局：grid 而非 el-row，少一层注册依赖 */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 24px;
+}
+/* 限高滚动 + 迷你滚动条：与 ProjectDetailDialog/ShipmentDetailDialog 的 .detail-scroll
+   完全同款（公式 280 同源），改必须三处同步 */
+.dialog-scroll {
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.dialog-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.dialog-scroll::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+}
+.dialog-scroll::-webkit-scrollbar-thumb:hover {
+  background: #909399;
+}
+.dialog-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 </style>

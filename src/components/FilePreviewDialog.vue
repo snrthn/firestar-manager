@@ -169,7 +169,7 @@ async function handleCopyLink() {
   <el-dialog
     v-model="visible"
     :title="`预览 - ${displayName}`"
-    width="720px"
+    width="640px"
     :fullscreen="fullscreen"
     append-to-body
   >

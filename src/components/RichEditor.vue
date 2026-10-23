@@ -337,7 +337,7 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 链接弹窗（需求③）-->
-    <el-dialog v-model="linkDialogVisible" title="插入链接" width="440px" append-to-body>
+    <el-dialog v-model="linkDialogVisible" title="插入链接" width="480px" append-to-body>
       <el-input
         v-model="linkUrl"
         placeholder="https://..."

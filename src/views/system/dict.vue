@@ -237,7 +237,7 @@ onMounted(loadTypes)
   </el-card>
 
   <!-- 新增 / 修改弹窗 -->
-  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px">
+  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="640px">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
       <el-form-item label="字典名称" prop="typeName">
         <el-input v-model="form.typeName" placeholder="请输入字典类型名称" maxlength="64" show-word-limit />

@@ -237,7 +237,7 @@ onMounted(loadLevels)
   </el-card>
 
   <!-- 新增 / 修改弹窗 -->
-  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px">
+  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="640px">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
       <el-form-item label="职级编码" prop="levelCode">
         <el-input

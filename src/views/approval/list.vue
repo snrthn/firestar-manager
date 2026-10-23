@@ -1,23 +1,18 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { Refresh, Search } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import DictSelect from '@/components/DictSelect.vue'
-import ApprovalProgressDialog from '@/components/ApprovalProgressDialog.vue'
-import { myTasksPage, myStartedPage, myApprovedHistoryPage, completeTask, rejectTask } from '@/api/approval'
-import { completeShipmentTask, rejectShipmentTask } from '@/api/shipment'
+import ProjectDetailDialog from '@/views/project/ProjectDetailDialog.vue'
+import ShipmentDetailDialog from '@/views/shipment/ShipmentDetailDialog.vue'
+import { myTasksPage, myStartedPage, myApprovedHistoryPage } from '@/api/approval'
 import { formatDateTime } from '@/utils/datetime'
 import type { ApprovalHistoryVO, TaskInfoVO } from '@/types/approval'
 import type { ProjectVO } from '@/types/project'
-
-const router = useRouter()
+import { isShipmentTask } from '@/composables/useTaskApproval'
 
 /** 发货审批任务标识（2026-10-23 通用化：待办 enrich 按流程 key 分发，前端审批动作同样按 key 路由） */
-const SHIPMENT_PROCESS_CODE = 'shipment_approval'
-const isShipmentTask = (row: TaskInfoVO | ApprovalHistoryVO) =>
-  row.processDefinitionKey === SHIPMENT_PROCESS_CODE
 
 // ===== 顶部 Tab（2026-10-22 虎哥：审批中心按标准页面改造，我发起的 / 我审批的）=====
 const activeTab = ref('approval')
@@ -149,83 +144,62 @@ const handleTabChange = (name: string) => {
   }
 }
 
-// ===== 审批进度弹窗（共用组件：卡片化时间线）=====
-const progressVisible = ref(false)
-const progressProjectId = ref<number | null>(null)
-const progressProjectName = ref('')
+// ===== 详情弹窗（2026-10-24 虎哥：审批中心不再留独立的「查看进度」入口，
+//       一律并入详情弹窗——进度是详情的一部分，与立项/发货列表的操作列口径一致）=====
+// 一律 readonly（纯查看）——理由有二：
+// ① 审批中心的定位是「审批视角」，单据管理动作（提交/签约/撤回）归立项管理页，
+//    两边都能操作就成了同一动作两个入口，正是刚统一操作列要消灭的漂移；
+// ② 本页没有提交审批/签约的弹窗与校验逻辑，放开会出现点了没反应的死按钮。
+const projectVisible = ref(false)
+const projectId = ref<number | null>(null)
 
-const openProgress = (projectId: number | null, projectName: string) => {
-  progressProjectId.value = projectId
-  progressProjectName.value = projectName
-  progressVisible.value = true
+// 普通详情入口（「我发起的」/ 历史「详情」）：非审批场景，务必清空审批态，
+// 否则会带着上一次失败的审批任务误入审批表单（只读视图变成可操作）
+const openProject = (id: number | null) => {
+  if (id == null) return
+  approvalTask.value = null
+  projectId.value = id
+  projectVisible.value = true
 }
 
-// ===== 审批弹窗（通过/驳回合并——2026-10-22 虎哥拍板）=====
-// 一个弹窗办两种事：默认选中「通过」，留言选填；切到「驳回」时留言变必填
-// （即驳回理由），并要选退回节点。
-const dialogVisible = ref(false)
-const action = ref<'approve' | 'reject'>('approve')
-const comment = ref('')
-const rejectTarget = ref('')
-const saving = ref(false)
-const currentTask = ref<TaskInfoVO | null>(null)
+// 发货详情：三个 Tab 里的发货单都是别人的（我是审批人视角），一律 readonly
+const shipmentVisible = ref(false)
+const shipmentId = ref<number | null>(null)
 
-// act 预选：列表「通过」按钮直接开窗即通过态；「驳回」按钮开窗即驳回态
-const openDialog = (row: TaskInfoVO, act: 'approve' | 'reject') => {
-  currentTask.value = row
-  action.value = act
-  comment.value = ''
-  rejectTarget.value = ''
-  dialogVisible.value = true
+const openShipment = (id: number | null) => {
+  if (id == null) return
+  approvalTask.value = null
+  shipmentId.value = id
+  shipmentVisible.value = true
 }
 
-const handleSubmit = async () => {
-  if (!currentTask.value) return
-  const shipment = isShipmentTask(currentTask.value)
-  if (action.value === 'reject') {
-    // 发货流程单节点无退回目标（rejectTargets 恒空），仅校验理由；立项多节点需选退回节点
-    if (!shipment && !rejectTarget.value) {
-      ElMessage.warning('请选择退回节点')
-      return
-    }
-    if (!comment.value.trim()) {
-      ElMessage.warning('请填写驳回理由')
-      return
-    }
+// ===== 「待我审批」操作列合并为单一「审批」入口（2026-10-24 虎哥）=====
+// 点开不是独立小窗，而是「详情弹窗 + 底部审批表单」的合一工作台：
+// 上半看单据内容，底部直接选通过/驳回。审批逻辑在 composables/useTaskApproval，
+// 详情弹窗底部挂 ApprovalActionForm（立项/发货两处复用同一份），本页不再持有审批 UI。
+const approvalTask = ref<TaskInfoVO | null>(null)
+
+// 合并入口：待办行 → 打开对应单子的详情弹窗并进入审批模式
+const openApproval = (row: TaskInfoVO) => {
+  if (!row.bizKey) return
+  approvalTask.value = row
+  if (isShipmentTask(row)) {
+    shipmentId.value = Number(row.bizKey)
+    shipmentVisible.value = true
+  } else {
+    projectId.value = Number(row.bizKey)
+    projectVisible.value = true
   }
-  saving.value = true
-  try {
-    if (action.value === 'approve') {
-      // 留言选填：空串后端不落评论（complete 内 comment blank 才 addComment）
-      if (shipment) {
-        await completeShipmentTask(currentTask.value.taskId, { comment: comment.value.trim() })
-      } else {
-        await completeTask(currentTask.value.taskId, { comment: comment.value.trim() })
-      }
-      ElMessage.success('已通过')
-    } else {
-      if (shipment) {
-        await rejectShipmentTask(currentTask.value.taskId, comment.value.trim())
-      } else {
-        await rejectTask(currentTask.value.taskId, rejectTarget.value, comment.value.trim())
-      }
-      ElMessage.success('已驳回')
-    }
-    dialogVisible.value = false
-    await loadApprovals()
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-    // 失败也刷新列表（2026-10-22 虎哥实测：旧 taskId 被「重新提交」终结后点通过报错，
-    // 列表还是陈的，用户找不到新待办）。典型场景：项目被驳回重提 → 旧实例任务全死 →
-    // 旧页面点审批 → 后端 400「任务已结束（项目重新提交审批…）请刷新待办列表」。
-    // 此处直接替用户刷新，切到当前 Tab 的真实待办（新 taskId）。
-    if (activeTab.value === 'approval') {
-      await loadApprovals()
-    } else if (activeTab.value === 'history') {
-      await loadHistory()
-    }
-  } finally {
-    saving.value = false
+}
+
+// 详情弹窗内审批结束（成功与否都触发，详见 ApprovalActionForm）：刷新列表切到真实待办。
+// 成功才清空审批态（置空后下次点详情不会误入审批模式）；失败保留，用户可重试。
+const onApproved = (ok: boolean) => {
+  if (ok) approvalTask.value = null
+  if (activeTab.value === 'approval') {
+    loadApprovals()
+  } else if (activeTab.value === 'history') {
+    loadHistory()
   }
 }
 
@@ -289,19 +263,17 @@ onMounted(loadApprovals)
           <el-table-column label="到达时间" min-width="170">
             <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="250" fixed="right" align="center">
+          <el-table-column label="操作" width="120" fixed="right" align="center">
             <template #default="{ row }">
+              <!-- 合并入口（2026-10-24 虎哥）：点「审批」直接进「详情 + 底部审批表单」的合一工作台，
+                   不再分详情/通过/驳回三个按钮 -->
               <el-button
-                v-if="isShipmentTask(row)"
                 link
                 type="primary"
                 size="small"
                 :disabled="!row.bizKey"
-                @click="router.push(`/shipment?detail=${row.bizKey}`)"
-              >查看详情</el-button>
-              <el-button v-else link type="primary" size="small" @click="openProgress(Number(row.bizKey), row.bizTitle || '')">查看进度</el-button>
-              <el-button link type="primary" size="small" @click="openDialog(row, 'approve')">通过</el-button>
-              <el-button link type="danger" size="small" @click="openDialog(row, 'reject')">驳回</el-button>
+                @click="openApproval(row)"
+              >审批</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -327,7 +299,7 @@ onMounted(loadApprovals)
             <template #default="{ row }">{{ row.projectNo || '—' }}</template>
           </el-table-column>
           <el-table-column prop="projectName" label="项目名称" min-width="180" show-overflow-tooltip />
-          <el-table-column label="审批状态" width="110" align="center">
+          <el-table-column label="审批状态" min-width="160" align="center">
             <template #default="{ row }">
               <el-tag :type="row.approvalStatusStyle || 'info'" size="small">
                 {{ row.approvalStatusName || row.approvalStatus }}
@@ -339,7 +311,7 @@ onMounted(loadApprovals)
           </el-table-column>
           <el-table-column label="操作" width="120" fixed="right" align="center">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="openProgress(row.id, row.projectName)">查看进度</el-button>
+              <el-button link type="primary" size="small" @click="openProject(row.id)">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -365,7 +337,7 @@ onMounted(loadApprovals)
             <template #default="{ row }">{{ row.bizTitle || '—' }}</template>
           </el-table-column>
           <el-table-column prop="taskName" label="审批节点" min-width="140" show-overflow-tooltip />
-          <el-table-column label="我的结果" width="100" align="center">
+          <el-table-column label="我的结果" min-width="160" align="center">
             <template #default="{ row }">
               <el-tag :type="row.result === 'REJECTED' ? 'danger' : 'success'" size="small">
                 {{ row.result === 'REJECTED' ? '已驳回' : '已通过' }}
@@ -378,7 +350,7 @@ onMounted(loadApprovals)
           <el-table-column label="处理时间" min-width="170">
             <template #default="{ row }">{{ formatDateTime(row.endTime) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="250" fixed="right" align="center">
+          <el-table-column label="操作" width="120" fixed="right" align="center">
             <template #default="{ row }">
               <el-button
                 v-if="isShipmentTask(row)"
@@ -386,18 +358,16 @@ onMounted(loadApprovals)
                 type="primary"
                 size="small"
                 :disabled="!row.bizKey"
-                @click="router.push(`/shipment?detail=${row.bizKey}`)"
-              >查看详情</el-button>
+                @click="openShipment(Number(row.bizKey))"
+              >详情</el-button>
               <el-button
                 v-else
                 link
                 type="primary"
                 size="small"
                 :disabled="!row.bizKey"
-                @click="openProgress(Number(row.bizKey), row.bizTitle || '')"
-              >
-                查看进度
-              </el-button>
+                @click="openProject(Number(row.bizKey))"
+              >详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -417,46 +387,22 @@ onMounted(loadApprovals)
       </el-tab-pane>
     </el-tabs>
 
-    <!-- 审批弹窗：通过/驳回合并（默认通过；留言选填，驳回时必填且需选退回节点） -->
-    <el-dialog v-model="dialogVisible" :title="`审批 - ${currentTask?.bizTitle || currentTask?.taskName || ''}`" width="480px">
-      <el-form label-width="90px" @submit.prevent>
-        <el-form-item label="审批结果">
-          <el-radio-group v-model="action">
-            <el-radio label="approve">通过</el-radio>
-            <el-radio label="reject">驳回</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item v-if="action === 'reject' && currentTask && !isShipmentTask(currentTask)" label="退回节点" required>
-          <el-select v-model="rejectTarget" placeholder="请选择退回节点" style="width: 100%">
-            <el-option
-              v-for="n in currentTask?.rejectTargets || []"
-              :key="n.nodeId"
-              :label="n.nodeName"
-              :value="n.nodeId"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="审批意见" :required="action === 'reject'">
-          <el-input
-            v-model="comment"
-            type="textarea"
-            :rows="3"
-            maxlength="200"
-            show-word-limit
-            :placeholder="action === 'reject' ? '请填写驳回理由，将通知申请人' : '选填，通过时也可留言'"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button :type="action === 'reject' ? 'danger' : 'primary'" :loading="saving" @click="handleSubmit">
-          {{ action === 'reject' ? '确定驳回' : '确认通过' }}
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 审批进度（卡片化时间线，与立项列表共用组件） -->
-    <ApprovalProgressDialog v-model:visible="progressVisible" :project-id="progressProjectId" :project-name="progressProjectName" />
+    <!-- 详情弹窗（进度已内联进详情）：审批中心复用查看别人发起的单子。
+         待我审批点「审批」时还传入 approval-task，弹窗底部切换为审批表单（详情+审批合一） -->
+    <ProjectDetailDialog
+      v-model:visible="projectVisible"
+      :project-id="projectId"
+      :approval-task="approvalTask"
+      readonly
+      @approved="onApproved"
+    />
+    <ShipmentDetailDialog
+      v-model:visible="shipmentVisible"
+      :shipment-id="shipmentId"
+      :approval-task="approvalTask"
+      readonly
+      @approved="onApproved"
+    />
   </el-card>
 </template>
 

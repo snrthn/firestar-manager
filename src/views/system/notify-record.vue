@@ -307,7 +307,7 @@ async function submitPublish() {
       />
     </div>
 
-    <el-dialog v-model="pubDialog" title="发布通知" width="560px">
+    <el-dialog v-model="pubDialog" title="发布通知" width="640px">
       <el-form label-width="90px">
         <el-form-item label="发送方式">
           <el-select v-model="pub.code" placeholder="直接文案" clearable>

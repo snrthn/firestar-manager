@@ -264,7 +264,7 @@ onMounted(reloadAll)
   </el-card>
 
   <!-- 新增 / 修改弹窗 -->
-  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px">
+  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="640px">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
       <el-form-item label="字典标签" prop="dictLabel">
         <el-input v-model="form.dictLabel" placeholder="请输入字典标签（展示名）" maxlength="64" show-word-limit />

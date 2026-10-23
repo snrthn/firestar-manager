@@ -321,7 +321,7 @@ onMounted(() => {
   </el-card>
 
   <!-- 新增 / 修改弹窗 -->
-  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px">
+  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="640px">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
       <el-form-item label="上级部门" prop="parentId">
         <el-tree-select

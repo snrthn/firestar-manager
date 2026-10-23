@@ -181,7 +181,7 @@ onMounted(loadLogs)
   </el-card>
 
   <!-- 详情弹窗：完整字段 + 关键字段 diff（由 expand 折叠改造而来） -->
-  <el-dialog v-model="detailVisible" title="操作日志详情" width="720px" append-to-body>
+  <el-dialog v-model="detailVisible" title="操作日志详情" width="640px" append-to-body>
     <el-descriptions v-if="detailRow" :column="2" border>
       <el-descriptions-item label="操作人">{{ detailRow.operatorName || '—' }}</el-descriptions-item>
       <el-descriptions-item label="操作">

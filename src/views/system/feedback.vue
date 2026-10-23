@@ -300,7 +300,7 @@ async function submitCreate() {
     />
 
     <!-- 详情抽屉 -->
-    <el-drawer v-model="drawer" :title="detail ? `问题反馈 #${detail.id}` : '问题反馈'" size="560px">
+    <el-drawer v-model="drawer" :title="detail ? `问题反馈 #${detail.id}` : '问题反馈'" size="640px">
       <div v-loading="detailLoading" class="detail-body">
         <template v-if="detail">
           <h3 class="d-title">{{ detail.title }}</h3>

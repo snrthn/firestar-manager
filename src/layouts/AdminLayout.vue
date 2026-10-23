@@ -164,7 +164,7 @@ onMounted(() => {
     <el-dialog
       :model-value="showAgree"
       :title="currentAgree?.needReconsent ? '协议已更新，请重新确认' : '请阅读并同意用户协议'"
-      width="720px"
+      width="640px"
       :close-on-click-modal="false"
       :close-on-press-escape="false"
       :show-close="false"

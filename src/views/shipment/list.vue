@@ -77,9 +77,16 @@ const { label: statusLabel, style: statusStyle } = useDictLabels('shipment_statu
 const createVisible = ref(false)
 const detailVisible = ref(false)
 const detailId = ref<number | null>(null)
+// 编辑模式：复用同一个 ShipmentCreateDialog，靠 shipmentId 区分新建/编辑（2026-10-23）
+const editVisible = ref(false)
+const editId = ref<number | null>(null)
 
 const openCreate = () => {
   createVisible.value = true
+}
+const openEdit = (row: ShipmentVO) => {
+  editId.value = row.id
+  editVisible.value = true
 }
 const openDetail = (row: ShipmentVO) => {
   detailId.value = row.id
@@ -153,8 +160,17 @@ onMounted(() => {
       <el-table-column label="创建时间" min-width="170">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="120" fixed="right" align="center">
+      <!-- 操作列（2026-10-23 虎哥统一规划）：编辑 + 详情两位固定；
+           标记发货/标记收货/撤回等业务动作收在详情弹窗内，避免按钮随状态漂移 -->
+      <el-table-column label="操作" width="140" fixed="right" align="center">
         <template #default="{ row }">
+          <!-- 仅待发货（PENDING）且未审批通过可编辑：审批通过（APPROVED）后锁编辑，直接标记发货；
+               已发货/已收货/已驳回/已撤销改内容会与库存、应收冲突（2026-10-24 虎哥：审批通过后不展示编辑入口） -->
+          <el-button
+            v-if="row.shipmentStatus === 'PENDING' && row.approvalStatus !== 'APPROVED'"
+            link type="primary" size="small"
+            @click="openEdit(row)"
+          >编辑</el-button>
           <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
         </template>
       </el-table-column>
@@ -175,6 +191,12 @@ onMounted(() => {
   </el-card>
 
   <ShipmentCreateDialog v-model:visible="createVisible" @saved="reloadAfterMutation" />
+  <!-- 编辑：与新建同一组件，传 shipmentId 切编辑模式（项目锁定、明细回填、走 PUT） -->
+  <ShipmentCreateDialog
+    v-model:visible="editVisible"
+    :shipment-id="editId"
+    @saved="reloadAfterMutation"
+  />
   <ShipmentDetailDialog v-model:visible="detailVisible" :shipment-id="detailId" @updated="reloadAfterMutation" />
 </template>
 

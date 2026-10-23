@@ -303,7 +303,7 @@ onMounted(loadFiles)
        会导致「点击能传、拖拽全被过滤」（2026-10-16 虎哥实测），留空即放开全部类型 -->
   <!-- auto-upload=false：选文件只暂存，点「确认上传」才提交——
        避免选完文件的瞬间就自动上传关窗、来不及填业务/类型/别名 -->
-  <el-dialog v-model="uploadVisible" title="上传文件" width="520px">
+  <el-dialog v-model="uploadVisible" title="上传文件" width="480px">
     <el-upload
       drag
       :auto-upload="false"

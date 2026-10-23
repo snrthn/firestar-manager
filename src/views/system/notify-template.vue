@@ -112,7 +112,7 @@ async function submit() {
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="`编辑模板：${form.code}`" width="560px">
+    <el-dialog v-model="dialogVisible" :title="`编辑模板：${form.code}`" width="640px">
       <el-form label-width="90px">
         <el-form-item label="模板名称">
           <el-input v-model="form.templateName" maxlength="64" show-word-limit placeholder="下拉与列表中展示的中文名" />

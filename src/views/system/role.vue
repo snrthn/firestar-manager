@@ -398,7 +398,7 @@ onMounted(loadRoles)
   </el-card>
 
   <!-- 新增 / 修改弹窗 -->
-  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="560px">
+  <el-dialog v-model="dialogVisible" :title="dialogTitle" width="640px">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
       <el-form-item label="角色编码" prop="roleCode">
         <el-input
@@ -433,7 +433,7 @@ onMounted(loadRoles)
   </el-dialog>
 
   <!-- 分配权限 + 菜单弹窗（左右双栏：菜单树在左、操作权限树在右；整体替换语义） -->
-  <el-dialog v-model="permDialogVisible" :title="`分配权限与菜单 - ${permRoleName}`" width="760px">
+  <el-dialog v-model="permDialogVisible" :title="`分配权限与菜单 - ${permRoleName}`" width="1000px">
     <div class="assign-cols">
       <!-- 左栏：菜单权限 -->
       <div class="assign-col">
