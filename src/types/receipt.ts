@@ -88,10 +88,22 @@ export interface ReceiptRequest {
   remark?: string | null
 }
 
-/** 收款审批状态字典值 */
+/**
+ * 收款审批状态字典值。
+ *
+ * 必须与后端 ReceiptServiceImpl 实际写入 approval_status 的字面量 + receipt_status 字典（V64 补齐）一一对应：
+ *   PENDING_APPROVAL   创建即草稿态
+ *   CASHIER_APPROVING  提交审批中
+ *   CANCELLED          申请人撤回（V64：字典此前缺此值，撤回后标签/样式全空）
+ *   RECEIVED           已收款
+ *   PARTIAL_WRITEOFF   部分核销
+ *   FULL_WRITEOFF      全部核销
+ *   REJECTED           审批驳回
+ */
 export const RECEIPT_STATUS = {
   PENDING_APPROVAL: 'PENDING_APPROVAL',
   CASHIER_APPROVING: 'CASHIER_APPROVING',
+  CANCELLED: 'CANCELLED',
   RECEIVED: 'RECEIVED',
   PARTIAL_WRITEOFF: 'PARTIAL_WRITEOFF',
   FULL_WRITEOFF: 'FULL_WRITEOFF',
