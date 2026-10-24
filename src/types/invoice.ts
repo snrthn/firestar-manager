@@ -107,10 +107,20 @@ export interface InvoiceRequest {
   remark?: string | null
 }
 
-/** 开票状态字典值 */
+/**
+ * 开票状态字典值。
+ *
+ * 必须与后端 InvoiceServiceImpl 实际写入的状态字面量 + invoice_status 字典（V63 补齐）一一对应：
+ *   PENDING   创建即草稿态
+ *   ISSUING   提交审批中
+ *   CANCELLED 申请人撤回（V63：字典此前缺此值，撤回后标签/样式全空）
+ *   ISSUED    审批通过
+ *   REJECTED  审批驳回（V63：字典此前同样缺）
+ */
 export const INVOICE_STATUS = {
   PENDING: 'PENDING',
   ISSUING: 'ISSUING',
+  CANCELLED: 'CANCELLED',
   ISSUED: 'ISSUED',
   REJECTED: 'REJECTED',
 } as const
