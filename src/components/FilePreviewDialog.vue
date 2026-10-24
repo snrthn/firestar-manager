@@ -207,7 +207,8 @@ async function handleCopyLink() {
       <el-button link type="primary" size="small" :icon="FullScreen" @click="fullscreen = !fullscreen">
         {{ fullscreen ? '退出全屏' : '全屏' }}
       </el-button>
-      <el-button link size="small" @click="visible = false">关闭</el-button>
+      <!-- 不放「关闭」按钮：el-dialog 右上角自带 ×，两处关闭入口重复（2026-10-25 虎哥要求移除）。
+           另外 ESC / 点遮罩同样能关，出口已经够多。 -->
     </template>
   </el-dialog>
 </template>
