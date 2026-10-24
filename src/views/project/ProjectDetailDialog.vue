@@ -146,7 +146,7 @@ const itemsTotal = computed(() =>
     <div v-loading="loading" class="detail-scroll">
       <el-empty v-if="!detail" description="暂无数据" :image-size="60" />
       <template v-else>
-        <el-descriptions :column="3" border size="small" class="head-desc">
+        <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
           <el-descriptions-item label="项目名称">{{ detail.projectName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="项目编号">{{ detail.projectNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="客户">{{ detail.customerName || '—' }}</el-descriptions-item>

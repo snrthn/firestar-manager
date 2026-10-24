@@ -6,7 +6,6 @@ import type {
   ItemVO,
   ShipmentCreateForm,
   ShipmentConfirmForm,
-  ReceivableVO,
 } from '@/types/shipment'
 import type { TimelineNodeVO } from '@/types/project'
 
@@ -82,6 +81,5 @@ export function listItems(projectId: number) {
 }
 
 /** 应收单详情（详情页点开查看，/shipment 关联生成后才有） */
-export function receivableDetail(id: number) {
-  return request.get<ApiResult<ReceivableVO>>(`/receivable/${id}`).then((r) => r.data.data!)
-}
+// 应收单相关接口已收敛到 api/receivable.ts（同一端点 /receivable/**
+// 且无人引用本文件版本），避免两份实现各自演化。

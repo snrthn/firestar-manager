@@ -385,7 +385,7 @@ const handleWithdraw = async () => {
       <el-empty v-if="!detail" description="暂无数据" :image-size="60" />
       <template v-else>
         <!-- 头部信息 -->
-        <el-descriptions :column="3" border size="small" class="head-desc">
+        <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
           <el-descriptions-item label="批次号">{{ detail.batchNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="项目编号">{{ detail.projectNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="项目名称">{{ detail.projectName || '—' }}</el-descriptions-item>
@@ -426,7 +426,7 @@ const handleWithdraw = async () => {
         <template v-if="detail.receivable">
           <h4 class="block-title">关联应收单</h4>
           <el-card shadow="never" class="recv-card">
-            <el-descriptions :column="3" border size="small">
+            <el-descriptions :column="3" border size="small" class="kv-desc">
               <el-descriptions-item label="应收单号">{{ detail.receivable.receivableNo || '—' }}</el-descriptions-item>
               <el-descriptions-item label="单据方向">{{ docDirLabel(detail.receivable.docDirection) }}</el-descriptions-item>
               <el-descriptions-item label="来源">{{ recvSourceLabel(detail.receivable.sourceType) }}</el-descriptions-item>

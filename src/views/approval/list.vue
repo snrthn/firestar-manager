@@ -6,11 +6,13 @@ import ElMessage from 'element-plus/es/components/message/index.mjs'
 import DictSelect from '@/components/DictSelect.vue'
 import ProjectDetailDialog from '@/views/project/ProjectDetailDialog.vue'
 import ShipmentDetailDialog from '@/views/shipment/ShipmentDetailDialog.vue'
+import ReceiptDetailDialog from '@/views/receipt/ReceiptDetailDialog.vue'
+import InvoiceDetailDialog from '@/views/invoice/InvoiceDetailDialog.vue'
 import { myTasksPage, myStartedPage, myApprovedHistoryPage } from '@/api/approval'
 import { formatDateTime } from '@/utils/datetime'
 import type { ApprovalHistoryVO, TaskInfoVO } from '@/types/approval'
 import type { ProjectVO } from '@/types/project'
-import { isShipmentTask } from '@/composables/useTaskApproval'
+import { approvalModuleOf, isShipmentTask, isReceiptTask, isInvoiceTask } from '@/composables/useTaskApproval'
 
 /** 发货审批任务标识（2026-10-23 通用化：待办 enrich 按流程 key 分发，前端审批动作同样按 key 路由） */
 
@@ -173,6 +175,28 @@ const openShipment = (id: number | null) => {
   shipmentVisible.value = true
 }
 
+// 回款详情：审批人视角，一律 readonly
+const receiptVisible = ref(false)
+const receiptId = ref<number | null>(null)
+
+const openReceipt = (id: number | null) => {
+  if (id == null) return
+  approvalTask.value = null
+  receiptId.value = id
+  receiptVisible.value = true
+}
+
+// 发票详情：审批人视角，一律 readonly
+const invoiceVisible = ref(false)
+const invoiceId = ref<number | null>(null)
+
+const openInvoice = (id: number | null) => {
+  if (id == null) return
+  approvalTask.value = null
+  invoiceId.value = id
+  invoiceVisible.value = true
+}
+
 // ===== 「待我审批」操作列合并为单一「审批」入口（2026-10-24 虎哥）=====
 // 点开不是独立小窗，而是「详情弹窗 + 底部审批表单」的合一工作台：
 // 上半看单据内容，底部直接选通过/驳回。审批逻辑在 composables/useTaskApproval，
@@ -183,7 +207,14 @@ const approvalTask = ref<TaskInfoVO | null>(null)
 const openApproval = (row: TaskInfoVO) => {
   if (!row.bizKey) return
   approvalTask.value = row
-  if (isShipmentTask(row)) {
+  const mod = approvalModuleOf(row)
+  if (mod === 'receipt') {
+    receiptId.value = Number(row.bizKey)
+    receiptVisible.value = true
+  } else if (mod === 'invoice') {
+    invoiceId.value = Number(row.bizKey)
+    invoiceVisible.value = true
+  } else if (isShipmentTask(row)) {
     shipmentId.value = Number(row.bizKey)
     shipmentVisible.value = true
   } else {
@@ -353,7 +384,23 @@ onMounted(loadApprovals)
           <el-table-column label="操作" width="120" fixed="right" align="center">
             <template #default="{ row }">
               <el-button
-                v-if="isShipmentTask(row)"
+                v-if="isReceiptTask(row)"
+                link
+                type="primary"
+                size="small"
+                :disabled="!row.bizKey"
+                @click="openReceipt(Number(row.bizKey))"
+              >详情</el-button>
+              <el-button
+                v-else-if="isInvoiceTask(row)"
+                link
+                type="primary"
+                size="small"
+                :disabled="!row.bizKey"
+                @click="openInvoice(Number(row.bizKey))"
+              >详情</el-button>
+              <el-button
+                v-else-if="isShipmentTask(row)"
                 link
                 type="primary"
                 size="small"
@@ -399,6 +446,20 @@ onMounted(loadApprovals)
     <ShipmentDetailDialog
       v-model:visible="shipmentVisible"
       :shipment-id="shipmentId"
+      :approval-task="approvalTask"
+      readonly
+      @approved="onApproved"
+    />
+    <ReceiptDetailDialog
+      v-model:visible="receiptVisible"
+      :receipt-id="receiptId"
+      :approval-task="approvalTask"
+      readonly
+      @approved="onApproved"
+    />
+    <InvoiceDetailDialog
+      v-model:visible="invoiceVisible"
+      :invoice-id="invoiceId"
       :approval-task="approvalTask"
       readonly
       @approved="onApproved"

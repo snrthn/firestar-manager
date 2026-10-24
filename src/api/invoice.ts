@@ -1,0 +1,68 @@
+import request from './request'
+import type { ApiResult } from '@/types/auth'
+import type { InvoicePageVO, InvoiceVO, InvoiceRequest } from '@/types/invoice'
+import type { TimelineNodeVO } from '@/types/project'
+
+// 发票（开票）管理接口（后端 /invoice/**；审批动作经 Flowable 任务端点）
+
+/**
+ * 分页发票列表。
+ *
+ * 后端 InvoiceController.page 只声明 pageNum/pageSize/projectId/receivableId/status，
+ * 其余键会被忽略（@RequestParam 未声明）——故这里不传 invoiceNo/projectName 等模糊条件。
+ */
+export function invoicePage(
+  pageNum = 1,
+  pageSize = 10,
+  params: { projectId?: number; receivableId?: number; status?: string } = {},
+) {
+  return request
+    .get<ApiResult<InvoicePageVO>>('/invoice/page', { params: { pageNum, pageSize, ...params } })
+    .then((r) => r.data.data!)
+}
+
+/** 发票详情（含字典翻译 + 待办任务） */
+export function invoiceDetail(id: number) {
+  return request.get<ApiResult<InvoiceVO>>(`/invoice/${id}`).then((r) => r.data.data!)
+}
+
+/** 审批时间线（按 businessKey=发票单 ID 聚合） */
+export function invoiceTimeline(id: number) {
+  return request
+    .get<ApiResult<TimelineNodeVO[]>>(`/invoice/${id}/timeline`)
+    .then((r) => r.data.data!)
+}
+
+/** 新建发票单（提交即发起审批，状态 PENDING） */
+export function createInvoice(data: InvoiceRequest) {
+  return request.post<ApiResult<number>>('/invoice', data).then((r) => r.data.data!)
+}
+
+/** 编辑发票单（仅 PENDING 可改） */
+export function updateInvoice(id: number, data: InvoiceRequest) {
+  return request.put<ApiResult<null>>(`/invoice/${id}`, data).then((r) => r.data)
+}
+
+/** 申请人提交审批（PENDING → ISSUING，发起 Flowable 流程） */
+export function submitInvoice(id: number) {
+  return request.post<ApiResult<null>>(`/invoice/${id}/submit`).then((r) => r.data)
+}
+
+/** 申请人撤回（流程未结束即可撤回） */
+export function withdrawInvoice(id: number) {
+  return request.post<ApiResult<null>>(`/invoice/${id}/withdraw`).then((r) => r.data)
+}
+
+/** 审批通过（ROLE_INVOICER 单节点；variables 可选） */
+export function completeInvoiceTask(taskId: string, variables?: Record<string, unknown>) {
+  return request
+    .post<ApiResult<null>>(`/invoice/task/${taskId}/complete`, variables ?? {})
+    .then((r) => r.data)
+}
+
+/** 审批驳回（单节点：终结实例 + 置 REJECTED + 通知申请人） */
+export function rejectInvoiceTask(taskId: string, comment: string) {
+  return request
+    .post<ApiResult<null>>(`/invoice/task/${taskId}/reject?comment=${encodeURIComponent(comment)}`)
+    .then((r) => r.data)
+}

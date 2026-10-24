@@ -188,18 +188,26 @@ async function handleCopyLink() {
       <audio v-else-if="mode === 'audio' && src" :src="src" class="preview-media preview-audio" controls preload="auto" />
       <video v-else-if="mode === 'video' && src" :src="src" class="preview-media preview-media--video" controls preload="metadata" playsinline />
       <el-empty v-else-if="!loading" description="该格式不支持在线预览（图片 / PDF / 音频 / 视频），请下载后查看">
-        <el-button type="primary" :icon="Download" @click="handleDownload">下载文件</el-button>
+        <el-button link type="primary" size="small" :icon="Download" @click="handleDownload">
+          下载文件
+        </el-button>
       </el-empty>
     </div>
     <template #footer>
-      <el-button v-if="mode !== 'unsupported'" :icon="Refresh" @click="reload">重新加载</el-button>
-      <el-button :icon="Link" @click="handleCopyLink">复制链接</el-button>
+      <!-- 底部操作一律用列表操作列同款「el-button link primary small」（2026-10-25 虎哥要求）：
+           本组件被文件管理页与业务详情/上传弹窗共用，按钮形态必须一致。
+           点击态谈不上危险操作，不需要实心主按钮的视觉重量。 -->
+      <el-button v-if="mode !== 'unsupported'" link type="primary" size="small" :icon="Refresh" @click="reload">
+        重新加载
+      </el-button>
+      <el-button link type="primary" size="small" :icon="Download" @click="handleDownload">下载</el-button>
+      <el-button link type="primary" size="small" :icon="Link" @click="handleCopyLink">复制链接</el-button>
       <!-- 全屏按钮放底部（2026-10-16 虎哥要求：header 图标位置和 × 挨太近容易误点），
            与关闭按钮同排、在其前面；文字常驻，全屏态显示「退出全屏」 -->
-      <el-button :icon="FullScreen" @click="fullscreen = !fullscreen">
+      <el-button link type="primary" size="small" :icon="FullScreen" @click="fullscreen = !fullscreen">
         {{ fullscreen ? '退出全屏' : '全屏' }}
       </el-button>
-      <el-button @click="visible = false">关闭</el-button>
+      <el-button link size="small" @click="visible = false">关闭</el-button>
     </template>
   </el-dialog>
 </template>

@@ -17,7 +17,7 @@
 <script setup lang="ts">
 import { watch } from 'vue'
 import type { TaskInfoVO } from '@/types/approval'
-import { useTaskApproval, isShipmentTask } from '@/composables/useTaskApproval'
+import { useTaskApproval, isSingleNodeTask } from '@/composables/useTaskApproval'
 
 const props = defineProps<{ task: TaskInfoVO }>()
 
@@ -30,7 +30,7 @@ watch(
   { immediate: true },
 )
 
-const needTarget = () => !isShipmentTask(props.task) && action.value === 'reject'
+const needTarget = () => !isSingleNodeTask(props.task) && action.value === 'reject'
 </script>
 
 <template>

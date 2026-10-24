@@ -14,14 +14,48 @@ import { ref } from 'vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { completeTask, rejectTask } from '@/api/approval'
 import { completeShipmentTask, rejectShipmentTask } from '@/api/shipment'
+import { completeReceiptTask, rejectReceiptTask } from '@/api/receipt'
+import { completeInvoiceTask, rejectInvoiceTask } from '@/api/invoice'
 import type { ApprovalHistoryVO, TaskInfoVO } from '@/types/approval'
 
-/** 发货审批流程 key（后端 process_code；待办 enrich 与前端审批动作都按此分发） */
+/** 各业务审批流程 key（后端 process_code；待办 enrich 与前端审批动作都按此分发） */
 export const SHIPMENT_PROCESS_CODE = 'shipment_approval'
+export const RECEIPT_PROCESS_CODE = 'receipt_approval'
+export const INVOICE_PROCESS_CODE = 'invoice_approval'
+
+export type ApprovalModule = 'project' | 'shipment' | 'receipt' | 'invoice'
+
+/** 按流程定义 key 分发到对应业务模块（决定走哪套 API） */
+export function approvalModuleOf(
+  row: TaskInfoVO | ApprovalHistoryVO | null | undefined,
+): ApprovalModule {
+  switch (row?.processDefinitionKey) {
+    case SHIPMENT_PROCESS_CODE:
+      return 'shipment'
+    case RECEIPT_PROCESS_CODE:
+      return 'receipt'
+    case INVOICE_PROCESS_CODE:
+      return 'invoice'
+    default:
+      return 'project'
+  }
+}
 
 /** 是否发货审批任务（立项 / 发货两套 API 的判别依据） */
 export const isShipmentTask = (row: TaskInfoVO | ApprovalHistoryVO | null | undefined) =>
   row?.processDefinitionKey === SHIPMENT_PROCESS_CODE
+
+/** 是否回款审批任务（ROLE_CASHIER 单节点） */
+export const isReceiptTask = (row: TaskInfoVO | ApprovalHistoryVO | null | undefined) =>
+  row?.processDefinitionKey === RECEIPT_PROCESS_CODE
+
+/** 是否发票审批任务（ROLE_INVOICER 单节点） */
+export const isInvoiceTask = (row: TaskInfoVO | ApprovalHistoryVO | null | undefined) =>
+  row?.processDefinitionKey === INVOICE_PROCESS_CODE
+
+/** 单节点（ROLE）流程：驳回只需填理由，无退回目标节点选择（与立项多节点区分） */
+export const isSingleNodeTask = (row: TaskInfoVO | ApprovalHistoryVO | null | undefined) =>
+  isShipmentTask(row) || isReceiptTask(row) || isInvoiceTask(row)
 
 // ===== 模块级单例状态（2026-10-24 虎哥：取消/提交按钮上移弹窗 footer 后，footer 按钮
 // 与内容区表单面板必须读到同一份 action/saving/submit）——同一时刻只有一个审批弹窗
@@ -41,8 +75,8 @@ export function useTaskApproval() {
     rejectTarget.value = ''
   }
 
-  /** 是否发货任务（决定走哪套 API、是否需要选退回节点） */
-  const isShipment = (task: TaskInfoVO) => isShipmentTask(task)
+  /** 当前任务所属业务模块（决定走哪套 API、是否需要选退回节点） */
+  const moduleOf = (task: TaskInfoVO) => approvalModuleOf(task)
 
   /**
    * 提交审批结果。返回 true = 成功（调用方据此关窗并刷新列表）。
@@ -51,10 +85,11 @@ export function useTaskApproval() {
    */
   const submit = async (task: TaskInfoVO | null): Promise<boolean> => {
     if (!task) return false
-    const shipment = isShipment(task)
+    const mod = moduleOf(task)
     if (action.value === 'reject') {
-      // 发货流程单节点无退回目标（rejectTargets 恒空），仅校验理由；立项多节点需选退回节点
-      if (!shipment && !rejectTarget.value) {
+      // 单节点（ROLE）流程无退回目标（rejectTargets 恒空），仅校验理由；
+      // 立项多节点流程需选退回节点（rejectTarget）。
+      if (!isSingleNodeTask(task) && !rejectTarget.value) {
         ElMessage.warning('请选择退回节点')
         return false
       }
@@ -65,20 +100,19 @@ export function useTaskApproval() {
     }
     saving.value = true
     try {
+      const vars = { comment: comment.value.trim() }
       if (action.value === 'approve') {
         // 留言选填：空串后端不落评论（complete 内 comment 非 blank 才 addComment）
-        if (shipment) {
-          await completeShipmentTask(task.taskId, { comment: comment.value.trim() })
-        } else {
-          await completeTask(task.taskId, { comment: comment.value.trim() })
-        }
+        if (mod === 'shipment') await completeShipmentTask(task.taskId, vars)
+        else if (mod === 'receipt') await completeReceiptTask(task.taskId, vars)
+        else if (mod === 'invoice') await completeInvoiceTask(task.taskId, vars)
+        else await completeTask(task.taskId, vars)
         ElMessage.success('已通过')
       } else {
-        if (shipment) {
-          await rejectShipmentTask(task.taskId, comment.value.trim())
-        } else {
-          await rejectTask(task.taskId, rejectTarget.value, comment.value.trim())
-        }
+        if (mod === 'shipment') await rejectShipmentTask(task.taskId, comment.value.trim())
+        else if (mod === 'receipt') await rejectReceiptTask(task.taskId, comment.value.trim())
+        else if (mod === 'invoice') await rejectInvoiceTask(task.taskId, comment.value.trim())
+        else await rejectTask(task.taskId, rejectTarget.value, comment.value.trim())
         ElMessage.success('已驳回')
       }
       return true
@@ -90,5 +124,5 @@ export function useTaskApproval() {
     }
   }
 
-  return { action, comment, rejectTarget, saving, reset, submit, isShipment }
+  return { action, comment, rejectTarget, saving, reset, submit, moduleOf }
 }

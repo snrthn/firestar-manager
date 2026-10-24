@@ -70,25 +70,10 @@ export interface ShipmentLineVO {
 }
 
 /** 关联应收单（由发货「客户已收货」生成，决策#2） */
-export interface ReceivableVO {
-  id: number
-  receivableNo: string | null
-  projectId: number | null
-  shipmentId: number | null
-  docDirection: string | null
-  docDirectionName: string | null
-  receivableAmount: number | null
-  writtenOffAmount: number | null
-  unwrittenOffAmount: number | null
-  invoicedAmount: number | null
-  uninvoicedAmount: number | null
-  receivableDate: string | null
-  status: string | null
-  statusName: string | null
-  statusStyle: string | null
-  sourceType: string | null
-  sourceTypeName: string | null
-}
+// 应收单类型单一真源：types/receivable.ts（对齐后端 com.firestar.dto.ReceivableVO）。
+// 这里改为再导出，避免与内嵌场景（ShipmentVO.receivable）出现两份各自演化的定义。
+import type { ReceivableVO } from './receivable'
+export type { ReceivableVO }
 
 /** 货物明细（新建发货申请时按项目拉取，/item/list） */
 export interface ItemVO {

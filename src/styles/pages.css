@@ -38,3 +38,23 @@
 .query-bar .el-date-editor--daterange {
   width: 300px;
 }
+
+/* 金额/数值输入内容左对齐（el-input-number 默认居中偏右；
+   配 controls-position="right" + width:100% 使用，同 project/list.vue 的签约金额输入）。
+   ⚠️ 必须带 .el-input-number 前缀：EP 自带 `.el-input-number .el-input__inner { text-align:center }`
+   与普通 `.amount-left .el-input__inner` 同权重(0,2,0)，按样式表加载顺序 EP 在后会赢——
+   2026-10-25 虎哥实测「没生效」即此因。提到 (0,3,0) 无条件压过 EP。 */
+.el-input-number.amount-left .el-input__inner {
+  text-align: left;
+}
+
+/* ===== 详情弹窗键值表格列宽统一（2026-10-25 虎哥：三列 label 宽随内容漂移，层次不齐） =====
+ * 按类挂（.kv-desc），不影响 dashboard/profile 等页面的 descriptions。
+ * fixed 布局 + label 定宽后，三列「键值对」严格等宽对齐。 */
+.kv-desc .el-descriptions__table {
+  table-layout: fixed;
+  width: 100%;
+}
+.kv-desc .el-descriptions__label {
+  width: 110px;
+}
