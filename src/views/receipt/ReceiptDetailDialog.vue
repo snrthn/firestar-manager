@@ -12,6 +12,8 @@ import type { TimelineNodeVO } from '@/types/project'
 import type { TaskInfoVO } from '@/types/approval'
 import ApprovalTimeline from '@/components/ApprovalTimeline.vue'
 import ApprovalActionForm from '@/components/ApprovalActionForm.vue'
+// 事后核销分配编辑器（2026-10-25 虎哥拍板 A：已收款单把钱分到具体应收单）
+import AllocationEditorDialog from '@/components/AllocationEditorDialog.vue'
 // 预览一律复用文件管理模块的 FilePreviewDialog（2026-10-25 虎哥要求）：
 // 本窗不自己拼 URL，也不算 OSS/本地分流，图片/PDF/音视频判定、blob 取字节、
 // objectURL 泄漏回收、全屏、复制链接、失败重试全在组件内，行为与文件管理页一致。
@@ -100,6 +102,17 @@ const loadAttachments = async (id: number) => {
  */
 const previewVisible = ref(false)
 const previewRow = ref<FileVO | null>(null)
+/** 事后核销分配弹窗（2026-10-25 A 方案：仅 RECEIVED 态入口） */
+const allocateVisible = ref(false)
+
+/** 核销分配保存后：重拉详情（分配明细/已核销/未核销字段都变了）+ 通知父级刷列表 */
+const onAllocated = () => {
+  allocateVisible.value = false
+  if (props.receiptId != null) {
+    load(props.receiptId)
+  }
+  emit('updated')
+}
 const handlePreview = (f: FileVO) => {
   previewRow.value = f
   previewVisible.value = true
@@ -307,6 +320,14 @@ const handleWithdraw = async () => {
             :loading="acting"
             @click="emit('redFlush', detail.id)"
           >红冲</el-button>
+          <!-- 事后核销（2026-10-25 A 方案）：已收款态补/改分配到具体应收单；
+               历史老单（V65 前审批通过）与「预收未指定」新单都走这个入口 -->
+          <el-button
+            v-if="detail.approvalStatus === 'RECEIVED'"
+            type="primary"
+            plain
+            @click="allocateVisible = true"
+          >核销分配</el-button>
         </template>
         <el-button @click="visible = false">关闭</el-button>
       </template>
@@ -316,6 +337,17 @@ const handleWithdraw = async () => {
   <!-- 附件预览：复用文件管理模块的预览弹窗（图片 inline / PDF iframe / 音视频原生播放 /
        不支持格式引导下载），不再 window.open 新页签 -->
   <FilePreviewDialog v-model="previewVisible" :file="previewRow" />
+
+  <!-- 事后核销分配（仅已收款态显示入口）：保存后重拉详情 + 通知父级刷列表 -->
+  <AllocationEditorDialog
+    v-if="detail && detail.approvalStatus === 'RECEIVED'"
+    v-model:visible="allocateVisible"
+    :receipt-id="detail.id"
+    :project-id="detail.projectId"
+    :receipt-amount="detail.receiptAmount ?? 0"
+    :current-allocations="detail.allocations ?? []"
+    @saved="onAllocated"
+  />
 </template>
 
 <style scoped>

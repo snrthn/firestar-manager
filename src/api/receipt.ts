@@ -1,6 +1,6 @@
 import request from './request'
 import type { ApiResult } from '@/types/auth'
-import type { ReceiptPageVO, ReceiptVO, ReceiptRequest } from '@/types/receipt'
+import type { AllocationItem, ReceiptPageVO, ReceiptVO, ReceiptRequest } from '@/types/receipt'
 import type { TimelineNodeVO } from '@/types/project'
 
 // 回款（收款）管理接口（后端 /receipt/**；审批动作经 Flowable 任务端点）
@@ -51,6 +51,16 @@ export function submitReceipt(id: number) {
 /** 申请人撤回（流程未结束即可撤回，状态回到草稿/已撤销，后端决定） */
 export function withdrawReceipt(id: number) {
   return request.post<ApiResult<null>>(`/receipt/${id}/withdraw`).then((r) => r.data)
+}
+
+/**
+ * 事后核销分配（2026-10-25 虎哥拍板 A）：仅「已收款」态可调。
+ *
+ * 全量替换语义：items 整体覆盖旧分配（消失/金额变化的旧行由后端置 REVERSED 并回滚
+ * 应收单数字，新行立即滚入）；允许部分分配（Σ ≤ 收款金额，余额留在「未核销」）。
+ */
+export function allocateReceipt(id: number, allocations: AllocationItem[]) {
+  return request.post<ApiResult<null>>(`/receipt/${id}/allocate`, allocations).then((r) => r.data)
 }
 
 /** 审批通过（ROLE_CASHIER 单节点；variables 可选，传审批意见等） */
