@@ -382,11 +382,7 @@ async function submitPublish() {
   margin-bottom: 4px;
 }
 /* 标准分页器右对齐（同 user.vue 规格） */
-.pagination-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
+/* .pagination-bar 已上提到 styles/pages.css 全局（2026-10-26），本文件不再留本地副本 */
 /* 聚合展开的收件人明细（每条发布下的每人已读态） */
 .notify-sub {
   padding: 6px 16px 8px 48px;

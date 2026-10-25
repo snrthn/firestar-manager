@@ -295,9 +295,5 @@ async function remove(row: HelpArticle) {
 }
 /* 查询控件宽度已由全局 pages.css 统一为 200px（.query-bar .el-input/.el-select） */
 /* 分页条：与 user/role/dict 等列表页同款 */
-.pagination-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
+/* .pagination-bar 已上提到 styles/pages.css 全局（2026-10-26），本文件不再留本地副本 */
 </style>

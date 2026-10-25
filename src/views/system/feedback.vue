@@ -288,16 +288,20 @@ async function submitCreate() {
       </el-table-column>
     </el-table>
 
-    <el-pagination
-      v-model:current-page="query.pageNum"
-      v-model:page-size="query.pageSize"
-      class="pager"
-      layout="total, prev, pager, next, sizes"
-      :total="total"
-      :page-sizes="[10, 20, 50]"
-      @current-change="load"
-      @size-change="((query.pageNum = 1), load())"
-    />
+    <!-- 分页器：与全站同写法（.pagination-bar 已在 pages.css 全局；原自造 .pager 少写
+         display:flex，导致 justify-content:flex-end 失效、分页条实际左对齐） -->
+    <div class="pagination-bar">
+      <el-pagination
+        v-model:current-page="query.pageNum"
+        v-model:page-size="query.pageSize"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="total"
+        :page-sizes="[10, 20, 50, 100]"
+        background
+        @current-change="load"
+        @size-change="((query.pageNum = 1), load())"
+      />
+    </div>
 
     <!-- 详情抽屉 -->
     <el-drawer v-model="drawer" :title="detail ? `问题反馈 #${detail.id}` : '问题反馈'" size="640px">
@@ -436,10 +440,7 @@ async function submitCreate() {
 .filter-select {
   width: 200px;
 }
-.pager {
-  margin-top: 14px;
-  justify-content: flex-end;
-}
+/* .pagination-bar 已上提到 styles/pages.css 全局（2026-10-26），本文件不再留本地副本 */
 /* 详情抽屉 */
 .detail-body {
   min-height: 200px;

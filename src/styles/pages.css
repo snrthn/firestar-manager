@@ -2,6 +2,16 @@
  * 从 menu.vue / dict.vue 的 scoped 样式里抽出来的同款规则（值保持一致），
  * 新页面直接用 class，不再每页复制一份。后续用户/角色/权限三模块直接复用。 */
 
+/* 分页器容器（虎哥 2026-10-26：退货页用 .pagination-bar 却没有对应样式，
+   分页条左对齐贴着表格——根因是这个类在各列表页各存一份 scoped 副本，
+   新页面用对了类名、却没抄那份 CSS 就裸奔。现抽到全局：只要挂类名就生效）。
+   值与原各页副本完全一致：右对齐 + 与表格 16px 间距。 */
+.pagination-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 /* 工具条：列表区上方按钮组（若依风格 gap:0，按钮间距由 EP 自身 margin 提供） */
 .toolbar {
   display: flex;
@@ -57,4 +67,41 @@
 }
 .kv-desc .el-descriptions__label {
   width: 110px;
+}
+
+/* ===== 详情弹窗分区标题 + 头部键值区（2026-10-25 虎哥：退货详情这套标题样式要和兄弟模块拉齐） =====
+ * 背景：.block-title / .items-total / .head-desc 原本在 ProjectDetailDialog 与
+ * ShipmentDetailDialog 各存一份 scoped 副本，注释里互相写「改必须两处同步」——
+ * 退货详情一旦入伙就变成三处漂移。抽到全局做单一事实源：任何详情弹窗直接用 class 即可。
+ *
+ * 浅色渐变底 + 左侧强调竖条 = 区间分隔感（虎哥 2026-10-24）：
+ * 主色极浅 alpha 从左向右渐隐，配合左边 3px 竖条把「条」的起点钉住；
+ * 圆角只给右侧（0 4px 4px 0），左边保持直角，避免竖条被圆角切断。
+ * flex 布局承载「标题左 + 合计右」（虎哥 2026-10-24：合计不再单独占一行）。 */
+.head-desc {
+  margin-bottom: 8px;
+}
+.block-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 18px 0 12px;
+  padding: 8px 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  border-left: 3px solid var(--el-color-primary);
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(
+    90deg,
+    rgba(64, 158, 255, 0.16) 0%,
+    rgba(64, 158, 255, 0.07) 45%,
+    rgba(64, 158, 255, 0) 100%
+  );
+}
+.items-total {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
 }

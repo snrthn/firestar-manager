@@ -607,32 +607,8 @@ const handleWithdraw = async () => {
 </template>
 
 <style scoped>
-.head-desc {
-  margin-bottom: 8px;
-}
-/* 分区标题：与 ProjectDetailDialog 的 .block-title 完全一致（2026-10-24 统一布局口径，
-   两处改样式必须同步改，否则立项/发货详情看起来像两个产品）。
-   浅色渐变底 + 左侧强调竖条 = 区间分隔感（虎哥 2026-10-24）。
-   这里也用 flex（与立项同款），后续某个分区标题要在右侧放汇总值时可直接复用。 */
-.block-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 18px 0 12px;
-  padding: 8px 12px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-  border-left: 3px solid var(--el-color-primary);
-  border-radius: 0 4px 4px 0;
-  background: linear-gradient(
-    90deg,
-    rgba(64, 158, 255, 0.16) 0%,
-    rgba(64, 158, 255, 0.07) 45%,
-    rgba(64, 158, 255, 0) 100%
-  );
-}
+/* .head-desc / .block-title 已上提到 styles/pages.css 全局（2026-10-25），
+   立项详情与退货详情同吃一份，避免多份 scoped 副本漂移——老注释里的「两处同步」作废。 */
 /* 迷你滚动条（2026-10-24 虎哥：默认滚动条太宽）——与 ProjectDetailDialog 保持同款，
    改必须两处同步 */
 .detail-scroll::-webkit-scrollbar {

@@ -252,40 +252,8 @@ const itemsTotal = computed(() =>
 </template>
 
 <style scoped>
-.head-desc {
-  margin-bottom: 8px;
-}
-/* 分区标题：与 ShipmentDetailDialog 的 .block-title 完全一致（2026-10-24 统一布局口径，
-   两处改样式必须同步改，否则立项/发货详情看起来像两个产品）。
-   flex 布局承载「标题左 + 合计右」（虎哥 2026-10-24：合计不再单独占一行）。
-
-   浅色渐变底 + 左侧强调竖条 = 区间分隔感（虎哥 2026-10-24）：
-   主色极浅 alpha 从左向右渐隐，配合左边 3px 竖条把「条」的起点钉住；
-   圆角只给右侧（0 4px 4px 0），左边保持直角，避免竖条被圆角切断。 */
-.block-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 18px 0 12px;
-  padding: 8px 12px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-  border-left: 3px solid var(--el-color-primary);
-  border-radius: 0 4px 4px 0;
-  background: linear-gradient(
-    90deg,
-    rgba(64, 158, 255, 0.16) 0%,
-    rgba(64, 158, 255, 0.07) 45%,
-    rgba(64, 158, 255, 0) 100%
-  );
-}
-.items-total {
-  font-size: 13px;
-  font-weight: 600;
-  color: #303133;
-}
+/* .head-desc / .block-title / .items-total 已上提到 styles/pages.css 全局（2026-10-25），
+   发货详情与退货详情同吃一份，避免三份 scoped 副本漂移——老注释里的「两处同步」作废。 */
 /* 迷你滚动条（虎哥 2026-10-24：默认滚动条太宽，视觉差）——
    与 ShipmentDetailDialog 的 .detail-scroll 保持同款，改必须两处同步 */
 .detail-scroll::-webkit-scrollbar {

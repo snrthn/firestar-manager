@@ -46,7 +46,8 @@ watch(
 </script>
 
 <template>
-  <el-dialog v-model="visible" title="应收单详情" width="900px" top="10vh">
+  <!-- 宽度/垂直位置走全站详情档 1000px + top 7vh（2026-10-25 与立项/发货/回款/发票/退货统一） -->
+  <el-dialog v-model="visible" title="应收单详情" width="1000px" top="7vh">
     <div v-loading="loading" class="detail-scroll">
       <el-empty v-if="!detail" description="暂无数据" :image-size="60" />
       <template v-else>
@@ -95,28 +96,7 @@ watch(
 </template>
 
 <style scoped>
-.head-desc {
-  margin-bottom: 8px;
-}
-.block-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 18px 0 12px;
-  padding: 8px 12px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-  border-left: 3px solid var(--el-color-primary);
-  border-radius: 0 4px 4px 0;
-  background: linear-gradient(
-    90deg,
-    rgba(64, 158, 255, 0.16) 0%,
-    rgba(64, 158, 255, 0.07) 45%,
-    rgba(64, 158, 255, 0) 100%
-  );
-}
+/* .head-desc / .block-title 已上提到 styles/pages.css 全局（2026-10-25），本文件不再留本地副本 */
 .detail-scroll {
   max-height: calc(100vh - 280px);
   overflow-y: auto;

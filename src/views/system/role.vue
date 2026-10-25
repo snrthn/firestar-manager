@@ -520,11 +520,7 @@ onMounted(loadRoles)
   gap: 0;
   margin-bottom: 16px;
 }
-.pagination-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
+/* .pagination-bar 已上提到 styles/pages.css 全局（2026-10-26），本文件不再留本地副本 */
 .sort-no {
   display: inline-block;
   min-width: 28px;

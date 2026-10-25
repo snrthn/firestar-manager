@@ -523,11 +523,7 @@ onMounted(loadList)
   gap: 0;
   margin-bottom: 16px;
 }
-.pagination-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
+/* .pagination-bar 已上提到 styles/pages.css 全局（2026-10-26），本文件不再留本地副本 */
 /* ===== 审批进度时间线样式在 components/ApprovalTimeline.vue（详情弹窗内联复用） ===== */
 
 /* 2026-10-23 虎哥：合同金额输入框内容左对齐（el-input-number 默认偏右/居中，强制内部 input 左对齐） */

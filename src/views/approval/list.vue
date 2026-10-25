@@ -239,13 +239,14 @@ onMounted(loadApprovals)
 
 <template>
   <el-card shadow="never">
-    <!-- 查询条件：顶部一套，按当前 Tab 显示对应表单（虎哥 2026-10-22：Tab 栏放到查询条件下、表格上） -->
+    <!-- 查询条件：顶部一套，按当前 Tab 显示对应表单（虎哥 2026-10-22：Tab 栏放到查询条件下、表格上）。
+         控件宽度统一吃 pages.css 的 .query-bar（200px），本页不再内联写死，避免规范两处维护 -->
     <el-form v-if="activeTab === 'approval'" :inline="true" :model="approvalQuery" class="query-bar" @submit.prevent>
       <el-form-item label="业务名称">
-        <el-input v-model="approvalQuery.bizTitleKw" placeholder="模糊匹配" clearable style="width: 200px" @keyup.enter="searchApprovals" />
+        <el-input v-model="approvalQuery.bizTitleKw" placeholder="模糊匹配" clearable @keyup.enter="searchApprovals" />
       </el-form-item>
       <el-form-item label="节点名称">
-        <el-input v-model="approvalQuery.taskNameKw" placeholder="模糊匹配" clearable style="width: 200px" @keyup.enter="searchApprovals" />
+        <el-input v-model="approvalQuery.taskNameKw" placeholder="模糊匹配" clearable @keyup.enter="searchApprovals" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="searchApprovals">查询</el-button>
@@ -254,10 +255,10 @@ onMounted(loadApprovals)
     </el-form>
     <el-form v-else-if="activeTab === 'started'" :inline="true" :model="startedQuery" class="query-bar" @submit.prevent>
       <el-form-item label="项目名称">
-        <el-input v-model="startedQuery.projectName" placeholder="模糊匹配" clearable style="width: 200px" @keyup.enter="searchStarted" />
+        <el-input v-model="startedQuery.projectName" placeholder="模糊匹配" clearable @keyup.enter="searchStarted" />
       </el-form-item>
       <el-form-item label="审批状态">
-        <DictSelect v-model="startedQuery.approvalStatus" type-code="project_approval_status" placeholder="全部" style="width: 200px" />
+        <DictSelect v-model="startedQuery.approvalStatus" type-code="project_approval_status" placeholder="全部" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="searchStarted">查询</el-button>
@@ -266,10 +267,10 @@ onMounted(loadApprovals)
     </el-form>
     <el-form v-else-if="activeTab === 'history'" :inline="true" :model="historyQuery" class="query-bar" @submit.prevent>
       <el-form-item label="业务名称">
-        <el-input v-model="historyQuery.bizTitleKw" placeholder="模糊匹配" clearable style="width: 200px" @keyup.enter="searchHistory" />
+        <el-input v-model="historyQuery.bizTitleKw" placeholder="模糊匹配" clearable @keyup.enter="searchHistory" />
       </el-form-item>
       <el-form-item label="节点名称">
-        <el-input v-model="historyQuery.taskNameKw" placeholder="模糊匹配" clearable style="width: 200px" @keyup.enter="searchHistory" />
+        <el-input v-model="historyQuery.taskNameKw" placeholder="模糊匹配" clearable @keyup.enter="searchHistory" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="searchHistory">查询</el-button>
@@ -472,11 +473,7 @@ onMounted(loadApprovals)
 .query-bar {
   margin-bottom: 0px;
 }
-.pagination-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
-}
+/* .pagination-bar 已上提到 styles/pages.css 全局（2026-10-26），本文件不再留本地副本 */
 /* 处理人标签（集合时多个标签横排，虎哥 2026-10-22 要求） */
 .handler-tag {
   margin: 2px;

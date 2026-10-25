@@ -366,31 +366,11 @@ const handleWithdraw = async () => {
 .attach-link {
   font-size: 13px;
 }
-.head-desc {
-  margin-bottom: 8px;
-}
+/* .head-desc 已上提到 styles/pages.css 全局（2026-10-25），本文件不再留本地副本 */
 .muted {
   color: #909399;
 }
-.block-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 18px 0 12px;
-  padding: 8px 12px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-  border-left: 3px solid var(--el-color-primary);
-  border-radius: 0 4px 4px 0;
-  background: linear-gradient(
-    90deg,
-    rgba(64, 158, 255, 0.16) 0%,
-    rgba(64, 158, 255, 0.07) 45%,
-    rgba(64, 158, 255, 0) 100%
-  );
-}
+/* .block-title 已上提到 styles/pages.css 全局（2026-10-25），本文件不再留本地副本 */
 .detail-scroll {
   max-height: calc(100vh - 280px);
   overflow-y: auto;

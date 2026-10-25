@@ -111,13 +111,14 @@
         </el-table>
 
         <!-- 分页器（配置数据量小，前端分页；接口仍全量返回） -->
-        <div class="pt-adv-pager">
+        <!-- 容器类名统一到全站 .pagination-bar（pages.css 全局），不再自定义 .pt-adv-pager -->
+        <div class="pagination-bar">
           <el-pagination
             v-model:current-page="query.page"
             v-model:page-size="query.pageSize"
             :total="filteredRows.length"
-            :page-sizes="[10, 20, 50]"
-            layout="total, sizes, prev, pager, next"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
             background
           />
         </div>
@@ -418,9 +419,5 @@ onMounted(loadGroup)
 .pt-adv-value {
   word-break: break-all;
 }
-.pt-adv-pager {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-}
+/* .pagination-bar 已上提到 styles/pages.css 全局（2026-10-26），本文件不再留本地副本 */
 </style>
