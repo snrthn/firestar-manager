@@ -131,17 +131,17 @@ onMounted(() => {
     </div>
 
     <el-table v-loading="loading" :data="list" border>
-      <el-table-column prop="batchNo" label="批次号" min-width="150" show-overflow-tooltip>
+      <el-table-column prop="batchNo" label="批次号" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">{{ row.batchNo || '—' }}</template>
       </el-table-column>
-      <el-table-column prop="projectNo" label="项目编号" min-width="130" show-overflow-tooltip>
+      <el-table-column prop="projectNo" label="项目编号" min-width="160" show-overflow-tooltip>
         <template #default="{ row }">{{ row.projectNo || '—' }}</template>
       </el-table-column>
       <el-table-column prop="projectName" label="项目名称" min-width="180" show-overflow-tooltip />
       <el-table-column prop="customerName" label="客户名称" min-width="140" show-overflow-tooltip>
         <template #default="{ row }">{{ row.customerName || '—' }}</template>
       </el-table-column>
-      <el-table-column label="发货金额" width="150" align="right">
+      <el-table-column label="发货金额" width="120" align="right">
         <template #default="{ row }">{{ formatAmount(row.shipmentAmount) }}</template>
       </el-table-column>
       <el-table-column label="发货状态" width="110" align="center">

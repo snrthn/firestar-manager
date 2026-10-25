@@ -238,6 +238,7 @@ const handleWithdraw = async () => {
           </el-descriptions-item>
           <el-descriptions-item label="开票人">{{ detail.clerkName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="申请人">{{ detail.applicantName || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ formatDateTime(detail.createdAt) }}</el-descriptions-item>
           <el-descriptions-item label="发票文件" :span="2">
             <span v-if="!attachFiles.length" class="muted">—</span>
             <div v-else class="attach-list">
@@ -258,7 +259,6 @@ const handleWithdraw = async () => {
               </div>
             </div>
           </el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ formatDateTime(detail.createdAt) }}</el-descriptions-item>
         </el-descriptions>
 
         <h4 class="block-title">审批时间线</h4>

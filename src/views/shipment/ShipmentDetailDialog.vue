@@ -401,7 +401,7 @@ const handleWithdraw = async () => {
           <el-descriptions-item label="确认人">{{ detail.confirmedByName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="发货时间">{{ formatDateTime(detail.shipmentDate) }}</el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ formatDateTime(detail.createdAt) }}</el-descriptions-item>
-          <el-descriptions-item label="已收金额">{{ formatAmount(detail.receivedAmount) }}</el-descriptions-item>
+          <el-descriptions-item label="已回款金额">{{ formatAmount(detail.receivedAmount) }}</el-descriptions-item>
           <el-descriptions-item label="退货金额">{{ formatAmount(detail.returnedAmount) }}</el-descriptions-item>
         </el-descriptions>
 

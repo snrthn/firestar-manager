@@ -22,6 +22,10 @@ export interface ShipmentVO {
   /** 发货时间（标记已发货时写入） */
   shipmentDate: string | null
   shipmentAmount: number | null
+  /**
+   * 已回款金额（V65 虎哥拍板「按回款口径走」：后端实时读关联应收单的 received_amount；
+   * 原 fin_shipment.received_amount 废弃列恒 0，不再使用）
+   */
   receivedAmount: number | null
   returnedAmount: number | null
   /** 发货状态（字典 shipment_status） */

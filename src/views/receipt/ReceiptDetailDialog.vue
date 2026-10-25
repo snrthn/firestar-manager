@@ -246,7 +246,7 @@ const handleWithdraw = async () => {
           <el-descriptions-item v-if="detail.originalReceiptId" label="原单">
             {{ detail.originalReceiptNo || `收款单#${detail.originalReceiptId}` }}
           </el-descriptions-item>
-          <el-descriptions-item label="核销分配" :span="2">
+          <el-descriptions-item label="核销分配" :span="1">
             <span v-if="!detail.allocations?.length" class="muted">—（预收，未指定应收单）</span>
             <div v-else class="attach-list">
               <div v-for="a in detail.allocations" :key="a.receivableId" class="attach-item">
@@ -255,6 +255,8 @@ const handleWithdraw = async () => {
               </div>
             </div>
           </el-descriptions-item>
+          <el-descriptions-item label="申请人">{{ detail.applicantName || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ formatDateTime(detail.createdAt) }}</el-descriptions-item>
           <el-descriptions-item label="银行回单" :span="2">
             <span v-if="!attachFiles.length" class="muted">—</span>
             <div v-else class="attach-list">
@@ -275,8 +277,6 @@ const handleWithdraw = async () => {
               </div>
             </div>
           </el-descriptions-item>
-          <el-descriptions-item label="申请人">{{ detail.applicantName || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ formatDateTime(detail.createdAt) }}</el-descriptions-item>
         </el-descriptions>
 
         <!-- 审批时间线 -->
