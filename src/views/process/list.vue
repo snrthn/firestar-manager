@@ -116,7 +116,7 @@
           </el-button>
         </div>
         <el-table :data="editingNodes" border empty-text="尚未配置节点，点「新增节点」">
-          <el-table-column label="#" width="46">
+          <el-table-column label="#" width="35">
             <template #default="{ $index }">{{ $index + 1 }}</template>
           </el-table-column>
           <el-table-column label="节点名称" width="120">
@@ -133,7 +133,7 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="审批人 / 候选" min-width="150">
+          <el-table-column label="审批人 / 候选" min-width="120">
             <template #default="{ row }">
               <el-select
                 v-if="row.type === 'USER'" v-model="row.assignee" size="small"
