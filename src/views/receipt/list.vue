@@ -166,14 +166,14 @@ onMounted(() => {
       <el-table-column prop="receiptNo" label="收款单号" min-width="160" show-overflow-tooltip>
         <template #default="{ row }">{{ row.receiptNo || '—' }}</template>
       </el-table-column>
-      <el-table-column prop="projectNo" label="项目编号" min-width="130" show-overflow-tooltip>
+      <el-table-column prop="projectNo" label="项目编号" min-width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ row.projectNo || '—' }}</template>
       </el-table-column>
       <el-table-column prop="projectName" label="项目名称" min-width="180" show-overflow-tooltip />
-      <el-table-column prop="customerName" label="客户名称" min-width="140" show-overflow-tooltip>
+      <el-table-column prop="customerName" label="客户名称" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">{{ row.customerName || '—' }}</template>
       </el-table-column>
-      <el-table-column label="收款金额" width="150" align="right">
+      <el-table-column label="收款金额" width="120" align="right">
         <template #default="{ row }">{{ formatAmount(row.receiptAmount) }}</template>
       </el-table-column>
       <el-table-column label="款项类型" width="120" align="center">
