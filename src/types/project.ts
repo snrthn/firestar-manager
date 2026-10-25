@@ -27,7 +27,21 @@ export interface ProjectVO {
   contractAmount: number | null
   /** 累计发货金额（Σ fin_shipment.shipment_amount，按项目聚合，发货流程起有数） */
   shippedAmount: number | null
-  /** 累计已收金额（Σ fin_shipment.received_amount） */
+  /**
+   * 累计已收金额（Σ 审批通过的收款单 receipt_amount，按项目实时聚合，V65）。
+   *
+   * <p>虎哥 2026-10-25 拍板 A「按回款口径走」：原 receivedAmount 读的
+   * fin_shipment.received_amount 全库无写入方恒 0，本字段取代之。</p>
+   */
+  collectedAmount: number | null
+  /** 累计开票金额（Σ 审批通过的发票 invoice_amount，按项目实时聚合，V65） */
+  invoicedAmount: number | null
+  /** 应收金额合计（Σ 有效应收单 receivable_amount，V65） */
+  receivableAmount: number | null
+  /**
+   * 累计已收货金额（Σ fin_shipment.received_amount）——⚠️ V65 起废弃口径（恒 0），
+   * 保留仅为兼容；页面展示请用 collectedAmount
+   */
   receivedAmount: number | null
   /** 累计退货金额（Σ fin_shipment.returned_amount） */
   returnedAmount: number | null

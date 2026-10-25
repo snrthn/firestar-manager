@@ -82,6 +82,8 @@ watch(
           <el-descriptions-item label="未核销">{{ formatAmount(detail.unwrittenOffAmount) }}</el-descriptions-item>
           <el-descriptions-item label="已开票">{{ formatAmount(detail.invoicedAmount) }}</el-descriptions-item>
           <el-descriptions-item label="未开票">{{ formatAmount(detail.uninvoicedAmount) }}</el-descriptions-item>
+          <el-descriptions-item label="已回款">{{ formatAmount(detail.receivedAmount) }}</el-descriptions-item>
+          <el-descriptions-item label="未回款">{{ formatAmount(detail.unreceivedAmount) }}</el-descriptions-item>
         </el-descriptions>
       </template>
     </div>

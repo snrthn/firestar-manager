@@ -4,6 +4,10 @@
 //   com.firestar.dto.InvoiceRequest （/invoice POST、/invoice/{id} PUT 请求体）
 // 字典：invoice_status / invoice_type / doc_direction / receivable_status
 //      （invoice_type 由 V59 建，其余在 V2__init_dict_data.sql 已种）
+// 核销分配类型（AllocationItem/AllocationVO）从 './receipt' 引入——收款与发票共用一套双向拆分语义
+import type { AllocationItem, AllocationVO } from './receipt'
+
+export type { AllocationItem, AllocationVO }
 
 /** 分页结果（MyBatis-Plus IPage 序列化：records/total/size/current/pages） */
 export interface InvoicePageVO {
@@ -43,6 +47,11 @@ export interface InvoiceVO {
   docDirection: string | null
   docDirectionName: string | null
 
+  /** 红冲原单 ID（docDirection=RED 时非空） */
+  originalInvoiceId?: number | null
+  /** 红冲原单号（仅详情回填，展示「原单：YS-xxx」） */
+  originalInvoiceNo?: string | null
+
   /** 开票日期 */
   invoiceDate: string | null
   /**
@@ -55,6 +64,13 @@ export interface InvoiceVO {
    * 与发货签收证据 V54 shipment_receive_proof 同构）。列表接口不返回、仅详情返回。
    */
   attachmentFileIds?: number[] | null
+
+  /**
+   * 核销分配明细（V65 双向拆分；仅详情返回，列表不返回）。
+   *
+   * <p>哪张应收单分到多少；空数组兜底为主应收单独享（V65 前历史数据）。</p>
+   */
+  allocations?: AllocationVO[]
 
   /** 开票状态（字典 invoice_status） */
   invoiceStatus: string | null
@@ -104,7 +120,22 @@ export interface InvoiceRequest {
    * 随本请求提交；后端在单据落库后统一把 bizType/bizId 改写挂载（编辑态按全量列表差分解绑）。
    */
   attachmentFileIds?: number[] | null
+  /**
+   * 核销分配明细（V65 双向拆分，虎哥拍板 B）。
+   *
+   * <p>非空时强制 Σ amount = invoiceAmount，每行 ≤ 该应收单未开票余额（后端校验）；
+   * 主应收单（receivableId）取第一行，编辑时不可更换。空数组兜底为主应收单独享。</p>
+   */
+  allocations?: AllocationItem[]
   remark?: string | null
+  /**
+   * 单据方向（2026-10-25 红冲入口，虎哥拍板「正数+RED 方向」）。
+   *
+   * BLUE=蓝字（默认）；RED=红字（红冲单，必须配 originalInvoiceId）。
+   */
+  docDirection?: string | null
+  /** 红冲原单 ID（docDirection=RED 时必填；原单须已审批通过、同项目、金额≤原单） */
+  originalInvoiceId?: number | null
 }
 
 /**

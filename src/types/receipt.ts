@@ -4,6 +4,27 @@
 //   com.firestar.dto.ReceiptRequest   （/receipt POST、/receipt/{id} PUT 请求体）
 // 字典：receipt_status / receipt_type / doc_direction（均在 V2__init_dict_data.sql 已种）
 
+/**
+ * 核销分配项（V65 双向拆分，虎哥 2026-10-25 拍板 B）。
+ *
+ * <p>一笔收款/发票拆到某张应收单上的金额。收款与发票共用（发票侧从本文件 import）。</p>
+ */
+export interface AllocationItem {
+  /** 应收单 ID → fin_receivable.id */
+  receivableId: number
+  /** 本次分配金额 */
+  amount: number
+}
+
+/** 核销分配展示项（详情回填，含应收单号） */
+export interface AllocationVO {
+  receivableId: number
+  /** 应收单号（业务键） */
+  receivableNo: string | null
+  /** 本次分配金额 */
+  amount: number
+}
+
 /** 分页结果（MyBatis-Plus IPage 序列化：records/total/size/current/pages） */
 export interface ReceiptPageVO {
   records: ReceiptVO[]
@@ -30,6 +51,11 @@ export interface ReceiptVO {
   docDirectionName: string | null
   docDirectionStyle: string | null
 
+  /** 红冲原单 ID（docDirection=RED 时非空） */
+  originalReceiptId?: number | null
+  /** 红冲原单号（仅详情回填，展示「原单：SK-xxx」） */
+  originalReceiptNo?: string | null
+
   /** 款项类型（字典 receipt_type：NORMAL 正常收款 / PREPAY 预收款 / OVERPAY 多收款） */
   receiptType: string | null
   receiptTypeName: string | null
@@ -47,6 +73,13 @@ export interface ReceiptVO {
    * 与发货签收证据 V54 shipment_receive_proof 同构）。列表接口不返回、仅详情返回。
    */
   attachmentFileIds?: number[] | null
+
+  /**
+   * 核销分配明细（V65 双向拆分；仅详情返回，列表不返回）。
+   *
+   * <p>哪张应收单分到多少；空数组 = 预收未指定。撤回产生的 REVERSED 行不透出。</p>
+   */
+  allocations?: AllocationVO[]
 
   /** 审批状态（字典 receipt_status） */
   approvalStatus: string | null
@@ -85,7 +118,22 @@ export interface ReceiptRequest {
    * 随本请求提交；后端在单据落库后统一把 bizType/bizId 改写挂载（编辑态按全量列表差分解绑）。
    */
   attachmentFileIds?: number[] | null
+  /**
+   * 核销分配明细（V65 双向拆分，虎哥拍板 B）。
+   *
+   * <p>非空时强制 Σ amount = receiptAmount，每行 ≤ 该应收单未回款余额（后端校验）；
+   * 空数组/不传 = 预收未指定。同一应收单合并一行。</p>
+   */
+  allocations?: AllocationItem[]
   remark?: string | null
+  /**
+   * 单据方向（2026-10-25 红冲入口，虎哥拍板「正数+RED 方向」）。
+   *
+   * BLUE=蓝字（默认）；RED=红字（红冲单，必须配 originalReceiptId）。
+   */
+  docDirection?: string | null
+  /** 红冲原单 ID（docDirection=RED 时必填；原单须已审批通过、同项目、金额≤原单） */
+  originalReceiptId?: number | null
 }
 
 /**

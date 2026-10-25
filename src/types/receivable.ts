@@ -37,6 +37,10 @@ export interface ReceivableVO {
   invoicedAmount: number | null
   /** 未开票金额 */
   uninvoicedAmount: number | null
+  /** 已回款金额（V65：按 fin_write_off 明细累加） */
+  receivedAmount: number | null
+  /** 未回款金额（V65：应收金额 - 已回款） */
+  unreceivedAmount: number | null
 
   /** 应收日期 */
   receivableDate: string | null

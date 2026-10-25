@@ -153,6 +153,12 @@ onMounted(() => {
       <el-table-column label="未开票" width="130" align="right">
         <template #default="{ row }"><b>{{ formatAmount(row.uninvoicedAmount) }}</b></template>
       </el-table-column>
+      <el-table-column label="已回款" width="130" align="right">
+        <template #default="{ row }">{{ formatAmount(row.receivedAmount) }}</template>
+      </el-table-column>
+      <el-table-column label="未回款" width="130" align="right">
+        <template #default="{ row }"><b>{{ formatAmount(row.unreceivedAmount) }}</b></template>
+      </el-table-column>
       <el-table-column label="应收日期" width="120" align="center">
         <template #default="{ row }">{{ formatDate(row.receivableDate) }}</template>
       </el-table-column>

@@ -357,7 +357,7 @@ onMounted(loadList)
         <template #default="{ row }">{{ formatAmount(row.shippedAmount) }}</template>
       </el-table-column>
       <el-table-column label="已收金额" width="130" align="right">
-        <template #default="{ row }">{{ formatAmount(row.receivedAmount) }}</template>
+        <template #default="{ row }">{{ formatAmount(row.collectedAmount) }}</template>
       </el-table-column>
       <el-table-column label="退货金额" width="130" align="right">
         <template #default="{ row }">{{ formatAmount(row.returnedAmount) }}</template>

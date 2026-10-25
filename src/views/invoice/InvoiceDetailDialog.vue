@@ -23,7 +23,7 @@ import { downloadViaBackend } from '@/utils/fileDownload'
 
 // 发票详情弹窗（卡片化：信息 + 审批时间线 + 状态推进）。
 // 状态推进（虎哥统一规划：审批动作收归审批中心，本弹窗只做业务推进）：
-//  - PENDING → 提交审批（申请人自己的动作）
+//  - PENDING / REJECTED → 提交审批（申请人自己的动作；驳回后可改后重提）
 //  - PENDING / ISSUING → 撤回（申请人自己的动作）
 const props = defineProps<{
   invoiceId: number | null
@@ -34,6 +34,8 @@ const visible = defineModel<boolean>('visible', { required: true })
 const emit = defineEmits<{
   updated: []
   approved: [ok: boolean]
+  /** 红冲入口（2026-10-25）：父级打开新建弹窗（红冲模式），参数 = 被冲销的发票 ID */
+  redFlush: [invoiceId: number]
 }>()
 
 const dialogTitle = () =>
@@ -144,9 +146,13 @@ const reload = async () => {
 }
 
 // 注意：状态字段真名是 invoiceStatus（后端 InvoiceVO.invoiceStatus，非 status）
-const canSubmit = () => detail.value?.invoiceStatus === 'PENDING'
+// 草稿态 + 已驳回态可提交（2026-10-25 用友范式：驳回=回到编写中，改完可重提）
+const canSubmit = () => detail.value?.invoiceStatus === 'PENDING' || detail.value?.invoiceStatus === 'REJECTED'
 const canWithdraw = () =>
   detail.value?.invoiceStatus === 'PENDING' || detail.value?.invoiceStatus === 'ISSUING'
+// 红冲入口（2026-10-25）：仅审批通过（已开票）的单据可冲；红冲单本身不再套娃
+const canRedFlush = () =>
+  detail.value?.invoiceStatus === 'ISSUED' && detail.value?.docDirection !== 'RED'
 
 const handleSubmit = async () => {
   if (!detail.value) return
@@ -218,6 +224,18 @@ const handleWithdraw = async () => {
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="开票日期">{{ formatDate(detail.invoiceDate) }}</el-descriptions-item>
+          <el-descriptions-item v-if="detail.originalInvoiceId" label="原单">
+            {{ detail.originalInvoiceNo || `发票#${detail.originalInvoiceId}` }}
+          </el-descriptions-item>
+          <el-descriptions-item label="核销分配" :span="2">
+            <span v-if="!detail.allocations?.length" class="muted">—（主应收单独享）</span>
+            <div v-else class="attach-list">
+              <div v-for="a in detail.allocations" :key="a.receivableId" class="attach-item">
+                <span class="attach-name-text">{{ a.receivableNo || `应收单#${a.receivableId}` }}</span>
+                <span class="alloc-amt">{{ formatAmount(a.amount) }}</span>
+              </div>
+            </div>
+          </el-descriptions-item>
           <el-descriptions-item label="开票人">{{ detail.clerkName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="申请人">{{ detail.applicantName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="发票文件" :span="2">
@@ -275,6 +293,13 @@ const handleWithdraw = async () => {
             :loading="acting"
             @click="handleWithdraw"
           >撤回申请</el-button>
+          <el-button
+            v-if="canRedFlush()"
+            type="warning"
+            plain
+            :loading="acting"
+            @click="emit('redFlush', detail.id)"
+          >红冲</el-button>
         </template>
         <el-button @click="visible = false">关闭</el-button>
       </template>
@@ -299,6 +324,13 @@ const handleWithdraw = async () => {
   align-items: center;
   gap: 12px;
   line-height: 22px;
+}
+/* 核销分配金额（V65）：等宽数字右对齐，跟金融数据口径 */
+.alloc-amt {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #303133;
 }
 .attach-item {
   display: flex;

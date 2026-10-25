@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { UploadFilled } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { createReceipt, receiptDetail, updateReceipt } from '@/api/receipt'
 import { projectPage } from '@/api/project'
+import { receivablePage } from '@/api/receivable'
 import { listFiles, uploadFile } from '@/api/file'
-import type { ReceiptRequest } from '@/types/receipt'
+import type { AllocationItem, ReceiptRequest, ReceiptVO } from '@/types/receipt'
 import type { ProjectVO } from '@/types/project'
+import type { ReceivableVO } from '@/types/receivable'
 import type { FileVO } from '@/types/file'
 import DictSelect from '@/components/DictSelect.vue'
 // 已选附件支持就地预览（2026-10-25 虎哥要求）：与详情弹窗同一套，复用文件管理模块的预览组件。
@@ -25,7 +27,9 @@ import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
 // sys_file_storage 软关联，与发货签收证据（V54 shipment_receive_proof）严格同构。
 // 新建时单据尚无 id → 上传不带 bizId，保存后由后端统一挂载。
 const visible = defineModel<boolean>('visible', { required: true })
-const props = defineProps<{ receiptId?: number | null }>()
+// originalReceiptId：红冲模式入参（2026-10-25 红冲入口，虎哥拍板「正数+RED、走完整审批」）。
+// 从详情弹窗「红冲」按钮传入被冲销的蓝字单 ID；非空 = 本弹窗以红冲单模式打开。
+const props = defineProps<{ receiptId?: number | null; originalReceiptId?: number | null }>()
 const emit = defineEmits<{ saved: [] }>()
 
 /**
@@ -38,6 +42,10 @@ const ATTACH_BIZ_TYPE = 'receipt'
 const MAX_ATTACH_MB = 10
 
 const isEdit = () => props.receiptId != null
+/** 红冲模式：传了 originalReceiptId 即红字单（与编辑态互斥，红冲永远新建） */
+const isRedFlush = () => props.originalReceiptId != null
+/** 红冲原单数据（预填来源 + 金额上限提示） */
+const redOriginal = ref<ReceiptVO | null>(null)
 
 const projectOptions = ref<ProjectVO[]>([])
 const loadingProjects = ref(false)
@@ -45,6 +53,43 @@ const saving = ref(false)
 /** 已选附件（编辑态从文件表按 bizType+bizId 回填） */
 const attachments = ref<FileVO[]>([])
 const uploading = ref(false)
+
+// ===== 核销分配（V65 双向拆分，虎哥 2026-10-25 拍板 B）=====
+// 预收/未指定 = 空列表；非空时强制 Σ = 收款金额（前端提示 + 后端强制），
+// 每行 ≤ 该应收单未回款余额（后端强制，前端只展示余额供参考）。
+const receivableOptions = ref<ReceivableVO[]>([])
+const loadingReceivables = ref(false)
+const allocations = ref<AllocationItem[]>([])
+
+const allocatedTotal = computed(() =>
+  allocations.value.reduce((s, a) => s + (a.amount == null ? 0 : Number(a.amount)), 0),
+)
+/** 差额 = 收款金额 - 已分配；null = 未填收款金额 */
+const remaining = computed(() => {
+  if (form.receiptAmount == null) return null
+  return Number(form.receiptAmount) - allocatedTotal.value
+})
+
+const loadReceivables = async (projectId: number) => {
+  loadingReceivables.value = true
+  try {
+    // 只列本项目下的应收单（后端 ReceivableServiceImpl 生成时 1:1 挂发货批次）
+    const page = await receivablePage(1, 500, { projectId })
+    receivableOptions.value = page.records
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    loadingReceivables.value = false
+  }
+}
+
+const addAllocation = () => {
+  allocations.value.push({ receivableId: null as unknown as number, amount: null as unknown as number })
+}
+
+const removeAllocation = (idx: number) => {
+  allocations.value.splice(idx, 1)
+}
 
 const form = reactive<{
   projectId: number | null
@@ -138,6 +183,9 @@ const resetForm = () => {
   form.receiptType = null
   form.receiptDate = null
   attachments.value = []
+  allocations.value = []
+  receivableOptions.value = []
+  redOriginal.value = null
 }
 
 const handleSubmit = async () => {
@@ -149,6 +197,27 @@ const handleSubmit = async () => {
     ElMessage.warning('请填写大于 0 的收款金额')
     return
   }
+  // 红冲口径（2026-10-25）：金额 ≤ 原单金额（支持部分红冲），后端同校验
+  if (isRedFlush() && redOriginal.value) {
+    const max = Number(redOriginal.value.receiptAmount)
+    if (Number(form.receiptAmount) > max) {
+      ElMessage.warning(`红冲金额不能超过原单金额 ${max}`)
+      return
+    }
+  }
+  // 核销分配（V65）：过滤未填完整的行；空列表 = 预收未指定
+  const allocs: AllocationItem[] = allocations.value
+    .filter((a) => a.receivableId != null && a.amount != null && Number(a.amount) > 0)
+    .map((a) => ({ receivableId: a.receivableId, amount: Number(a.amount) }))
+  // 前端口径提示（后端 saveAllocations 同样强制）：Σ 必须 = 收款金额
+  if (allocs.length) {
+    const sum = allocs.reduce((s, a) => s + a.amount, 0)
+    const total = Number(form.receiptAmount)
+    if (Number(sum.toFixed(2)) !== Number(total.toFixed(2))) {
+      ElMessage.warning(`分配总额 ${sum.toFixed(2)} 与收款金额 ${total.toFixed(2)} 不一致，请调整`)
+      return
+    }
+  }
   // 日期控件返回 'YYYY-MM-DD'，后端 LocalDate 可直接解析；清空时传 null
   const payload: ReceiptRequest = {
     projectId: form.projectId,
@@ -156,12 +225,19 @@ const handleSubmit = async () => {
     receiptType: form.receiptType || null,
     receiptDate: form.receiptDate || null,
     attachmentFileIds: attachments.value.map((f) => f.id),
+    allocations: allocs,
+    // 红冲单（2026-10-25）：方向 RED + 原单 ID；审批通过后对应收单/项目汇总做减法
+    docDirection: isRedFlush() ? 'RED' : undefined,
+    originalReceiptId: isRedFlush() ? props.originalReceiptId! : undefined,
   }
   saving.value = true
   try {
     if (isEdit()) {
       await updateReceipt(props.receiptId!, payload)
       ElMessage.success('回款单已更新')
+    } else if (isRedFlush()) {
+      await createReceipt(payload)
+      ElMessage.success('红冲单已创建（草稿），请在列表点「提交审批」发起审批')
     } else {
       await createReceipt(payload)
       ElMessage.success('回款单已创建（草稿），请在列表点「提交审批」发起审批')
@@ -175,15 +251,29 @@ const handleSubmit = async () => {
   }
 }
 
-const loadForEdit = async (id: number) => {
+/**
+ * 回填单据数据（编辑态 / 红冲预填共用）。
+ *
+ * @param asRedFlush 红冲模式：true 时不回填金额（用户自填，≤ 原单），其余同编辑回填；
+ *                   redOriginal 记原单供金额上限提示
+ */
+const loadForEdit = async (id: number, asRedFlush = false) => {
   try {
     const d = await receiptDetail(id)
+    if (asRedFlush) redOriginal.value = d
     form.projectId = d.projectId ?? null
-    form.receiptAmount = d.receiptAmount ?? null
+    form.receiptAmount = asRedFlush ? null : (d.receiptAmount ?? null)
     form.receiptType = d.receiptType ?? null
     form.receiptDate = d.receiptDate ?? null
     attachments.value = []
     await loadAttachments(id)
+    // 等 projectId 的 watch 先跑（会清空 allocations 并加载应收单），再回填，
+    // 否则回填值会被 watch 的清空动作覆盖
+    await nextTick()
+    allocations.value = (d.allocations || []).map((a) => ({
+      receivableId: a.receivableId,
+      amount: a.amount,
+    }))
   } catch (e) {
     ElMessage.error((e as Error).message)
   }
@@ -196,8 +286,24 @@ watch(
     loadProjects()
     if (isEdit()) {
       loadForEdit(props.receiptId!)
+    } else if (isRedFlush()) {
+      // 红冲模式：复用编辑回填拉原单数据预填（项目/类型/日期/分配镜像），金额留空让用户填
+      loadForEdit(props.originalReceiptId!, true)
     } else {
       resetForm()
+    }
+  },
+)
+
+// 切换项目：分配明细作废（应收单属于项目维度），并按新项目重载应收单下拉
+watch(
+  () => form.projectId,
+  (pid) => {
+    allocations.value = []
+    if (pid != null) {
+      loadReceivables(pid)
+    } else {
+      receivableOptions.value = []
     }
   },
 )
@@ -206,18 +312,32 @@ watch(
 <template>
   <el-dialog
     v-model="visible"
-    :title="isEdit() ? '编辑回款单' : '新建回款单'"
+    :title="isRedFlush() ? '红冲收款单' : isEdit() ? '编辑回款单' : '新建回款单'"
     width="640px"
     top="7vh"
   >
     <div class="detail-scroll">
+      <!-- 红冲提示条（2026-10-25 红冲入口）：说明口径 + 原单信息 -->
+      <el-alert
+        v-if="isRedFlush()"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="red-flush-tip"
+      >
+        <template #title>
+          正在冲销原单
+          <b>{{ redOriginal?.receiptNo || `#${props.originalReceiptId}` }}</b>
+          （原单金额 {{ formatAmount(redOriginal?.receiptAmount) }}），支持部分红冲，金额不可超过原单。
+        </template>
+      </el-alert>
       <el-form label-width="100px" @submit.prevent>
         <el-form-item label="项目" required>
           <el-select
             v-model="form.projectId"
             filterable
-            :disabled="isEdit()"
-            :placeholder="isEdit() ? '编辑不可更换项目' : '选择已审批项目'"
+            :disabled="isEdit() || isRedFlush()"
+            :placeholder="isEdit() || isRedFlush() ? '与原单同项目，不可更换' : '选择已审批项目'"
             style="width: 100%"
             :loading="loadingProjects"
           >
@@ -243,6 +363,54 @@ watch(
             class="amount-left"
             style="width: 100%"
           />
+        </el-form-item>
+
+        <!-- 核销分配（V65 双向拆分）：选填，把收款金额拆到具体应收单（可拆多张）；
+             不填 = 预收，系统只记项目已收。Σ 必须 = 收款金额（前端提示，后端强制）。 -->
+        <el-form-item label="核销分配">
+          <div class="alloc-box">
+            <div class="alloc-hint muted">
+              选填：一笔收款可拆到多张应收单（分期核销）；不填 = 预收，之后再核销。
+            </div>
+            <div v-for="(a, idx) in allocations" :key="idx" class="alloc-row">
+              <el-select
+                v-model="a.receivableId"
+                filterable
+                placeholder="选择应收单"
+                style="flex: 1 1 0; min-width: 0"
+                :loading="loadingReceivables"
+              >
+                <el-option
+                  v-for="rv in receivableOptions"
+                  :key="rv.id"
+                  :label="`${rv.receivableNo}（未回款 ${formatAmount(rv.unreceivedAmount)}）`"
+                  :value="rv.id"
+                />
+              </el-select>
+              <el-input-number
+                v-model="a.amount"
+                :min="0"
+                :precision="2"
+                controls-position="right"
+                placeholder="金额"
+                style="width: 150px"
+              />
+              <el-button link type="danger" size="small" @click="removeAllocation(idx)">
+                删除
+              </el-button>
+            </div>
+            <div class="alloc-foot">
+              <el-button size="small" :disabled="!form.projectId" @click="addAllocation">
+                + 添加分配行
+              </el-button>
+              <span v-if="allocations.length" class="alloc-sum">
+                已分配 <b>{{ formatAmount(allocatedTotal) }}</b>
+                <span v-if="remaining != null" :class="remaining === 0 ? 'alloc-ok' : 'alloc-warn'">
+                  {{ remaining === 0 ? '，已分配完' : `，差额 ${formatAmount(remaining)}` }}
+                </span>
+              </span>
+            </div>
+          </div>
         </el-form-item>
 
         <el-form-item label="款项类型">
@@ -312,10 +480,46 @@ watch(
 </template>
 
 <style scoped>
+.red-flush-tip {
+  margin-bottom: 12px;
+}
 .proj-meta {
   margin-top: 6px;
   font-size: 13px;
   color: #303133;
+}
+/* 核销分配区（V65） */
+.alloc-box {
+  width: 100%;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 8px 10px;
+  background: #fafcff;
+}
+.alloc-hint {
+  margin-bottom: 6px;
+}
+.alloc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.alloc-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+.alloc-sum {
+  font-size: 12px;
+  color: #606266;
+}
+.alloc-ok {
+  color: #67c23a;
+}
+.alloc-warn {
+  color: #e6a23c;
 }
 .muted {
   color: #909399;

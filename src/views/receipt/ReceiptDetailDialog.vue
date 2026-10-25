@@ -23,7 +23,7 @@ import { downloadViaBackend } from '@/utils/fileDownload'
 
 // 回款详情弹窗（卡片化：信息 + 审批时间线 + 状态推进）。
 // 状态推进（虎哥统一规划：审批动作收归审批中心，本弹窗只做业务推进）：
-//  - PENDING_APPROVAL → 提交审批（申请人自己的动作）
+//  - PENDING_APPROVAL / REJECTED → 提交审批（申请人自己的动作；驳回后可改后重提）
 //  - PENDING_APPROVAL / CASHIER_APPROVING → 撤回（申请人自己的动作）
 // 审批通过/驳回请到「审批中心 → 待我审批」处理。
 //
@@ -40,6 +40,8 @@ const emit = defineEmits<{
   updated: []
   /** 审批已处理：带回 ok，父级成功才清空审批态（失败保留可重试） */
   approved: [ok: boolean]
+  /** 红冲入口（2026-10-25）：父级打开新建弹窗（红冲模式），参数 = 被冲销的收款单 ID */
+  redFlush: [receiptId: number]
 }>()
 
 const dialogTitle = () =>
@@ -151,10 +153,15 @@ const reload = async () => {
 
 // 操作区展示判定（虎哥：审批动作收归审批中心，本弹窗只做业务推进 + 撤回）
 // 注意：状态字段真名是 approvalStatus（后端 ReceiptVO.approvalStatus，非 status）
-const canSubmit = () => detail.value?.approvalStatus === 'PENDING_APPROVAL'
+// 草稿态 + 已驳回态可提交（2026-10-25 用友范式：驳回=回到编写中，改完可重提）
+const canSubmit = () =>
+  detail.value?.approvalStatus === 'PENDING_APPROVAL' || detail.value?.approvalStatus === 'REJECTED'
 const canWithdraw = () =>
   detail.value?.approvalStatus === 'PENDING_APPROVAL' ||
   detail.value?.approvalStatus === 'CASHIER_APPROVING'
+// 红冲入口（2026-10-25）：仅审批通过（已收款）的单据可冲；红冲单本身不再套娃
+const canRedFlush = () =>
+  detail.value?.approvalStatus === 'RECEIVED' && detail.value?.docDirection !== 'RED'
 
 const handleSubmit = async () => {
   if (!detail.value) return
@@ -223,6 +230,18 @@ const handleWithdraw = async () => {
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="收款日期">{{ formatDate(detail.receiptDate) }}</el-descriptions-item>
+          <el-descriptions-item v-if="detail.originalReceiptId" label="原单">
+            {{ detail.originalReceiptNo || `收款单#${detail.originalReceiptId}` }}
+          </el-descriptions-item>
+          <el-descriptions-item label="核销分配" :span="2">
+            <span v-if="!detail.allocations?.length" class="muted">—（预收，未指定应收单）</span>
+            <div v-else class="attach-list">
+              <div v-for="a in detail.allocations" :key="a.receivableId" class="attach-item">
+                <span class="attach-name-text">{{ a.receivableNo || `应收单#${a.receivableId}` }}</span>
+                <span class="alloc-amt">{{ formatAmount(a.amount) }}</span>
+              </div>
+            </div>
+          </el-descriptions-item>
           <el-descriptions-item label="银行回单" :span="2">
             <span v-if="!attachFiles.length" class="muted">—</span>
             <div v-else class="attach-list">
@@ -281,6 +300,13 @@ const handleWithdraw = async () => {
             :loading="acting"
             @click="handleWithdraw"
           >撤回申请</el-button>
+          <el-button
+            v-if="canRedFlush()"
+            type="warning"
+            plain
+            :loading="acting"
+            @click="emit('redFlush', detail.id)"
+          >红冲</el-button>
         </template>
         <el-button @click="visible = false">关闭</el-button>
       </template>
@@ -311,6 +337,13 @@ const handleWithdraw = async () => {
   align-items: center;
   gap: 12px;
   line-height: 22px;
+}
+/* 核销分配金额（V65）：等宽数字右对齐，跟金融数据口径 */
+.alloc-amt {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #303133;
 }
 /* 文件名 = 列表操作列同款「el-button link primary small」（2026-10-25 虎哥定稿）：
    点文件名即预览，行内只再留一个「下载」。

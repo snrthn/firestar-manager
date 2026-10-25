@@ -93,6 +93,9 @@ const detailId = ref<number | null>(null)
 // 编辑模式：复用同一个 ReceiptCreateDialog，靠 receiptId 区分新建/编辑
 const editVisible = ref(false)
 const editId = ref<number | null>(null)
+// 红冲模式（2026-10-25 红冲入口）：复用新建弹窗，靠 originalReceiptId 切红冲模式
+const redFlushVisible = ref(false)
+const redFlushOriginalId = ref<number | null>(null)
 
 const openCreate = () => {
   createVisible.value = true
@@ -104,6 +107,12 @@ const openEdit = (row: ReceiptVO) => {
 const openDetail = (row: ReceiptVO) => {
   detailId.value = row.id
   detailVisible.value = true
+}
+/** 详情弹窗「红冲」：以红冲模式打开新建弹窗（先关详情，避免双层弹窗遮罩混乱） */
+const openRedFlush = (receiptId: number) => {
+  detailVisible.value = false
+  redFlushOriginalId.value = receiptId
+  redFlushVisible.value = true
 }
 
 const route = useRoute()
@@ -193,8 +202,9 @@ onMounted(() => {
       <!-- 操作列：编辑 + 详情两位固定；提交/撤回等业务动作收在详情弹窗内 -->
       <el-table-column label="操作" width="140" fixed="right" align="center">
         <template #default="{ row }">
+          <!-- 草稿态 + 已驳回态可编辑（驳回=回到编写中，用友范式，可改后重提） -->
           <el-button
-            v-if="row.approvalStatus === 'PENDING_APPROVAL'"
+            v-if="row.approvalStatus === 'PENDING_APPROVAL' || row.approvalStatus === 'REJECTED'"
             link
             type="primary"
             size="small"
@@ -226,7 +236,18 @@ onMounted(() => {
     :receipt-id="editId"
     @saved="reloadAfterMutation"
   />
-  <ReceiptDetailDialog v-model:visible="detailVisible" :receipt-id="detailId" @updated="reloadAfterMutation" />
+  <!-- 红冲：与新建同一组件，传 originalReceiptId 切红冲模式（2026-10-25） -->
+  <ReceiptCreateDialog
+    v-model:visible="redFlushVisible"
+    :original-receipt-id="redFlushOriginalId"
+    @saved="reloadAfterMutation"
+  />
+  <ReceiptDetailDialog
+    v-model:visible="detailVisible"
+    :receipt-id="detailId"
+    @updated="reloadAfterMutation"
+    @red-flush="openRedFlush"
+  />
 </template>
 
 <style scoped>

@@ -161,7 +161,9 @@ const itemsTotal = computed(() =>
           </el-descriptions-item>
           <el-descriptions-item label="合同金额">{{ formatAmount(detail.contractAmount) }}</el-descriptions-item>
           <el-descriptions-item label="累计发货">{{ formatAmount(detail.shippedAmount) }}</el-descriptions-item>
-          <el-descriptions-item label="累计已收">{{ formatAmount(detail.receivedAmount) }}</el-descriptions-item>
+          <el-descriptions-item label="累计已收">{{ formatAmount(detail.collectedAmount) }}</el-descriptions-item>
+          <el-descriptions-item label="累计开票">{{ formatAmount(detail.invoicedAmount) }}</el-descriptions-item>
+          <el-descriptions-item label="应收合计">{{ formatAmount(detail.receivableAmount) }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.contractSignedAt" label="签约时间">
             {{ formatDateTime(detail.contractSignedAt) }}
           </el-descriptions-item>
