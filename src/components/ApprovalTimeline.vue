@@ -41,18 +41,20 @@ watch(
 // 据此定标签色——审批通过 success / 审批未通过 danger
 const endedPassed = (n: TimelineNodeVO) => n.handlerNames?.[0] === '审批通过'
 
-// 时间线节点 → 展示样式：进行中高亮（primary），已驳回 danger，已通过 success
+// 时间线节点 → 展示样式：进行中高亮（primary），已驳回 danger，已撤回 info，已通过 success
 const nodeType = (n: TimelineNodeVO) => {
   if (n.result === 'ACTIVE') return 'primary'
   if (n.result === 'ENDED') return endedPassed(n) ? 'success' : 'danger'
   if (n.result === 'REJECTED') return 'danger'
+  if (n.result === 'WITHDRAWN') return 'info'
   return 'success'
 }
 
-// 卡片色调：ACTIVE 主色浅底 / REJECTED 红色浅底 / DONE 白底 / ENDED 按结论取色
+// 卡片色调：ACTIVE 主色浅底 / REJECTED 红色浅底 / WITHDRAWN 灰色浅底 / DONE 白底 / ENDED 按结论取色
 const cardTone = (n: TimelineNodeVO) => {
   if (n.result === 'ACTIVE') return 'active'
   if (n.result === 'REJECTED') return 'rejected'
+  if (n.result === 'WITHDRAWN') return 'withdrawn'
   if (n.result === 'ENDED') return endedPassed(n) ? 'done' : 'rejected'
   return 'done'
 }
@@ -91,6 +93,7 @@ const cardTone = (n: TimelineNodeVO) => {
               {{ endedPassed(n) ? '已结束' : '已驳回' }}
             </el-tag>
             <el-tag v-else-if="n.result === 'REJECTED'" type="danger" size="small">已驳回</el-tag>
+            <el-tag v-else-if="n.result === 'WITHDRAWN'" type="info" size="small">已撤回</el-tag>
             <el-tag v-else type="success" size="small">已通过</el-tag>
           </div>
           <div v-if="n.result !== 'ENDED'" class="tl-meta">
@@ -101,7 +104,7 @@ const cardTone = (n: TimelineNodeVO) => {
             <span v-else>—</span>
           </div>
           <div v-if="n.comment" class="tl-comment">
-            <template v-if="n.result === 'ENDED'">{{ n.comment }}</template>
+            <template v-if="n.result === 'ENDED' || n.result === 'WITHDRAWN'">{{ n.comment }}</template>
             <template v-else>审批意见：{{ n.comment }}</template>
           </div>
         </div>
@@ -156,6 +159,11 @@ const cardTone = (n: TimelineNodeVO) => {
 .tl-card--rejected {
   border-color: var(--el-color-danger-light-8);
   background: var(--el-color-danger-light-9);
+}
+/* WITHDRAWN（申请人撤回，2026-10-25 新增）：灰色浅底——既不是驳回（红）也不是通过（绿） */
+.tl-card--withdrawn {
+  border-color: var(--el-color-info-light-8);
+  background: var(--el-color-info-light-9);
 }
 .tl-card-head {
   display: flex;

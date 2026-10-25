@@ -84,8 +84,8 @@ export interface ProjectSignFormData {
 export interface TimelineNodeVO {
   nodeId: string
   nodeName: string
-  /** ACTIVE = 待审批（前端高亮）/ DONE = 已通过 / REJECTED = 已驳回或跳过 / ENDED = 流程结束合成节点 */
-  result: 'ACTIVE' | 'DONE' | 'REJECTED' | 'ENDED'
+  /** ACTIVE = 待审批（前端高亮）/ DONE = 已通过 / REJECTED = 已驳回或跳过 / WITHDRAWN = 申请人撤回 / ENDED = 流程结束合成节点 */
+  result: 'ACTIVE' | 'DONE' | 'REJECTED' | 'WITHDRAWN' | 'ENDED'
   /** 处理人展示名：DONE/REJECTED 只放实际操作人；ACTIVE 是候选集合 */
   handlerNames: string[] | null
   /** 审批留言（Flowable 评论，无则 null） */
