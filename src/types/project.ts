@@ -16,7 +16,18 @@ export interface ProjectVO {
   /** 项目编号（审批通过后才赋予，此前为 null） */
   projectNo: string | null
   projectName: string
+  /**
+   * 客户名称（**快照**，V68 起不再作为聚合键）。
+   *
+   * 显示用：客户主表改名不会回改历史单据的名称，这是刻意的（对账时单据抬头要能对上当时）。
+   */
   customerName: string | null
+  /**
+   * 客户 ID → fin_customer.id（V68；0/null = 未关联）。
+   *
+   * 看板「按客户」维度的聚合键 —— 统计别拿 customerName 做 GROUP BY，文本会重名分裂。
+   */
+  customerId: number | null
   /** 销售经理 ID → sys_user.id */
   salesManagerId: number | null
   /** 销售经理展示名（后端批量翻译：nickname 优先 username 兜底；空值前端回显 ID） */
@@ -72,6 +83,13 @@ export interface ProjectVO {
 export interface ProjectFormData {
   id?: number
   projectName: string
+  /**
+   * 客户 ID → fin_customer.id（V68 起与下面的名称配套）。
+   *
+   * 优先级：后端以 id 为准（再用主表名称覆盖快照）；没给 id 但有名称时按名称自动建档。
+   */
+  customerId?: number
+  /** 客户名称（快照；下拉 allow-create 手输新客户时只有名称、没有 id，后端会据其建档） */
   customerName?: string
   salesManagerId?: number
   contractAmount?: number

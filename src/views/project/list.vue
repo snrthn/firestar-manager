@@ -12,6 +12,8 @@ import { formatDateTime } from '@/utils/datetime'
 import { listUserOptions } from '@/api/user'
 import type { UserOptionVO } from '@/types/user'
 import DictSelect from '@/components/DictSelect.vue'
+import { customerOptions } from '@/api/customer'
+import type { CustomerOptionVO } from '@/types/customer'
 import { useDictLabels } from '@/composables/useDict'
 
 // ===== 查询条件 =====
@@ -79,6 +81,7 @@ const formRef = ref<FormInstance>()
 
 const emptyForm = (): ProjectFormData => ({
   projectName: '',
+  customerId: undefined,
   customerName: '',
   salesManagerId: undefined,
   contractAmount: undefined,
@@ -128,17 +131,22 @@ const openCreate = () => {
   dialogTitle.value = '新建立项'
   dialogVisible.value = true
   ensureUserOptions()
+  ensureCustomerOptions()
 }
 
 // 编辑：仅 DRAFT / REJECTED 行有入口（后端 PUT 同语义把关）。先拉详情回填再开窗，
 // 保证拿到服务端翻译后的最新值，不拿列表行快照（列表行字段可能滞后）
 const openEdit = async (row: ProjectVO) => {
   ensureUserOptions()
+  ensureCustomerOptions()
   try {
     const detail = await projectDetail(row.id)
     Object.assign(form, emptyForm(), {
       id: detail.id,
       projectName: detail.projectName,
+      // V68：id + 快照名双回填。历史单据可能 customerId=0（V68 迁移未覆盖到），
+      // 此时只回填名称，下拉仍显示为未选中状态，用户重选一遍即可补上关联。
+      customerId: detail.customerId && detail.customerId > 0 ? detail.customerId : undefined,
       customerName: detail.customerName ?? undefined,
       salesManagerId: detail.salesManagerId ?? undefined,
       contractAmount: detail.contractAmount ?? undefined,
@@ -162,6 +170,32 @@ const ensureUserOptions = async () => {
   if (userOptions.value.length === 0) {
     userOptions.value = await listUserOptions()
   }
+}
+
+// 客户下拉选项（V68）：与上面的用户下拉同范式 —— 开窗时才拉一次，靠「长度非空」做懒加载。
+// 一期没有客户管理页面，所以这里不提供「选项为空时如何新建」的额外入口：
+// 下拉本身是 filterable + allow-create，手输的新名称直接由后端按名称 upsert 建档。
+const customerOpts = ref<CustomerOptionVO[]>([])
+const ensureCustomerOptions = async () => {
+  if (customerOpts.value.length === 0) {
+    customerOpts.value = (await customerOptions()) ?? []
+  }
+}
+
+/**
+ * 客户选择变更：把「名称 → 主表 id」同步到表单。
+ *
+ * 下拉以客户名为 value（allow-create 的天然用法），命中已有选项就带上 id；
+ * 手输的新名称查不到 id → 保持 undefined，由后端按名称 upsert 建档。
+ * 清空时两边一起清，避免残留 id 指向别的客户。
+ */
+const onCustomerChange = (name: string) => {
+  if (!name) {
+    form.customerId = undefined
+    return
+  }
+  const hit = customerOpts.value.find((c) => c.customerName === name)
+  form.customerId = hit ? hit.id : undefined
 }
 
 const handleSubmit = async () => {
@@ -442,8 +476,31 @@ onMounted(loadList)
         <el-form-item label="项目名称" prop="projectName">
           <el-input v-model="form.projectName" placeholder="请输入项目名称" maxlength="128" show-word-limit />
         </el-form-item>
+        <!-- 客户名称（V68）：由自由文本输入改为「选已有 + 可手输新建」下拉。
+             allow-create 手输的名称会被后端按名称 upsert 建档 —— 一期不做客户管理页面，
+             这是唯一的新客户入口。selected 时同步把名称写回 form.customerName，
+             后端虽有「以 id 为准」的最终裁定，前端这里显式同步一次更好排查。 -->
         <el-form-item label="客户名称">
-          <el-input v-model="form.customerName" placeholder="选填" maxlength="128" />
+          <el-select
+            v-model="form.customerName"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            placeholder="选择已有客户，或直接输入新客户名"
+            style="width: 100%"
+            @change="onCustomerChange"
+          >
+            <el-option
+              v-for="c in customerOpts"
+              :key="c.id"
+              :label="c.customerName"
+              :value="c.customerName"
+            >
+              <span>{{ c.customerName }}</span>
+              <span class="opt-sub">{{ c.customerNo }}</span>
+            </el-option>
+          </el-select>
         </el-form-item>
         <el-form-item label="销售经理">
           <el-select v-model="form.salesManagerId" filterable placeholder="选择销售经理" style="width: 100%">
@@ -584,5 +641,12 @@ onMounted(loadList)
 }
 .dialog-scroll::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* V68 客户下拉：选项带上客户编号做副标题，区分同名不同的人/公司 */
+.opt-sub {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>
