@@ -10,7 +10,7 @@ import { projectPage } from '@/api/project'
 import type { ItemVO, ShipmentCreateForm, ShipmentLineForm } from '@/types/shipment'
 import type { ProjectVO } from '@/types/project'
 
-// 发货申请弹窗：新建（提交即发起审批，决策#1）/ 编辑（2026-10-23 虎哥补入口，仅 PENDING 可改）。
+// 发货申请弹窗：新建（保存草稿，审批由详情触发）/ 编辑（2026-10-23 虎哥补入口，仅 DRAFT/REJECTED 可改）。
 // 仅允许从「已审批」项目发起；逐行填写发货数量，前端预校验超发（决策#3）与超合同预警（决策#4，
 // 后端仍硬卡，前端仅提示），最终以后端异常为权威闸门。
 //
@@ -125,7 +125,7 @@ const handleSubmit = async () => {
       ElMessage.success('发货单已更新')
     } else {
       await createShipment(payload)
-      ElMessage.success('发货申请已提交，进入审批')
+      ElMessage.success('发货申请已保存为草稿')
     }
     visible.value = false
     emit('saved')
@@ -281,7 +281,7 @@ watch(
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
       <el-button type="primary" :loading="saving" :icon="Plus" @click="handleSubmit">
-        {{ isEdit() ? '保存修改' : '提交发货申请' }}
+        {{ isEdit() ? '保存修改' : '保存草稿' }}
       </el-button>
     </template>
   </el-dialog>

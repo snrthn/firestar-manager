@@ -73,6 +73,8 @@ const formatAmount = (v: number | null | undefined): string => {
 
 // 发货状态字典（标签 + 颜色，字典维护页改色即生效）
 const { label: statusLabel, style: statusStyle } = useDictLabels('shipment_status')
+// 审批状态字典（2026-10-26 虎哥：审批归审批，与发货状态拆分展示）
+const { label: apprStatusLabel, style: apprStatusStyle } = useDictLabels('shipment_approval_status')
 
 // ===== 弹窗 =====
 const createVisible = ref(false)
@@ -145,13 +147,20 @@ onMounted(() => {
       <el-table-column label="发货金额" width="120" align="right">
         <template #default="{ row }">{{ formatAmount(row.shipmentAmount) }}</template>
       </el-table-column>
-      <el-table-column label="发货状态" width="110" align="center">
-        <template #default="{ row }">
-          <el-tag :type="statusStyle(row.shipmentStatus) || 'info'" size="small">
-            {{ statusLabel(row.shipmentStatus) }}
-          </el-tag>
-        </template>
-      </el-table-column>
+          <el-table-column label="发货状态" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag :type="statusStyle(row.shipmentStatus) || 'info'" size="small">
+                {{ statusLabel(row.shipmentStatus) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="审批状态" width="110" align="center">
+            <template #default="{ row }">
+              <el-tag :type="apprStatusStyle(row.approvalStatus) || 'info'" size="small">
+                {{ apprStatusLabel(row.approvalStatus) || '—' }}
+              </el-tag>
+            </template>
+          </el-table-column>
       <el-table-column prop="applicantName" label="申请人" min-width="100" show-overflow-tooltip>
         <template #default="{ row }">{{ row.applicantName || '—' }}</template>
       </el-table-column>
@@ -165,10 +174,10 @@ onMounted(() => {
            标记发货/标记收货/撤回等业务动作收在详情弹窗内，避免按钮随状态漂移 -->
       <el-table-column label="操作" width="140" fixed="right" align="center">
         <template #default="{ row }">
-          <!-- 仅待发货（PENDING）且未审批通过可编辑：审批通过（APPROVED）后锁编辑，直接标记发货；
-               已发货/已收货/已驳回/已撤销改内容会与库存、应收冲突（2026-10-24 虎哥：审批通过后不展示编辑入口） -->
+          <!-- 仅草稿(DRAFT)/驳回(REJECTED)可编辑：审批中/已通过/已撤销锁编辑（2026-10-26 虎哥：
+               提交审批后隐藏编辑入口，避免「有编辑入口的同时审批流已发出」不合规） -->
           <el-button
-            v-if="row.shipmentStatus === 'PENDING' && row.approvalStatus !== 'APPROVED'"
+            v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
             link type="primary" size="small"
             @click="openEdit(row)"
           >编辑</el-button>

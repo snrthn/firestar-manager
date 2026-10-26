@@ -34,9 +34,14 @@ export function shipmentTimeline(id: number) {
     .then((r) => r.data.data!)
 }
 
-/** 新建立项发货申请（提交即发起审批，决策#1；后端逐行硬卡超发/超合同） */
+/** 新建发货申请（保存草稿，审批由详情面板触发；后端逐行硬卡超发/超合同） */
 export function createShipment(data: ShipmentCreateForm) {
   return request.post<ApiResult<number>>('/shipment', data).then((r) => r.data.data!)
+}
+
+/** 提交审批（详情面板触发；仅草稿/驳回可提，起流程 + 置审批中） */
+export function submitShipment(id: number) {
+  return request.post<ApiResult<null>>(`/shipment/${id}/submit`).then((r) => r.data)
 }
 
 /** 编辑发货单（2026-10-23 虎哥要求补入口）：仅 PENDING 可改，项目不可更换 */

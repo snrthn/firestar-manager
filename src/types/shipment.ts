@@ -34,8 +34,12 @@ export interface ShipmentVO {
   shipmentStatusStyle: string | null
   receivableId: number | null
   processInstanceId: string | null
-  /** 审批状态（APPROVING/APPROVED/REJECTED/CANCELLED；APPROVED=已通过，前端据此隐藏编辑入口） */
+  /** 审批状态（DRAFT/APPROVING/APPROVED/REJECTED/CANCELLED；APPROVED=已通过，前端据此隐藏编辑入口） */
   approvalStatus: string | null
+  /** 审批状态中文名（字典 shipment_approval_status） */
+  approvalStatusName: string | null
+  /** 审批状态标签色 */
+  approvalStatusStyle: string | null
   applicantId: number | null
   applicantName: string | null
   shippedById: number | null

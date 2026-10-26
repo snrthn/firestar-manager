@@ -84,8 +84,8 @@ const { label: docDirectionLabel, style: docDirectionStyle } = useDictLabels('do
 
 const loadAttachments = async (id: number) => {
   try {
-    // 文件列表默认只含 NORMAL；按 bizType 拉一页再按 bizId 精筛（同发货签收证据的做法）
-    const fp = await listFiles(1, 200, { bizType: ATTACH_BIZ_TYPE })
+    // 文件列表默认只含 NORMAL；按 bizType+bizId 拉本单附件（后端已按 bizId 精确过滤，前端再兜底筛）
+    const fp = await listFiles(1, 200, { bizType: ATTACH_BIZ_TYPE, bizId: id })
     attachFiles.value = (fp.records || []).filter((f) => f.bizId === id)
   } catch (e) {
     ElMessage.error((e as Error).message)

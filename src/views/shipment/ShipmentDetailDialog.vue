@@ -10,6 +10,7 @@ import {
   markShipped,
   confirmReceive,
   withdrawShipment,
+  submitShipment,
 } from '@/api/shipment'
 import { listFiles, uploadFile, downloadFileUrl, fetchFileBlob } from '@/api/file'
 import type { ShipmentVO, ShipmentConfirmForm, ShipmentLineReceiveForm } from '@/types/shipment'
@@ -78,6 +79,7 @@ const proofFiles = ref<FileVO[]>([])
 // 且 markShipped 不同步行状态，展示价值不大）；底层 line_status 字段保留——客户收货时
 // confirmReceive 仍写 FULL_RECEIVED/PARTIAL_RECEIVED，后续如需按行收货进度再恢复展示。
 const { label: statusLabel, style: statusStyle } = useDictLabels('shipment_status')
+const { label: apprStatusLabel, style: apprStatusStyle } = useDictLabels('shipment_approval_status')
 const { label: recvStatusLabel, style: recvStatusStyle } = useDictLabels('receivable_status')
 const { label: recvSourceLabel } = useDictLabels('receivable_source')
 const { label: docDirLabel } = useDictLabels('doc_direction')
@@ -350,6 +352,33 @@ const canReceive = () =>
 // 撤回（方案 B）：待发货且流程仍未走完。真正的「发起人身份 + 流程运行中」两道闸在后端引擎，
 // 这里只做前端可见性，越权/已审完由后端报错兜底
 const canWithdraw = () => detail.value?.shipmentStatus === 'PENDING'
+// 提交审批（2026-10-26 虎哥）：仅草稿/驳回可提；提交后审批态转 APPROVING，编辑入口随之隐藏
+const canSubmit = () =>
+  detail.value?.approvalStatus === 'DRAFT' || detail.value?.approvalStatus === 'REJECTED'
+
+const submitting = ref(false)
+const handleSubmit = async () => {
+  if (!detail.value) return
+  try {
+    await ElMessageBox.confirm(
+      `确认提交发货单 ${detail.value.batchNo} 进入审批流程？提交后状态为「审批中」，可在详情继续查看。`,
+      '提交审批',
+      { type: 'warning', confirmButtonText: '确认提交', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  submitting.value = true
+  try {
+    await submitShipment(detail.value.id)
+    ElMessage.success('已提交审批')
+    await reload()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    submitting.value = false
+  }
+}
 
 const handleWithdraw = async () => {
   if (!detail.value) return
@@ -394,6 +423,11 @@ const handleWithdraw = async () => {
           <el-descriptions-item label="发货状态">
             <el-tag :type="statusStyle(detail.shipmentStatus) || 'info'" size="small">
               {{ statusLabel(detail.shipmentStatus) }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="审批状态">
+            <el-tag :type="apprStatusStyle(detail.approvalStatus) || 'info'" size="small">
+              {{ apprStatusLabel(detail.approvalStatus) || '—' }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="发货金额">{{ formatAmount(detail.shipmentAmount) }}</el-descriptions-item>
@@ -518,6 +552,13 @@ const handleWithdraw = async () => {
             :loading="acting"
             @click="openReceive"
           >标记客户收货</el-button>
+          <!-- 提交审批（2026-10-26 虎哥）：草稿/驳回态显示，提交后转审批中、编辑入口隐藏 -->
+          <el-button
+            v-if="canSubmit()"
+            type="primary"
+            :loading="submitting"
+            @click="handleSubmit"
+          >提交审批</el-button>
           <!-- 撤回（方案 B，2026-10-23）：申请人主动终结审批流程 -->
           <el-button
             v-if="canWithdraw()"

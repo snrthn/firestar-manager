@@ -3,13 +3,15 @@ import { handleSessionExpired } from './sessionGuard'
 import type { ApiResult } from '@/types/auth'
 import type { FilePageVO, FileVO, FileDownloadLogPageVO } from '@/types/file'
 
-// 文件管理接口（后端 /files/**）。读接口类级 file:view，上传/删除方法级 file:manage。
+// 文件管理接口（后端 /files/**）。读接口（list/detail/download/preview/raw）对登录用户开放
+// （业务页展示附件不再受 file:view 门禁约束）；上传/删除/改名方法级 file:manage 收口；
+// 下载记录全量视图（/files/download-logs）仍保留 file:view。
 
 /** 文件分页列表（默认每页 10 条；keyword 模糊匹配 originalName/bizType） */
 export function listFiles(
   pageNum = 1,
   pageSize = 10,
-  params?: { bizType?: string; fileType?: string; keyword?: string },
+  params?: { bizType?: string; bizId?: number; fileType?: string; keyword?: string },
 ) {
   return request
     .get<ApiResult<FilePageVO>>('/files/list', { params: { pageNum, pageSize, ...params } })
