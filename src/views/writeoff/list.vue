@@ -14,6 +14,7 @@ import { projectPage } from '@/api/project'
 import type { AutoMatchResultVO, DifferencePoolVO, WriteOffLedgerVO } from '@/types/writeoff'
 import type { ProjectVO } from '@/types/project'
 import DictSelect from '@/components/DictSelect.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { useDictLabels } from '@/composables/useDict'
 import { formatDate, formatDateTime } from '@/utils/datetime'
 
@@ -298,6 +299,9 @@ onMounted(() => {
               <span v-else class="op-done">—</span>
             </template>
           </el-table-column>
+          <template #empty>
+            <EmptyState />
+          </template>
         </el-table>
 
         <div class="pagination-bar">
@@ -390,7 +394,7 @@ onMounted(() => {
             </template>
           </el-table-column>
           <template #empty>
-            <span class="pool-empty">没有待配平的差异（所有项目钱票两清）</span>
+            <EmptyState description="没有待配平的差异（所有项目钱票两清）" />
           </template>
         </el-table>
       </el-tab-pane>
@@ -432,6 +436,9 @@ onMounted(() => {
       <el-table-column label="金额" width="130" align="right">
         <template #default="{ row }">{{ formatAmount(row.amount) }}</template>
       </el-table-column>
+      <template #empty>
+        <EmptyState />
+      </template>
     </el-table>
     <template #footer>
       <el-button type="primary" @click="matchResultVisible = false">知道了</el-button>

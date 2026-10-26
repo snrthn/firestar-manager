@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { ElMessage } from 'element-plus'
 import { listTemplates, saveTemplate } from '@/api/notification'
 import type { NotificationTemplate } from '@/types/notification'
@@ -110,6 +111,9 @@ async function submit() {
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
         </template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
 
     <el-dialog v-model="dialogVisible" :title="`编辑模板：${form.code}`" width="640px">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import {
@@ -286,6 +287,9 @@ async function submitCreate() {
           <el-button link type="primary" @click="openDetail(row)">详情</el-button>
         </template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
 
     <!-- 分页器：与全站同写法（.pagination-bar 已在 pages.css 全局；原自造 .pager 少写

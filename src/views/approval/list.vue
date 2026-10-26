@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
@@ -281,7 +282,7 @@ onMounted(loadApprovals)
     <el-tabs v-model="activeTab" @tab-change="handleTabChange">
       <!-- Tab1 我审批的：当前登录用户的 active 待办（三线合并） -->
       <el-tab-pane label="待我审批" name="approval">
-        <el-table v-loading="approvalLoading" :data="approvalList" border empty-text="暂无待办">
+        <el-table v-loading="approvalLoading" :data="approvalList" border>
           <el-table-column prop="bizTitle" label="业务" min-width="200" show-overflow-tooltip />
           <el-table-column prop="taskName" label="当前节点" min-width="140" />
           <el-table-column label="处理人" min-width="160">
@@ -308,6 +309,9 @@ onMounted(loadApprovals)
               >审批</el-button>
             </template>
           </el-table-column>
+        <template #empty>
+          <EmptyState description="暂无待办" />
+        </template>
         </el-table>
 
         <div class="pagination-bar">
@@ -326,7 +330,7 @@ onMounted(loadApprovals)
 
       <!-- Tab2 我发起的：当前用户发起过流程的立项单（服务端过滤，排除草稿）；查询表单在 Tab 栏上方 -->
       <el-tab-pane label="我发起的" name="started">
-        <el-table v-loading="startedLoading" :data="startedList" border empty-text="暂无发起记录">
+        <el-table v-loading="startedLoading" :data="startedList" border>
           <el-table-column prop="projectNo" label="项目编号" min-width="140" show-overflow-tooltip>
             <template #default="{ row }">{{ row.projectNo || '—' }}</template>
           </el-table-column>
@@ -346,6 +350,9 @@ onMounted(loadApprovals)
               <el-button link type="primary" size="small" @click="openProject(row.id)">详情</el-button>
             </template>
           </el-table-column>
+        <template #empty>
+          <EmptyState description="暂无发起记录" />
+        </template>
         </el-table>
 
         <div class="pagination-bar">
@@ -364,7 +371,7 @@ onMounted(loadApprovals)
 
       <!-- Tab3 我审批的：我处理过的历史任务（taskCompletedBy，按处理时间倒序） -->
       <el-tab-pane label="我审批的" name="history">
-        <el-table v-loading="historyLoading" :data="historyList" border empty-text="暂无审批记录">
+        <el-table v-loading="historyLoading" :data="historyList" border>
           <el-table-column prop="bizTitle" label="业务" min-width="200" show-overflow-tooltip>
             <template #default="{ row }">{{ row.bizTitle || '—' }}</template>
           </el-table-column>
@@ -418,6 +425,9 @@ onMounted(loadApprovals)
               >详情</el-button>
             </template>
           </el-table-column>
+        <template #empty>
+          <EmptyState description="暂无审批记录" />
+        </template>
         </el-table>
 
         <div class="pagination-bar">

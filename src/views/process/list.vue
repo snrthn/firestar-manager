@@ -47,6 +47,9 @@
           <el-button link type="info" size="small" @click="openVersions(row)">版本</el-button>
         </template>
       </el-table-column>
+      <template #empty>
+        <EmptyState />
+      </template>
     </el-table>
 
     <!-- 标准分页器：默认每页 10 条，与后端默认值一致 -->
@@ -115,7 +118,7 @@
             保存并部署
           </el-button>
         </div>
-        <el-table :data="editingNodes" border empty-text="尚未配置节点，点「新增节点」">
+        <el-table :data="editingNodes" border>
           <el-table-column label="#" width="35">
             <template #default="{ $index }">{{ $index + 1 }}</template>
           </el-table-column>
@@ -170,13 +173,16 @@
               <el-button link type="danger" size="small" @click="removeNode($index)">删除</el-button>
             </template>
           </el-table-column>
+          <template #empty>
+            <EmptyState description="尚未配置节点，点「新增节点」" />
+          </template>
         </el-table>
       </template>
     </el-drawer>
 
     <!-- 版本抽屉 -->
     <el-drawer v-model="versionDrawer" title="历史版本" size="640px">
-      <el-table :data="versions" v-loading="versionLoading" border empty-text="暂无部署版本">
+      <el-table :data="versions" v-loading="versionLoading" border>
         <el-table-column prop="version" label="版本" width="55" />
         <el-table-column prop="name" label="名称" min-width="120" />
         <el-table-column label="状态" width="70">
@@ -186,6 +192,9 @@
         </el-table-column>
         <el-table-column prop="deploymentId" label="部署ID" min-width="130" show-overflow-tooltip />
         <el-table-column prop="deploymentTime" label="部署时间" min-width="150" />
+        <template #empty>
+          <EmptyState description="暂无部署版本" />
+        </template>
       </el-table>
     </el-drawer>
   </el-card>
@@ -193,6 +202,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'

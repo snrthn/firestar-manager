@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { listAllDownloadLogs } from '@/api/file'
@@ -76,6 +77,9 @@ onMounted(loadLogs)
       <el-table-column prop="downloadedAt" label="下载时间" min-width="100">
         <template #default="{ row }">{{ formatDateTime(row.downloadedAt) }}</template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
 
     <div class="pagination-bar">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { Plus } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
@@ -263,6 +264,9 @@ watch(
               <b>{{ formatAmount(lineAmount(row)) }}</b>
             </template>
           </el-table-column>
+        <template #empty>
+          <EmptyState />
+        </template>
         </el-table>
 
         <div class="summary-bar">

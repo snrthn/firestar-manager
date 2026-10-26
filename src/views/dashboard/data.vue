@@ -3,8 +3,10 @@ import { onMounted, reactive, ref } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import type { StatsQuery } from '@/types/stats'
 import { customerOptions } from '@/api/customer'
+import { goodsOptions } from '@/api/goods'
 import { listUserOptions } from '@/api/user'
 import type { CustomerOptionVO } from '@/types/customer'
+import type { GoodsOptionVO } from '@/types/goods'
 import type { UserOptionVO } from '@/types/user'
 import OverviewTab from './tabs/OverviewTab.vue'
 import ArTab from './tabs/ArTab.vue'
@@ -15,6 +17,7 @@ import FulfillmentTab from './tabs/FulfillmentTab.vue'
 const activeTab = ref('overview')
 const query = reactive<StatsQuery>({ periodPreset: 'THIS_YEAR' })
 const customerOpts = ref<CustomerOptionVO[]>([])
+const goodsOpts = ref<GoodsOptionVO[]>([])
 const managerOpts = ref<UserOptionVO[]>([])
 
 const presetOptions = [
@@ -27,8 +30,9 @@ const presetOptions = [
 
 const loadOptions = async () => {
   try {
-    const [c, m] = await Promise.all([customerOptions(), listUserOptions()])
+    const [c, g, m] = await Promise.all([customerOptions(), goodsOptions(), listUserOptions()])
     customerOpts.value = c ?? []
+    goodsOpts.value = g ?? []
     managerOpts.value = m ?? []
   } catch {
     // 下拉加载失败不阻断看板主流程
@@ -38,6 +42,7 @@ const loadOptions = async () => {
 const resetQuery = () => {
   query.periodPreset = 'THIS_YEAR'
   query.customerId = undefined
+  query.goodsId = undefined
   query.managerId = undefined
   query.projectId = undefined
 }
@@ -69,6 +74,16 @@ onMounted(loadOptions)
           placeholder="全部客户"
         >
           <el-option v-for="c in customerOpts" :key="c.id" :label="c.customerName" :value="c.id" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="货物">
+        <el-select
+          v-model="query.goodsId"
+          filterable
+          clearable
+          placeholder="全部货物"
+        >
+          <el-option v-for="g in goodsOpts" :key="g.id" :label="g.goodsName" :value="g.id" />
         </el-select>
       </el-form-item>
       <el-form-item label="销售经理">

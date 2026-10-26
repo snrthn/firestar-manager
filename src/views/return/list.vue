@@ -9,6 +9,7 @@ import type { ReturnVO } from '@/types/return'
 import ReturnCreateDialog from './ReturnCreateDialog.vue'
 import ReturnDetailDialog from './ReturnDetailDialog.vue'
 import DictSelect from '@/components/DictSelect.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { formatDateTime } from '@/utils/datetime'
 
 const createVisible = ref(false)
@@ -166,7 +167,7 @@ onMounted(load)
         </template>
       </el-table-column>
       <template #empty>
-        <el-empty description="暂无退货记录" :image-size="80" />
+        <EmptyState description="暂无退货记录" />
       </template>
     </el-table>
 

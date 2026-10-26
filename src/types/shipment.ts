@@ -83,6 +83,8 @@ export type { ReceivableVO }
 export interface ItemVO {
   id: number
   projectId: number
+  /** 货物 ID → fin_goods.id（V71；0 = 未关联；看板按此聚合） */
+  goodsId: number | null
   itemName: string | null
   specModel: string | null
   unit: string | null

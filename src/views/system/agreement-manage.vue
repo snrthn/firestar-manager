@@ -35,6 +35,9 @@
                 <span v-else>—</span>
               </template>
             </el-table-column>
+          <template #empty>
+            <EmptyState />
+          </template>
           </el-table>
         </el-card>
       </el-col>
@@ -64,6 +67,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { ElMessage } from 'element-plus'
 import RichView from '@/components/RichView.vue'
 import RichEditor from '@/components/RichEditor.vue'

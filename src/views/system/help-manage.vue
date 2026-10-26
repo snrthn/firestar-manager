@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -222,6 +223,9 @@ async function remove(row: HelpArticle) {
           <el-button link type="danger" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
 
     <!-- 标准分页器（与 user/role/dict 等列表页同款，虎哥 2026-10-21 统一） -->

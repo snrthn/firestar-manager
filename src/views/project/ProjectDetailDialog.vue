@@ -9,6 +9,7 @@ import type { TimelineNodeVO } from '@/types/project'
 import type { TaskInfoVO } from '@/types/approval'
 import ApprovalTimeline from '@/components/ApprovalTimeline.vue'
 import ApprovalActionForm from '@/components/ApprovalActionForm.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { useTaskApproval } from '@/composables/useTaskApproval'
 import { useDictLabels } from '@/composables/useDict'
 import { formatDateTime } from '@/utils/datetime'
@@ -193,6 +194,9 @@ const itemsTotal = computed(() =>
           <el-table-column prop="totalAmount" label="行金额" width="120" align="right">
             <template #default="{ row }">{{ formatAmount(row.totalAmount) }}</template>
           </el-table-column>
+          <template #empty>
+            <EmptyState />
+          </template>
         </el-table>
 
         <!-- 审批进度（内联 ApprovalTimeline，不弹中弹）。

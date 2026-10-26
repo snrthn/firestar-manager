@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { listLoginLogs } from '@/api/log'
@@ -117,6 +118,9 @@ onMounted(loadLogs)
       <el-table-column prop="loginAt" label="时间" width="170" align="center">
         <template #default="{ row }">{{ formatDateTime(row.loginAt) }}</template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
 
     <div class="pagination-bar">

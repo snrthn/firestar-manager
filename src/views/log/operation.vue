@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { listOperationLogs } from '@/api/log'
@@ -28,8 +29,8 @@ const resetQuery = () => {
   loadLogs()
 }
 
-// 目标类型：字典 audit_target_type 消费（V22 新增，与后端 @Auditable 真实落库的
-// 6 个目标类型 USER/ROLE/MENU/DICT_TYPE/DICT_DATA/FILE 一一对应）。
+// 目标类型：字典 audit_target_type 消费（V22 新增 6 项，V69 补齐 INVOICE/APPROVAL/
+// RECEIPT/PROJECT 共 10 项，与后端 @Auditable 真实落库的 10 个目标类型一一对应）。
 const { label: targetTypeLabel } = useDictLabels('audit_target_type')
 // 操作类型：字典 audit_operation 消费（下拉 + 表格标签同源）。
 // V21 已为字典补 UPLOAD 项（后端 FileServiceImpl @Auditable("UPLOAD") 真实落库值）。
@@ -164,6 +165,9 @@ onMounted(loadLogs)
           <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
         </template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
 
     <div class="pagination-bar">
@@ -205,6 +209,9 @@ onMounted(loadLogs)
         <el-table-column label="改后" min-width="200">
           <template #default="{ row: d }">{{ d.after }}</template>
         </el-table-column>
+      <template #empty>
+        <EmptyState />
+      </template>
       </el-table>
       <el-empty v-else description="无关键字段快照" :image-size="60" />
     </template>

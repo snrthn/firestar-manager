@@ -5,6 +5,7 @@ import { Check, Close } from '@element-plus/icons-vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import ApprovalTimeline from '@/components/ApprovalTimeline.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { completeReturnTask, rejectReturnTask, returnDetail } from '@/api/return'
 import type { ReturnVO } from '@/types/return'
 
@@ -155,6 +156,9 @@ watch(
           <el-table-column label="行金额" min-width="130" align="right">
             <template #default="{ row }"><b>¥{{ formatAmount(row.lineAmount) }}</b></template>
           </el-table-column>
+          <template #empty>
+            <EmptyState />
+          </template>
         </el-table>
 
         <!-- 三级审批时间线 -->

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { listRecords, listTemplates, publishNotification } from '@/api/notification'
@@ -291,6 +292,9 @@ async function submitPublish() {
           {{ row.createdAt ? row.createdAt.replace('T', ' ') : '-' }}
         </template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
 
     <!-- 标准分页器：默认每页 10 条，与后端默认值一致（同 user.vue 规格） -->

@@ -108,6 +108,9 @@
               <el-button link type="primary" size="small" @click="openEditDialog(row)">编辑</el-button>
             </template>
           </el-table-column>
+        <template #empty>
+          <EmptyState />
+        </template>
         </el-table>
 
         <!-- 分页器（配置数据量小，前端分页；接口仍全量返回） -->
@@ -162,6 +165,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { getGroup, updateValues, createConfig, updateConfigItem } from '../../api/config'
 import { useAppStore } from '@/stores/app'

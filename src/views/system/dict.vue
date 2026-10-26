@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { useRouter } from 'vue-router'
 import type { FormInstance } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
@@ -219,6 +220,9 @@ onMounted(loadTypes)
           <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
 
     <!-- 标准分页器：默认每页 10 条，与后端默认值一致 -->

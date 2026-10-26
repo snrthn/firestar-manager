@@ -16,6 +16,7 @@ export interface StatsQuery {
   projectId?: number
   customerId?: number
   managerId?: number
+  goodsId?: number
 }
 
 /** Tab① 经营总览 */
@@ -33,6 +34,7 @@ export interface OverviewVO {
   overdueAmount: number
   projectCount: number
   customerCount: number
+  goodsCount: number
 }
 
 /** Tab② 应收与回款摘要（L1） */

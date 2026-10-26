@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import type { FormInstance } from 'element-plus'
 import { Delete, Plus, Refresh, Search } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
@@ -13,7 +14,9 @@ import { listUserOptions } from '@/api/user'
 import type { UserOptionVO } from '@/types/user'
 import DictSelect from '@/components/DictSelect.vue'
 import { customerOptions } from '@/api/customer'
+import { goodsOptions } from '@/api/goods'
 import type { CustomerOptionVO } from '@/types/customer'
+import type { GoodsOptionVO } from '@/types/goods'
 import { useDictLabels } from '@/composables/useDict'
 
 // ===== 查询条件 =====
@@ -132,6 +135,7 @@ const openCreate = () => {
   dialogVisible.value = true
   ensureUserOptions()
   ensureCustomerOptions()
+  ensureGoodsOptions()
 }
 
 // 编辑：仅 DRAFT / REJECTED 行有入口（后端 PUT 同语义把关）。先拉详情回填再开窗，
@@ -139,6 +143,7 @@ const openCreate = () => {
 const openEdit = async (row: ProjectVO) => {
   ensureUserOptions()
   ensureCustomerOptions()
+  ensureGoodsOptions()
   try {
     const detail = await projectDetail(row.id)
     Object.assign(form, emptyForm(), {
@@ -179,6 +184,15 @@ const customerOpts = ref<CustomerOptionVO[]>([])
 const ensureCustomerOptions = async () => {
   if (customerOpts.value.length === 0) {
     customerOpts.value = (await customerOptions()) ?? []
+  }
+}
+
+// 货物下拉选项（V71）：与上面的客户下拉同范式 —— 开窗时才拉一次，靠「长度非空」做懒加载。
+// 一期没有货物管理页面，下拉本身 filterable + allow-create，手输的新名称由后端按名称 upsert 建档。
+const goodsOpts = ref<GoodsOptionVO[]>([])
+const ensureGoodsOptions = async () => {
+  if (goodsOpts.value.length === 0) {
+    goodsOpts.value = (await goodsOptions()) ?? []
   }
 }
 
@@ -418,6 +432,9 @@ onMounted(loadList)
           <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
         </template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
 
     <!-- 标准分页器：默认每页 10 条，与后端默认值一致 -->
@@ -520,9 +537,27 @@ onMounted(loadList)
       <div class="item-table">
         <el-table :data="form.items || []" border>
           <el-table-column type="index" label="#" width="44" align="center" />
-          <el-table-column label="货物名称" min-width="160">
+          <el-table-column label="货物名称" min-width="200">
             <template #default="{ row }">
-              <el-input v-model="row.itemName" placeholder="必填" />
+              <el-select
+                v-model="row.itemName"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                placeholder="选择已有货物，或直接输入新货物名"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="g in goodsOpts"
+                  :key="g.id"
+                  :label="g.goodsName"
+                  :value="g.goodsName"
+                >
+                  <span>{{ g.goodsName }}</span>
+                  <span class="opt-sub">{{ g.goodsNo }}</span>
+                </el-option>
+              </el-select>
             </template>
           </el-table-column>
           <el-table-column label="规格" min-width="120">
@@ -555,6 +590,9 @@ onMounted(loadList)
               <el-button type="danger" link :icon="Delete" @click="removeItem($index)" />
             </template>
           </el-table-column>
+        <template #empty>
+          <EmptyState />
+        </template>
         </el-table>
         <div class="item-actions">
           <el-button type="primary" plain :icon="Plus" @click="addItem">添加货物</el-button>

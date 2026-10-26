@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import type { FormInstance } from 'element-plus'
 import { Expand, Fold, Plus, Refresh, Folder, Search } from '@element-plus/icons-vue'
 // 菜单图标注册表（若依 / vue-element-admin 成熟做法：存图标组件名，<component :is> 渲染，空值兜底 Folder）
@@ -527,6 +528,9 @@ onMounted(() => {
           <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
   </el-card>
 

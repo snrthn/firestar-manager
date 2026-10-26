@@ -84,6 +84,7 @@ const option = computed<Record<string, unknown>>(() => {
       <el-col :span="6"><StatCard label="逾期金额 (B-03)" :value="formatMoney(data?.overdueAmount)" accent="#f56c6c" /></el-col>
       <el-col :span="6"><StatCard label="项目总数" :value="formatNumber(data?.projectCount)" /></el-col>
       <el-col :span="6"><StatCard label="客户总数" :value="formatNumber(data?.customerCount)" /></el-col>
+      <el-col :span="6"><StatCard label="货物总数" :value="formatNumber(data?.goodsCount)" /></el-col>
     </el-row>
 
     <el-card shadow="never" class="chart-card">

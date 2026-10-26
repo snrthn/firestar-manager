@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import type { StatsQuery, ProjectRankingVO } from '@/types/stats'
 import { statsProject } from '@/api/stats'
@@ -76,6 +77,9 @@ const pct = (v: number | null | undefined) => Math.min(100, Math.round((Number(v
           <el-progress :percentage="pct(row.receiptRate)" :stroke-width="14" color="#67c23a" />
         </template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
 
     <div class="rank-foot">共 {{ data?.total || 0 }} 个已签合同项目</div>

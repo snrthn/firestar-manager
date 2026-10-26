@@ -18,6 +18,7 @@ import type { FileVO } from '@/types/file'
 import type { TaskInfoVO } from '@/types/approval'
 import ApprovalTimeline from '@/components/ApprovalTimeline.vue'
 import ApprovalActionForm from '@/components/ApprovalActionForm.vue'
+import EmptyState from '@/components/EmptyState.vue'
 import { useTaskApproval } from '@/composables/useTaskApproval'
 import { useDictLabels } from '@/composables/useDict'
 import { formatDateTime } from '@/utils/datetime'
@@ -420,6 +421,9 @@ const handleWithdraw = async () => {
           <el-table-column prop="lineAmount" label="行金额" width="120" align="right">
             <template #default="{ row }">{{ formatAmount(row.lineAmount) }}</template>
           </el-table-column>
+          <template #empty>
+            <EmptyState />
+          </template>
         </el-table>
 
         <!-- 关联应收单 -->
@@ -580,6 +584,9 @@ const handleWithdraw = async () => {
         </div>
 
       <el-table :data="detail?.lines || []" border size="small" style="margin-top: 12px">
+        <template #empty>
+          <EmptyState />
+        </template>
         <el-table-column prop="itemName" label="货物" min-width="160" show-overflow-tooltip />
         <el-table-column prop="shipmentQty" label="发货量" width="80" align="right" />
         <el-table-column prop="receivedQty" label="已收" width="80" align="right" />

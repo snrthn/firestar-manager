@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import EmptyState from '@/components/EmptyState.vue'
 import type { UploadUserFile } from 'element-plus'
 import { Delete, Download, Edit, Refresh, Search, Upload, View } from '@element-plus/icons-vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
@@ -282,6 +283,9 @@ onMounted(loadFiles)
           <el-button link type="danger" size="small" :icon="Delete" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
+    <template #empty>
+      <EmptyState />
+    </template>
     </el-table>
 
     <div class="pagination-bar">
