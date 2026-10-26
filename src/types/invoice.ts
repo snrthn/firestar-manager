@@ -2,7 +2,7 @@
 // 字段逐一对齐后端：
 //   com.firestar.dto.InvoiceVO      （/invoice/page、/invoice/{id} 返回）
 //   com.firestar.dto.InvoiceRequest （/invoice POST、/invoice/{id} PUT 请求体）
-// 字典：invoice_status / invoice_type / doc_direction / receivable_status
+// 字典：approval_status / invoice_type / doc_direction / receivable_status
 //      （invoice_type 由 V59 建，其余在 V2__init_dict_data.sql 已种）
 // 核销分配类型（AllocationItem/AllocationVO）从 './receipt' 引入——收款与发票共用一套双向拆分语义
 import type { AllocationItem, AllocationVO } from './receipt'
@@ -18,7 +18,7 @@ export interface InvoicePageVO {
   pages: number
 }
 
-/** 发票单列表行 / 详情。注意：状态字段真名是 invoiceStatus（不是 status） */
+/** 发票单列表行 / 详情。注意：状态字段真名是 approvalStatus（V75 由 invoiceStatus 改名；不是 status） */
 export interface InvoiceVO {
   id: number
   /** 发票号码 */
@@ -72,10 +72,10 @@ export interface InvoiceVO {
    */
   allocations?: AllocationVO[]
 
-  /** 开票状态（字典 invoice_status） */
-  invoiceStatus: string | null
-  invoiceStatusName: string | null
-  invoiceStatusStyle: string | null
+  /** 审批状态（字典 approval_status；V75 由 invoice_status 通用化改名） */
+  approvalStatus: string | null
+  approvalStatusName: string | null
+  approvalStatusStyle: string | null
 
   /** Flowable 流程实例 ID（提交审批后非空） */
   processInstanceId: string | null
@@ -88,6 +88,8 @@ export interface InvoiceVO {
   createdAt: string | null
   /** 当前登录用户在该流程实例上的待办任务 ID（无则 null） */
   myPendingTaskId: string | null
+  /** 当前审批节点名（审批中由后端回填 Flowable 当前活跃任务名；非审批中为空） */
+  currentNodeName?: string | null
 }
 
 /**
@@ -139,19 +141,19 @@ export interface InvoiceRequest {
 }
 
 /**
- * 开票状态字典值。
+ * 开票审批状态字典值（V75 起与通用 approval_status 对齐：PENDING→DRAFT、ISSUING→APPROVING、ISSUED→APPROVED）。
  *
- * 必须与后端 InvoiceServiceImpl 实际写入的状态字面量 + invoice_status 字典（V63 补齐）一一对应：
- *   PENDING   创建即草稿态
- *   ISSUING   提交审批中
- *   CANCELLED 申请人撤回（V63：字典此前缺此值，撤回后标签/样式全空）
- *   ISSUED    审批通过
- *   REJECTED  审批驳回（V63：字典此前同样缺）
+ * 必须与后端 InvoiceServiceImpl 实际写入的状态字面量 + approval_status 字典一一对应：
+ *   DRAFT     创建即草稿态
+ *   APPROVING 提交审批中
+ *   CANCELLED 申请人撤回
+ *   APPROVED  审批通过（= 已开票）
+ *   REJECTED  审批驳回
  */
 export const INVOICE_STATUS = {
-  PENDING: 'PENDING',
-  ISSUING: 'ISSUING',
+  DRAFT: 'DRAFT',
+  APPROVING: 'APPROVING',
   CANCELLED: 'CANCELLED',
-  ISSUED: 'ISSUED',
+  APPROVED: 'APPROVED',
   REJECTED: 'REJECTED',
 } as const

@@ -23,14 +23,16 @@ export interface ReturnVO {
   /** 退货金额 = Σ(明细行数量 × 行单价)，后端核定 */
   returnAmount: number | null
   returnReason: string | null
-  /** 审批状态（return_approval_status：APPROVING/APPROVED/REJECTED/CANCELLED/COMPLETED） */
+  /** 审批状态（字典 approval_status；V75 通用化，原 return_approval_status 三级节点态统一为 APPROVING） */
   approvalStatus: string | null
   approvalStatusName: string | null
   approvalStatusStyle: string | null
-  /** 执行状态（return_execute_status：NOT_EXECUTED/PARTIAL/COMPLETED） */
+  /** 执行状态（return_execute_status：NOT_EXECUTED/EXECUTING/COMPLETED） */
   executeStatus: string | null
   executeStatusName: string | null
   executeStatusStyle: string | null
+  /** 当前审批节点名（审批中由后端回填；非审批中为空） */
+  currentNodeName?: string | null
   processInstanceId: string | null
   applicantId: number | null
   applicantName: string | null

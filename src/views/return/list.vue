@@ -110,7 +110,7 @@ onMounted(load)
       <el-form-item label="审批状态">
         <DictSelect
           v-model="query.status"
-          type-code="return_approval_status"
+          type-code="approval_status"
           placeholder="全部"
           clearable
         />
@@ -141,11 +141,15 @@ onMounted(load)
           <b class="amount">¥{{ formatAmount(row.returnAmount) }}</b>
         </template>
       </el-table-column>
-      <el-table-column label="审批状态" width="120" align="center">
+      <el-table-column label="审批状态" width="160" align="center">
         <template #default="{ row }">
           <el-tag :type="(row.approvalStatusStyle as any) || 'info'" size="small">
             {{ row.approvalStatusName || row.approvalStatus || '—' }}
           </el-tag>
+          <span v-if="row.approvalStatus === 'APPROVING' && row.currentNodeName"
+                style="margin-left: 4px; font-size: 12px; color: #909399">
+            {{ row.currentNodeName }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column label="执行状态" width="120" align="center">

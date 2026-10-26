@@ -84,7 +84,7 @@ const formatAmount = (v: number | null | undefined): string => {
 }
 
 // 字典翻译（开票状态 / 发票类型；字典维护页改色即生效）
-const { label: statusLabel, style: statusStyle } = useDictLabels('invoice_status')
+const { label: statusLabel, style: statusStyle } = useDictLabels('approval_status')
 const { label: typeLabel, style: typeStyle } = useDictLabels('invoice_type')
 
 // ===== 弹窗 =====
@@ -150,7 +150,7 @@ onMounted(() => {
         </el-select>
       </el-form-item>
       <el-form-item label="开票状态">
-        <DictSelect v-model="query.status" type-code="invoice_status" placeholder="全部" />
+        <DictSelect v-model="query.status" type-code="approval_status" placeholder="全部" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>
@@ -192,9 +192,13 @@ onMounted(() => {
       </el-table-column>
       <el-table-column label="开票状态" width="110" align="center">
         <template #default="{ row }">
-          <el-tag :type="statusStyle(row.invoiceStatus) || 'info'" size="small">
-            {{ statusLabel(row.invoiceStatus) }}
+          <el-tag :type="statusStyle(row.approvalStatus) || 'info'" size="small">
+            {{ statusLabel(row.approvalStatus) }}
           </el-tag>
+          <span v-if="row.approvalStatus === 'APPROVING' && row.currentNodeName"
+                style="margin-left: 4px; font-size: 12px; color: #909399">
+            {{ row.currentNodeName }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column label="开票人" min-width="100" show-overflow-tooltip>
@@ -211,7 +215,7 @@ onMounted(() => {
         <template #default="{ row }">
           <!-- 草稿态 + 已驳回态可编辑（驳回=回到编写中，用友范式，可改后重提） -->
           <el-button
-            v-if="row.invoiceStatus === 'PENDING' || row.invoiceStatus === 'REJECTED'"
+            v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
             link
             type="primary"
             size="small"

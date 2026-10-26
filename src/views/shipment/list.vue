@@ -74,7 +74,7 @@ const formatAmount = (v: number | null | undefined): string => {
 // 发货状态字典（标签 + 颜色，字典维护页改色即生效）
 const { label: statusLabel, style: statusStyle } = useDictLabels('shipment_status')
 // 审批状态字典（2026-10-26 虎哥：审批归审批，与发货状态拆分展示）
-const { label: apprStatusLabel, style: apprStatusStyle } = useDictLabels('shipment_approval_status')
+const { label: apprStatusLabel, style: apprStatusStyle } = useDictLabels('approval_status')
 
 // ===== 弹窗 =====
 const createVisible = ref(false)
@@ -159,6 +159,10 @@ onMounted(() => {
               <el-tag :type="apprStatusStyle(row.approvalStatus) || 'info'" size="small">
                 {{ apprStatusLabel(row.approvalStatus) || '—' }}
               </el-tag>
+              <span v-if="row.approvalStatus === 'APPROVING' && row.currentNodeName"
+                    style="margin-left: 4px; font-size: 12px; color: #909399">
+                {{ row.currentNodeName }}
+              </span>
             </template>
           </el-table-column>
       <el-table-column prop="applicantName" label="申请人" min-width="100" show-overflow-tooltip>

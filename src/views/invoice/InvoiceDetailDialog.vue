@@ -24,7 +24,7 @@ import { downloadViaBackend } from '@/utils/fileDownload'
 // 发票详情弹窗（卡片化：信息 + 审批时间线 + 状态推进）。
 // 状态推进（虎哥统一规划：审批动作收归审批中心，本弹窗只做业务推进）：
 //  - PENDING / REJECTED → 提交审批（申请人自己的动作；驳回后可改后重提）
-//  - PENDING / ISSUING → 撤回（申请人自己的动作）
+//  - DRAFT / APPROVING → 撤回（申请人自己的动作）
 const props = defineProps<{
   invoiceId: number | null
   readonly?: boolean
@@ -68,7 +68,7 @@ const attachFiles = ref<FileVO[]>([])
  */
 const ATTACH_BIZ_TYPE = 'invoice'
 
-const { label: statusLabel, style: statusStyle } = useDictLabels('invoice_status')
+const { label: statusLabel, style: statusStyle } = useDictLabels('approval_status')
 const { label: typeLabel, style: typeStyle } = useDictLabels('invoice_type')
 const { label: docDirectionLabel, style: docDirectionStyle } = useDictLabels('doc_direction')
 
@@ -145,14 +145,14 @@ const reload = async () => {
   }
 }
 
-// 注意：状态字段真名是 invoiceStatus（后端 InvoiceVO.invoiceStatus，非 status）
+// 注意：状态字段真名是 approvalStatus（V75 由 InvoiceVO.invoiceStatus 改名，非 status）
 // 草稿态 + 已驳回态可提交（2026-10-25 用友范式：驳回=回到编写中，改完可重提）
-const canSubmit = () => detail.value?.invoiceStatus === 'PENDING' || detail.value?.invoiceStatus === 'REJECTED'
+const canSubmit = () => detail.value?.approvalStatus === 'DRAFT' || detail.value?.approvalStatus === 'REJECTED'
 const canWithdraw = () =>
-  detail.value?.invoiceStatus === 'PENDING' || detail.value?.invoiceStatus === 'ISSUING'
+  detail.value?.approvalStatus === 'DRAFT' || detail.value?.approvalStatus === 'APPROVING'
 // 红冲入口（2026-10-25）：仅审批通过（已开票）的单据可冲；红冲单本身不再套娃
 const canRedFlush = () =>
-  detail.value?.invoiceStatus === 'ISSUED' && detail.value?.docDirection !== 'RED'
+  detail.value?.approvalStatus === 'APPROVED' && detail.value?.docDirection !== 'RED'
 
 const handleSubmit = async () => {
   if (!detail.value) return
@@ -214,8 +214,8 @@ const handleWithdraw = async () => {
           </el-descriptions-item>
           <el-descriptions-item label="税额">{{ formatAmount(detail.taxAmount) }}</el-descriptions-item>
           <el-descriptions-item label="开票状态">
-            <el-tag :type="statusStyle(detail.invoiceStatus) || 'info'" size="small">
-              {{ statusLabel(detail.invoiceStatus) }}
+            <el-tag :type="statusStyle(detail.approvalStatus) || 'info'" size="small">
+              {{ statusLabel(detail.approvalStatus) }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="单据方向">

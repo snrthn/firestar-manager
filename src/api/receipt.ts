@@ -43,7 +43,7 @@ export function updateReceipt(id: number, data: ReceiptRequest) {
   return request.put<ApiResult<null>>(`/receipt/${id}`, data).then((r) => r.data)
 }
 
-/** 申请人提交审批（PENDING_APPROVAL → CASHIER_APPROVING，发起 Flowable 流程） */
+/** 申请人提交审批（PENDING_APPROVAL → APPROVING，发起 Flowable 流程） */
 export function submitReceipt(id: number) {
   return request.post<ApiResult<null>>(`/receipt/${id}/submit`).then((r) => r.data)
 }

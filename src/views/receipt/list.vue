@@ -84,7 +84,7 @@ const formatAmount = (v: number | null | undefined): string => {
 }
 
 // 字典翻译（收款状态 / 款项类型；字典维护页改色即生效）
-const { label: statusLabel, style: statusStyle } = useDictLabels('receipt_status')
+const { label: statusLabel, style: statusStyle } = useDictLabels('approval_status')
 const { label: typeLabel, style: typeStyle } = useDictLabels('receipt_type')
 
 // ===== 弹窗 =====
@@ -150,7 +150,7 @@ onMounted(() => {
         </el-select>
       </el-form-item>
       <el-form-item label="收款状态">
-        <DictSelect v-model="query.status" type-code="receipt_status" placeholder="全部" />
+        <DictSelect v-model="query.status" type-code="approval_status" placeholder="全部" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>
@@ -192,6 +192,10 @@ onMounted(() => {
           <el-tag :type="statusStyle(row.approvalStatus) || 'info'" size="small">
             {{ statusLabel(row.approvalStatus) }}
           </el-tag>
+          <span v-if="row.approvalStatus === 'APPROVING' && row.currentNodeName"
+                style="margin-left: 4px; font-size: 12px; color: #909399">
+            {{ row.currentNodeName }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column prop="applicantName" label="申请人" min-width="100" show-overflow-tooltip>

@@ -363,7 +363,7 @@ onMounted(loadList)
       </el-form-item>
       <el-form-item label="审批状态">
         <!-- 宽度走 pages.css 的 .query-bar 统一规范（200px），不再内联绕过 -->
-        <DictSelect v-model="query.approvalStatus" type-code="project_approval_status" placeholder="全部" />
+        <DictSelect v-model="query.approvalStatus" type-code="approval_status" placeholder="全部" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>
@@ -410,11 +410,15 @@ onMounted(loadList)
       <el-table-column label="退货金额" width="130" align="right">
         <template #default="{ row }">{{ formatAmount(row.returnedAmount) }}</template>
       </el-table-column>
-      <el-table-column label="审批状态" width="110" align="center">
+      <el-table-column label="审批状态" width="150" align="center">
         <template #default="{ row }">
           <el-tag :type="row.approvalStatusStyle || 'info'" size="small">
             {{ row.approvalStatusName || row.approvalStatus }}
           </el-tag>
+          <span v-if="row.approvalStatus === 'APPROVING' && row.currentNodeName"
+                style="margin-left: 4px; font-size: 12px; color: #909399">
+            {{ row.currentNodeName }}
+          </span>
         </template>
       </el-table-column>
       <el-table-column label="创建时间" min-width="170">

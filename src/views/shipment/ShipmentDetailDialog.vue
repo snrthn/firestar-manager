@@ -79,7 +79,7 @@ const proofFiles = ref<FileVO[]>([])
 // 且 markShipped 不同步行状态，展示价值不大）；底层 line_status 字段保留——客户收货时
 // confirmReceive 仍写 FULL_RECEIVED/PARTIAL_RECEIVED，后续如需按行收货进度再恢复展示。
 const { label: statusLabel, style: statusStyle } = useDictLabels('shipment_status')
-const { label: apprStatusLabel, style: apprStatusStyle } = useDictLabels('shipment_approval_status')
+const { label: apprStatusLabel, style: apprStatusStyle } = useDictLabels('approval_status')
 const { label: recvStatusLabel, style: recvStatusStyle } = useDictLabels('receivable_status')
 const { label: recvSourceLabel } = useDictLabels('receivable_source')
 const { label: docDirLabel } = useDictLabels('doc_direction')

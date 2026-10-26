@@ -2,7 +2,7 @@
 // 字段逐一对齐后端：
 //   com.firestar.dto.ReceiptVO        （/receipt/page、/receipt/{id} 返回）
 //   com.firestar.dto.ReceiptRequest   （/receipt POST、/receipt/{id} PUT 请求体）
-// 字典：receipt_status / receipt_type / doc_direction（均在 V2__init_dict_data.sql 已种）
+// 字典：approval_status（审批态，V75 通用化）/ receipt_business_status（收款业务态）/ receipt_type / doc_direction
 
 /**
  * 核销分配项（V65 双向拆分，虎哥 2026-10-25 拍板 B）。
@@ -81,10 +81,16 @@ export interface ReceiptVO {
    */
   allocations?: AllocationVO[]
 
-  /** 审批状态（字典 receipt_status） */
+  /** 审批状态（字典 approval_status；V75 通用化，原 receipt_status 审批骨架并入） */
   approvalStatus: string | null
   approvalStatusName: string | null
   approvalStatusStyle: string | null
+  /** 收款业务状态（字典 receipt_business_status：RECEIVED 已收款） */
+  receiptStatus?: string | null
+  receiptStatusName?: string | null
+  receiptStatusStyle?: string | null
+  /** 当前审批节点名（审批中由后端回填；非审批中为空） */
+  currentNodeName?: string | null
 
   /** Flowable 流程实例 ID（提交审批后非空） */
   processInstanceId: string | null
@@ -137,23 +143,22 @@ export interface ReceiptRequest {
 }
 
 /**
- * 收款审批状态字典值。
+ * 收款「审批状态」字典值（V75 起走通用 approval_status）。
  *
- * 必须与后端 ReceiptServiceImpl 实际写入 approval_status 的字面量 + receipt_status 字典（V64 补齐）一一对应：
- *   PENDING_APPROVAL   创建即草稿态
- *   CASHIER_APPROVING  提交审批中
- *   CANCELLED          申请人撤回（V64：字典此前缺此值，撤回后标签/样式全空）
- *   RECEIVED           已收款
- *   PARTIAL_WRITEOFF   部分核销
- *   FULL_WRITEOFF      全部核销
- *   REJECTED           审批驳回
+ * 必须与后端 ReceiptServiceImpl 实际写入 approval_status 的字面量一一对应：
+ *   PENDING_APPROVAL  创建即待审批（本业务不叫 DRAFT，语义同草稿）
+ *   APPROVING         提交审批中（V75：原 CASHIER_APPROVING 并入通用 APPROVING，层级看 currentNodeName）
+ *   CANCELLED         申请人撤回
+ *   REJECTED          审批驳回
+ *   APPROVED          审批通过
+ *
+ * 注意：「已收款 / 部分核销 / 全部核销」是业务态，V75 后不再挤在审批态里——
+ * 已收款走 receiptStatus（字典 receipt_business_status），核销进度走 writeoff_status。
  */
 export const RECEIPT_STATUS = {
   PENDING_APPROVAL: 'PENDING_APPROVAL',
-  CASHIER_APPROVING: 'CASHIER_APPROVING',
+  APPROVING: 'APPROVING',
   CANCELLED: 'CANCELLED',
-  RECEIVED: 'RECEIVED',
-  PARTIAL_WRITEOFF: 'PARTIAL_WRITEOFF',
-  FULL_WRITEOFF: 'FULL_WRITEOFF',
   REJECTED: 'REJECTED',
+  APPROVED: 'APPROVED',
 } as const

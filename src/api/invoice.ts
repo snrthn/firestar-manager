@@ -43,7 +43,7 @@ export function updateInvoice(id: number, data: InvoiceRequest) {
   return request.put<ApiResult<null>>(`/invoice/${id}`, data).then((r) => r.data)
 }
 
-/** 申请人提交审批（PENDING → ISSUING，发起 Flowable 流程） */
+/** 申请人提交审批（DRAFT → APPROVING，发起 Flowable 流程） */
 export function submitInvoice(id: number) {
   return request.post<ApiResult<null>>(`/invoice/${id}/submit`).then((r) => r.data)
 }

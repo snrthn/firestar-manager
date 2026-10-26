@@ -71,7 +71,7 @@ const detail = ref<ProjectVO | null>(null)
 const timeline = ref<TimelineNodeVO[]>([])
 const acting = ref(false)
 
-const { label: statusLabel, style: statusStyle } = useDictLabels('project_approval_status')
+const { label: statusLabel, style: statusStyle } = useDictLabels('approval_status')
 const { label: contractStatusLabel } = useDictLabels('project_contract_status')
 
 const load = async (id: number) => {

@@ -26,7 +26,7 @@ import { downloadViaBackend } from '@/utils/fileDownload'
 // 回款详情弹窗（卡片化：信息 + 审批时间线 + 状态推进）。
 // 状态推进（虎哥统一规划：审批动作收归审批中心，本弹窗只做业务推进）：
 //  - PENDING_APPROVAL / REJECTED → 提交审批（申请人自己的动作；驳回后可改后重提）
-//  - PENDING_APPROVAL / CASHIER_APPROVING → 撤回（申请人自己的动作）
+//  - PENDING_APPROVAL / APPROVING → 撤回（申请人自己的动作）
 // 审批通过/驳回请到「审批中心 → 待我审批」处理。
 //
 // 【readonly 模式】审批中心复用本弹窗查看别人发起的回款单时传 true：隐藏底部全部业务动作。
@@ -76,7 +76,7 @@ const attachFiles = ref<FileVO[]>([])
  */
 const ATTACH_BIZ_TYPE = 'receipt'
 
-const { label: statusLabel, style: statusStyle } = useDictLabels('receipt_status')
+const { label: statusLabel, style: statusStyle } = useDictLabels('approval_status')
 const { label: receiptTypeLabel, style: receiptTypeStyle } = useDictLabels('receipt_type')
 const { label: docDirectionLabel, style: docDirectionStyle } = useDictLabels('doc_direction')
 
@@ -171,10 +171,10 @@ const canSubmit = () =>
   detail.value?.approvalStatus === 'PENDING_APPROVAL' || detail.value?.approvalStatus === 'REJECTED'
 const canWithdraw = () =>
   detail.value?.approvalStatus === 'PENDING_APPROVAL' ||
-  detail.value?.approvalStatus === 'CASHIER_APPROVING'
+  detail.value?.approvalStatus === 'APPROVING'
 // 红冲入口（2026-10-25）：仅审批通过（已收款）的单据可冲；红冲单本身不再套娃
 const canRedFlush = () =>
-  detail.value?.approvalStatus === 'RECEIVED' && detail.value?.docDirection !== 'RED'
+  detail.value?.receiptStatus === 'RECEIVED' && detail.value?.docDirection !== 'RED'
 
 const handleSubmit = async () => {
   if (!detail.value) return
@@ -230,6 +230,20 @@ const handleWithdraw = async () => {
             <el-tag :type="statusStyle(detail.approvalStatus) || 'info'" size="small">
               {{ statusLabel(detail.approvalStatus) }}
             </el-tag>
+            <span v-if="detail.currentNodeName" style="margin-left: 6px; font-size: 12px; color: #909399">
+              · {{ detail.currentNodeName }}
+            </span>
+          </el-descriptions-item>
+          <el-descriptions-item label="业务状态">
+            <el-tag
+              v-if="detail.receiptStatusName"
+              :type="(detail.receiptStatusStyle as any) || 'info'"
+              size="small"
+              effect="plain"
+            >
+              {{ detail.receiptStatusName }}
+            </el-tag>
+            <span v-else>—</span>
           </el-descriptions-item>
           <el-descriptions-item label="收款金额">{{ formatAmount(detail.receiptAmount) }}</el-descriptions-item>
           <el-descriptions-item label="款项类型">

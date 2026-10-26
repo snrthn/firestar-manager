@@ -259,7 +259,7 @@ onMounted(loadApprovals)
         <el-input v-model="startedQuery.projectName" placeholder="模糊匹配" clearable @keyup.enter="searchStarted" />
       </el-form-item>
       <el-form-item label="审批状态">
-        <DictSelect v-model="startedQuery.approvalStatus" type-code="project_approval_status" placeholder="全部" />
+        <DictSelect v-model="startedQuery.approvalStatus" type-code="approval_status" placeholder="全部" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="searchStarted">查询</el-button>
