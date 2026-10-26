@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { receivableDetail } from '@/api/receivable'
+import { shipmentDetail } from '@/api/shipment'
 import type { ReceivableVO } from '@/types/receivable'
 import { useDictLabels } from '@/composables/useDict'
 import { formatDate } from '@/utils/datetime'
@@ -15,6 +16,8 @@ const visible = defineModel<boolean>('visible', { required: true })
 
 const loading = ref(false)
 const detail = ref<ReceivableVO | null>(null)
+// 来源发货单可读批次号（FH-PJ-xxxx-NNN）；取号失败 / 发货单已删则回退到裸 id
+const shipmentNo = ref<string | null>(null)
 
 const { label: statusLabel, style: statusStyle } = useDictLabels('receivable_status')
 const { label: docDirectionLabel, style: docDirectionStyle } = useDictLabels('doc_direction')
@@ -27,8 +30,20 @@ const formatAmount = (v: number | null | undefined): string => {
 
 const load = async (id: number) => {
   loading.value = true
+  shipmentNo.value = null
   try {
-    detail.value = await receivableDetail(id)
+    const vo = await receivableDetail(id)
+    detail.value = vo
+    // 来源发货单：取可读批次号，而非裸 FK id；发货单已删 / 取号失败则回退到 id
+    if (vo.shipmentId != null) {
+      shipmentDetail(vo.shipmentId)
+        .then((s) => {
+          shipmentNo.value = s?.batchNo ?? null
+        })
+        .catch(() => {
+          shipmentNo.value = null
+        })
+    }
   } catch (e) {
     ElMessage.error((e as Error).message)
     detail.value = null
@@ -70,7 +85,7 @@ watch(
           </el-descriptions-item>
           <el-descriptions-item label="项目编号">{{ detail.projectNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="项目名称">{{ detail.projectName || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="来源发货单">{{ detail.shipmentId ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="来源发货单">{{ shipmentNo || detail.shipmentId || '—' }}</el-descriptions-item>
           <el-descriptions-item label="应收日期">{{ formatDate(detail.receivableDate) }}</el-descriptions-item>
         </el-descriptions>
 
