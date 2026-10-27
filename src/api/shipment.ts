@@ -11,11 +11,12 @@ import type { TimelineNodeVO } from '@/types/project'
 
 // 发货管理接口（后端 /shipment/**、/item/**）
 
-/** 分页发货列表（batchNo / projectName 模糊、status 精确；默认每页 10 条） */
+/** 分页发货列表（batchNo / projectName 模糊、status(发货状态)精确、approvalStatus(审批状态)精确；默认每页 10 条）
+ *  ⚠️ status=发货生命周期状态；approvalStatus=审批状态(APPROVED 等)。退货弹窗用 approvalStatus，勿混用。 */
 export function shipmentPage(
   pageNum = 1,
   pageSize = 10,
-  params: { batchNo?: string; projectName?: string; status?: string } = {},
+  params: { batchNo?: string; projectName?: string; status?: string; approvalStatus?: string } = {},
 ) {
   return request
     .get<ApiResult<ShipmentPageVO>>('/shipment/page', { params: { pageNum, pageSize, ...params } })

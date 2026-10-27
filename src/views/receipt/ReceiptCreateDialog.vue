@@ -344,7 +344,11 @@ const loadForEdit = async (id: number, asRedFlush = false) => {
     form.receiptAmount = asRedFlush ? null : (d.receiptAmount ?? null)
     // 红冲模式：款项类型走 receipt_red_type 字典，默认退货退款，不继承原单蓝字类型
     // （否则红冲单会被标成"正常收款"，与 docDirection=RED 自相矛盾）
-    form.receiptType = asRedFlush ? 'REFUND' : (d.receiptType ?? null)
+    // 编辑态红冲单若因历史脏数据把 receipt_type 错标成蓝字值（NORMAL 等），强制归位 RED，
+    // 避免打开编辑再保存后款项类型回落为"正常收款"（防止再犯）。
+    const legacyRedMislabel =
+      (d.docDirection ?? null) === 'RED' && d.receiptType !== 'REFUND' && d.receiptType !== 'RED'
+    form.receiptType = asRedFlush ? 'REFUND' : legacyRedMislabel ? 'RED' : (d.receiptType ?? null)
     form.receiptDate = d.receiptDate ?? null
     attachments.value = []
     await loadAttachments(id)

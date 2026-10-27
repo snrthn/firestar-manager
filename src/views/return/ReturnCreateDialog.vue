@@ -32,8 +32,9 @@ const saving = ref(false)
 const loadShipments = async () => {
   loadingShipments.value = true
   try {
-    // 只列审批通过（APPROVED）的发货单：后端 create 硬卡此条件，前端下拉就不给别的状态
-    const page = await shipmentPage(1, 500, { status: 'APPROVED' })
+    // 只列审批通过（approvalStatus=APPROVED）的发货单：后端 create 硬卡此条件，前端下拉就不给别的状态。
+    // ⚠️ 必须传 approvalStatus（审批状态列），不能传 status（发货生命周期列）——APPROVED 不是发货状态值。
+    const page = await shipmentPage(1, 500, { approvalStatus: 'APPROVED' })
     shipmentOptions.value = page.records
   } catch (e) {
     ElMessage.error((e as Error).message)
