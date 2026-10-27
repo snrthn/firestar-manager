@@ -4,9 +4,11 @@ import { UploadFilled } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { createInvoice, invoiceDetail, updateInvoice } from '@/api/invoice'
+import { projectPage } from '@/api/project'
 import { receivablePage } from '@/api/receivable'
 import { listFiles, uploadFile } from '@/api/file'
 import type { AllocationItem, InvoiceRequest, InvoiceVO } from '@/types/invoice'
+import type { ProjectVO } from '@/types/project'
 import type { ReceivableVO } from '@/types/receivable'
 import type { FileVO } from '@/types/file'
 import DictSelect from '@/components/DictSelect.vue'
@@ -50,13 +52,21 @@ const redOriginal = ref<InvoiceVO | null>(null)
 
 const receivableOptions = ref<ReceivableVO[]>([])
 const loadingReceivables = ref(false)
+const projectOptions = ref<ProjectVO[]>([])
+const loadingProjects = ref(false)
 const saving = ref(false)
 /** 已选附件（编辑态从文件表按 bizType+bizId 回填） */
 const attachments = ref<FileVO[]>([])
 const uploading = ref(false)
 
+/**
+ * 挂靠主体 = 项目（2026-10-28 交互优化）。
+ * 原表头「应收单」与下方「核销分配行」表达的是同一条关联，且提交时被 allocations[0]
+ * 静默覆盖（前端 payload / 后端 InvoiceServiceImpl 同口径），属冗余死字段。
+ * 改为与回款单一致的「项目」后：项目由用户显式选，应收单关联统一由核销分配行表达。
+ */
 const form = reactive<{
-  receivableId: number | null
+  projectId: number | null
   invoiceNo: string
   invoiceCode: string
   invoiceType: string
@@ -65,7 +75,7 @@ const form = reactive<{
   taxAmount: number | null
   invoiceDate: string | null
 }>({
-  receivableId: null,
+  projectId: null,
   invoiceNo: '',
   invoiceCode: '',
   invoiceType: 'NORMAL',
@@ -75,11 +85,27 @@ const form = reactive<{
   invoiceDate: null,
 })
 
-const loadReceivables = async () => {
+const loadProjects = async () => {
+  loadingProjects.value = true
+  try {
+    // 只列已审批项目：与回款单同口径，未审批/草稿项目不可发起开票
+    const page = await projectPage(1, 500, { approvalStatus: 'APPROVED' })
+    projectOptions.value = page.records
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    loadingProjects.value = false
+  }
+}
+
+const selectedProject = () => projectOptions.value.find((p) => p.id === form.projectId) ?? null
+
+/** 按项目载应收单：应收单属于项目维度，切换项目即作废已填分配（与回款单同口径） */
+const loadReceivables = async (projectId: number) => {
   loadingReceivables.value = true
   try {
-    // 应收单由发货「客户已收货」自动生成；这里拉一页够选的候选（前端不分页）
-    const page = await receivablePage(1, 500)
+    // 应收单由发货「客户已收货」自动生成；只列本项目下的（前端不分页）
+    const page = await receivablePage(1, 500, { projectId })
     receivableOptions.value = page.records
   } catch (e) {
     ElMessage.error((e as Error).message)
@@ -88,15 +114,12 @@ const loadReceivables = async () => {
   }
 }
 
-/** 当前选中应收单（项目 ID 与可开票金额都从它来） */
-const selectedReceivable = computed(
-  () => receivableOptions.value.find((r) => r.id === form.receivableId) ?? null,
-)
-
 // ===== 核销分配（V65 双向拆分，虎哥 2026-10-25 拍板 B）=====
 // 一张发票可拆多张应收单（合并开）；填了分配行则以第一行为主应收单（payload.receivableId
 // 取它，与后端 create 的解析口径一致）。空列表 = 主应收单独享（原交互）。
-const allocations = ref<AllocationItem[]>([])
+/** 分配行 + 自动填充标记：autoBal = 上次由系统回填的余额，用于判断金额是否被用户手改过 */
+type AllocationRow = AllocationItem & { autoBal?: number | null }
+const allocations = ref<AllocationRow[]>([])
 
 const allocatedTotal = computed(() =>
   allocations.value.reduce((s, a) => s + (a.amount == null ? 0 : Number(a.amount)), 0),
@@ -108,7 +131,11 @@ const remaining = computed(() => {
 })
 
 const addAllocation = () => {
-  allocations.value.push({ receivableId: null as unknown as number, amount: null as unknown as number })
+  allocations.value.push({
+    receivableId: null as unknown as number,
+    amount: null as unknown as number,
+    autoBal: null,
+  })
 }
 
 const removeAllocation = (idx: number) => {
@@ -132,8 +159,21 @@ const onAllocationReceivableChange = (idx: number) => {
   if (!a || a.receivableId == null) return
   const rv = receivableOptions.value.find((r) => r.id === a.receivableId)
   if (!rv) return
-  const bal = rv.uninvoicedAmount == null ? 0 : Number(rv.uninvoicedAmount)
-  if (a.amount == null || a.amount === 0) a.amount = Number(bal.toFixed(2))
+  const bal = Number((rv.uninvoicedAmount == null ? 0 : Number(rv.uninvoicedAmount)).toFixed(2))
+  // 换单也要刷新金额（2026-10-28 修复）：原判据只在金额为空/0 时回填，首次填满后金额 >0，
+  // 再换单就永远不更新。改为「金额是否仍是上次系统回填的值」来判断用户有没有手改过：
+  // - 未手改（空 / 0 / 等于上次回填值）→ 跟随新应收单余额刷新；
+  // - 已手改（金额 ≠ 上次回填值）→ 尊重手填值，并解除自动回填标记。
+  const untouched =
+    a.amount == null ||
+    Number(a.amount) === 0 ||
+    (a.autoBal != null && Number(a.amount) === a.autoBal)
+  if (untouched) {
+    a.amount = bal
+    a.autoBal = bal
+  } else {
+    a.autoBal = null
+  }
 }
 // 单行分配金额上限 = 该应收单未开票余额（物理封顶，防止超过）；未选应收单时无限。
 const allocMaxAmount = (idx: number) => {
@@ -198,7 +238,7 @@ const handlePreview = (f: FileVO) => {
 }
 
 const resetForm = () => {
-  form.receivableId = null
+  form.projectId = null
   form.invoiceNo = ''
   editDocDirection.value = null
   form.invoiceCode = ''
@@ -224,11 +264,13 @@ const handleSubmit = async () => {
     return
   }
   const mainReceivableId = allocs[0].receivableId
-  const projectId = receivableOptions.value.find((r) => r.id === mainReceivableId)?.projectId
-  if (projectId == null) {
-    ElMessage.warning('所选应收单缺少项目信息，请更换')
+  // 项目由表头显式选择（不再从应收单反推）；应收单候选已按项目过滤，天然同项目，
+  // 后端 InvoiceServiceImpl 仍会校验「应收单属于该项目」兜底
+  if (form.projectId == null) {
+    ElMessage.warning('请选择项目')
     return
   }
+  const projectId = form.projectId
   // 开票日期必填（财务凭证关键字段；2026-10-27 实锤空日期曾可提交）
   if (!form.invoiceDate) {
     ElMessage.warning('请选择开票日期')
@@ -322,7 +364,7 @@ const loadForEdit = async (id: number, asRedFlush = false) => {
     if (asRedFlush) redOriginal.value = d
     // 仅编辑态记录本单方向；红冲态 d 是原单（蓝字），不可拿来当"本单方向"用
     editDocDirection.value = asRedFlush ? null : (d.docDirection ?? null)
-    form.receivableId = d.receivableId ?? null
+    form.projectId = d.projectId ?? null
     form.invoiceNo = asRedFlush ? '' : (d.invoiceNo ?? '')
     form.invoiceCode = asRedFlush ? '' : (d.invoiceCode ?? '')
     form.invoiceType = d.invoiceType ?? 'NORMAL'
@@ -349,7 +391,8 @@ watch(
   () => visible.value,
   (v) => {
     if (!v) return
-    loadReceivables()
+    // 应收单不再全量预载：由 form.projectId 的 watch 按项目加载（与回款单同口径）
+    loadProjects()
     if (isEdit()) {
       loadForEdit(props.invoiceId!)
     } else if (isRedFlush()) {
@@ -357,6 +400,19 @@ watch(
       loadForEdit(props.originalInvoiceId!, true)
     } else {
       resetForm()
+    }
+  },
+)
+
+// 切换项目：分配明细作废（应收单属于项目维度），并按新项目重载应收单下拉
+watch(
+  () => form.projectId,
+  (pid) => {
+    allocations.value = []
+    if (pid != null) {
+      loadReceivables(pid)
+    } else {
+      receivableOptions.value = []
     }
   },
 )
@@ -378,10 +434,11 @@ watch(
 // 方案A（2026-10-27）：总额强制 = Σ分配（只读）。创建/红冲态分配变化即同步开票金额；
 // 编辑态发票金额法定锁定，保留后端原值，不被分配联动覆盖
 watch(
-  allocatedTotal,
-  (v) => {
+  () => [allocatedTotal.value, allocations.value.length],
+  ([v, n]) => {
     if (isEdit()) return
-    form.invoiceAmount = v == null ? null : Number(v.toFixed(2))
+    // 删光分配行时总额必须清零（2026-10-28 修复）：原实现只同步 Σ，空列表时金额停在旧值
+    form.invoiceAmount = n === 0 ? 0 : Number(Number(v ?? 0).toFixed(2))
   },
   { immediate: false },
 )
@@ -411,36 +468,38 @@ watch(
         </template>
       </el-alert>
       <el-form label-width="110px" @submit.prevent>
-        <!-- 应收单是发票的挂靠主体，带提示行 -->
-        <el-form-item label="应收单" required>
+        <!-- 项目是发票的挂靠主体（2026-10-28 交互优化）：原表头「应收单」与核销分配行表达的是
+             同一条关联，且提交时被 allocations[0] 静默覆盖，属冗余死字段。改为与回款单一致的
+             「项目」后，应收单关联统一由核销分配行表达，不再有「选了不算」的歧义。 -->
+        <el-form-item label="项目" required>
           <el-select
-            v-model="form.receivableId"
+            v-model="form.projectId"
             filterable
             :disabled="isEdit() || isRedFlush()"
-            :placeholder="isEdit() || isRedFlush() ? '与原单同应收单，不可更换' : '选择应收单（发票须挂应收）'"
+            :placeholder="isEdit() || isRedFlush() ? '与原单同项目，不可更换' : '选择已审批项目'"
             style="width: 100%"
-            :loading="loadingReceivables"
+            :loading="loadingProjects"
           >
             <el-option
-              v-for="r in receivableOptions"
-              :key="r.id"
-              :label="`${r.receivableNo || '—'}（应收 ${formatAmount(r.receivableAmount)}）`"
-              :value="r.id"
+              v-for="p in projectOptions"
+              :key="p.id"
+              :label="`${p.projectNo || '—'} ${p.projectName}`"
+              :value="p.id"
             />
           </el-select>
-          <div v-if="selectedReceivable" class="recv-meta">
-            未开票金额：<b>{{ formatAmount(selectedReceivable.uninvoicedAmount) }}</b>
-            <span class="muted">（项目随应收单带入，不可手改）</span>
+          <div v-if="selectedProject()" class="proj-meta">
+            合同金额：<b>{{ formatAmount(selectedProject()?.contractAmount) }}</b>
+            <span class="muted">（仅展示已审批项目）</span>
           </div>
         </el-form-item>
 
-        <!-- 核销分配（V65 双向拆分）：选填，一张发票可拆多张应收单（合并开）；
-             填了分配行则以第一行为主应收单（无需再选上面的应收单）。
-             Σ 必须 = 开票金额（前端提示，后端强制）。 -->
-        <el-form-item label="核销分配">
+        <!-- 核销分配（V65 双向拆分）：应收单关联的唯一入口（2026-10-28 起）。
+             一张发票可拆多张应收单（合并开），首行即主表 receivable_id 的来源；
+             开票金额 = Σ分配（只读，前端同步 + 后端强制）。 -->
+        <el-form-item label="核销分配" required>
           <div class="alloc-box">
             <div class="alloc-hint muted">
-              选填：一张发票可拆到多张应收单（合并开）；填了分配行则以第一行为主应收单。同一应收单不可重复选；选完自动回填未开票余额，金额不得超出该余额。
+              必填：发票开给哪些应收单由这里决定（可拆多张合并开），首行即主应收单。同一应收单不可重复选；选完自动回填未开票余额，金额不得超出该余额。
             </div>
             <div v-for="(a, idx) in allocations" :key="idx" class="alloc-row">
               <el-select
@@ -472,7 +531,9 @@ watch(
               </el-button>
             </div>
             <div class="alloc-foot">
-              <el-button size="small" @click="addAllocation">+ 添加分配行</el-button>
+              <el-button size="small" :disabled="!form.projectId" @click="addAllocation">
+                + 添加分配行
+              </el-button>
               <span v-if="allocations.length" class="alloc-sum">
                 已分配 <b>{{ formatAmount(allocatedTotal) }}</b>
                 <span v-if="remaining != null" :class="remaining === 0 ? 'alloc-ok' : 'alloc-warn'">
@@ -483,15 +544,8 @@ watch(
           </div>
         </el-form-item>
 
-        <el-form-item label="发票类型" required>
-          <DictSelect
-            v-model="form.invoiceType"
-            type-code="invoice_type"
-            placeholder="请选择"
-            class="w-full"
-          />
-        </el-form-item>
-
+        <!-- 开票金额紧跟核销分配（2026-10-28）：金额是 Σ分配的只读派生值，
+             放在来源之后符合「先拆分配 → 再看合计」的填单顺序 -->
         <el-form-item label="开票金额" required>
           <el-input-number
             v-model="form.invoiceAmount"
@@ -503,6 +557,15 @@ watch(
             style="width: 100%"
           />
           <div class="muted" style="margin-top: 4px">本金额 = 各核销分配行合计（强制拆分、只读自动算）</div>
+        </el-form-item>
+
+        <el-form-item label="发票类型" required>
+          <DictSelect
+            v-model="form.invoiceType"
+            type-code="invoice_type"
+            placeholder="请选择"
+            class="w-full"
+          />
         </el-form-item>
 
         <el-form-item label="发票号码">
@@ -600,7 +663,8 @@ watch(
 .red-flush-tip {
   margin-bottom: 12px;
 }
-.recv-meta {
+/* 项目提示行（2026-10-28）：原 .recv-meta 服务于已下线的表头「应收单」，改名复用 */
+.proj-meta {
   margin-top: 6px;
   font-size: 13px;
   color: #303133;

@@ -63,7 +63,9 @@ const uploading = ref(false)
 // 每行 ≤ 该应收单未回款余额（后端强制，前端只展示余额供参考）。
 const receivableOptions = ref<ReceivableVO[]>([])
 const loadingReceivables = ref(false)
-const allocations = ref<AllocationItem[]>([])
+/** 分配行 + 自动填充标记：autoBal = 上次由系统回填的余额，用于判断金额是否被用户手改过 */
+type AllocationRow = AllocationItem & { autoBal?: number | null }
+const allocations = ref<AllocationRow[]>([])
 
 const allocatedTotal = computed(() =>
   allocations.value.reduce((s, a) => s + (a.amount == null ? 0 : Number(a.amount)), 0),
@@ -88,7 +90,11 @@ const loadReceivables = async (projectId: number) => {
 }
 
 const addAllocation = () => {
-  allocations.value.push({ receivableId: null as unknown as number, amount: null as unknown as number })
+  allocations.value.push({
+    receivableId: null as unknown as number,
+    amount: null as unknown as number,
+    autoBal: null,
+  })
 }
 
 const removeAllocation = (idx: number) => {
@@ -139,8 +145,21 @@ const onAllocationReceivableChange = (idx: number) => {
   if (!a || a.receivableId == null) return
   const rv = receivableOptions.value.find((r) => r.id === a.receivableId)
   if (!rv) return
-  const bal = rv.unreceivedAmount == null ? 0 : Number(rv.unreceivedAmount)
-  if (a.amount == null || a.amount === 0) a.amount = Number(bal.toFixed(2))
+  const bal = Number((rv.unreceivedAmount == null ? 0 : Number(rv.unreceivedAmount)).toFixed(2))
+  // 换单也要刷新金额（2026-10-28 修复）：原判据只在金额为空/0 时回填，首次填满后金额 >0，
+  // 再换单就永远不更新。改为「金额是否仍是上次系统回填的值」来判断用户有没有手改过：
+  // - 未手改（空 / 0 / 等于上次回填值）→ 跟随新应收单余额刷新；
+  // - 已手改（金额 ≠ 上次回填值）→ 尊重手填值，并解除自动回填标记。
+  const untouched =
+    a.amount == null ||
+    Number(a.amount) === 0 ||
+    (a.autoBal != null && Number(a.amount) === a.autoBal)
+  if (untouched) {
+    a.amount = bal
+    a.autoBal = bal
+  } else {
+    a.autoBal = null
+  }
 }
 // 单行分配金额上限 = 该应收单未回款余额（物理封顶，防止超过）；未选应收单时无限。
 const allocMaxAmount = (idx: number) => {
@@ -407,13 +426,14 @@ watch(
   },
 )
 
-// 方案A（2026-10-27）：有核销分配时，收款总额强制 = Σ分配（只读）；无分配（预收）保留手填
+// 方案A（2026-10-27）：有核销分配时，收款总额强制 = Σ分配（只读）；预收款保留手填。
+// 2026-10-28 修复：删光分配行（length 变 0）时总额必须清零 —— 旧实现用 length>0 守卫，
+// 空列表直接跳过赋值，导致删到最后一条时金额停在旧值。预收款态不参与联动（保住手填额）。
 watch(
-  allocatedTotal,
-  (v) => {
-    if (allocations.value.length > 0) {
-      form.receiptAmount = v == null ? null : Number(v.toFixed(2))
-    }
+  () => [allocatedTotal.value, allocations.value.length],
+  ([v, n]) => {
+    if (isPrepay()) return
+    form.receiptAmount = n === 0 ? 0 : Number(Number(v ?? 0).toFixed(2))
   },
   { immediate: false },
 )
@@ -464,19 +484,15 @@ watch(
           </div>
         </el-form-item>
 
-        <el-form-item label="收款金额" required>
-          <el-input-number
-            v-model="form.receiptAmount"
-            :disabled="form.receiptType === 'NORMAL'"
-            :min="0"
-            :precision="2"
-            controls-position="right"
-            class="amount-left"
-            style="width: 100%"
+        <!-- 款项类型放在项目下方（2026-10-28 交互优化）：它决定下方「核销分配」的显隐，
+             位置靠上可避免切换时下方整块跳动把上方字段顶走，阅读顺序也符合「先定性质再分钱」 -->
+        <el-form-item label="款项类型" required>
+          <DictSelect
+            v-model="form.receiptType"
+            :type-code="isRedFlush() || editDocDirection === 'RED' ? 'receipt_red_type' : 'receipt_type'"
+            :placeholder="isRedFlush() || editDocDirection === 'RED' ? '选择红冲款项类型' : '选择款项类型'"
+            class="w-full"
           />
-          <div class="muted" style="margin-top: 4px">
-            正常收款：金额按应收单分配自动合计（只读）；切到「预收款」：隐藏分配、可手动填写金额。
-          </div>
         </el-form-item>
 
         <!-- 核销分配（V65 双向拆分）：仅「正常收款」显示；预收款(PREPAY)隐藏且不挂应收单。
@@ -529,14 +545,22 @@ watch(
           </div>
         </el-form-item>
 
-            <el-form-item label="款项类型" required>
-              <DictSelect
-                v-model="form.receiptType"
-                :type-code="isRedFlush() || editDocDirection === 'RED' ? 'receipt_red_type' : 'receipt_type'"
-                :placeholder="isRedFlush() || editDocDirection === 'RED' ? '选择红冲款项类型' : '选择款项类型'"
-                class="w-full"
-              />
-            </el-form-item>
+        <!-- 收款金额移到核销分配下方（2026-10-28 交互优化）：它是「分配结果/手填入口」，
+             紧跟其来源（分配区）视线不用来回跳；切预收款时分配区隐藏，金额就地变可填，位置稳定 -->
+        <el-form-item label="收款金额" required>
+          <el-input-number
+            v-model="form.receiptAmount"
+            :disabled="form.receiptType === 'NORMAL'"
+            :min="0"
+            :precision="2"
+            controls-position="right"
+            class="amount-left"
+            style="width: 100%"
+          />
+          <div class="muted" style="margin-top: 4px">
+            正常收款：金额按应收单分配自动合计（只读）；切到「预收款」：隐藏分配、可手动填写金额。
+          </div>
+        </el-form-item>
 
         <el-form-item label="收款日期" required>
           <el-date-picker
