@@ -442,10 +442,6 @@ onMounted(loadList)
           <el-tag :type="row.approvalStatusStyle || 'info'" size="small">
             {{ row.approvalStatusName || row.approvalStatus }}
           </el-tag>
-          <span v-if="row.approvalStatus === 'APPROVING' && row.currentNodeName"
-                style="margin-left: 4px; font-size: 12px; color: #909399">
-            {{ row.currentNodeName }}
-          </span>
         </template>
       </el-table-column>
       <el-table-column label="创建时间" min-width="170">
