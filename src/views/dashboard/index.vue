@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { Connection, HomeFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
-import request from '@/utils/request'
+import request from '@/api/request'
 
 const loading = ref<boolean>(false)
 const cost = ref<number>(0)
@@ -57,7 +57,9 @@ const ping = async () => {
   try {
     const res: any = await request.get('/system/db-check')
     cost.value = Date.now() - start
-    report.value = res
+    // 注意：api/request 成功拦截器返回整个 AxiosResponse（与旧 utils/request 直接返回 body 不同），
+    // 这里必须取 .data 才是 db-check 的真实响应体，否则报表字段全空。
+    report.value = res.data
   } catch (e: any) {
     cost.value = Date.now() - start
     // 后端在 unhealthy 时返回 503，axios 会走这里。

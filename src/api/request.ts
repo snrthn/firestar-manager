@@ -2,10 +2,13 @@ import axios from 'axios'
 import type { AxiosResponse } from 'axios'
 import { handleSessionExpired, hangSilently } from './sessionGuard'
 
-// 全局 axios 实例。baseURL=/api：开发期经 vite 代理剥离 /api 转发到后端 2025，
-// 部署期由 Nginx 同样剥离 /api。后端路由一律不带 /api（见后端 SecurityConfig 注释）。
+// 全局 axios 实例。baseURL 取自 .env 的 VITE_API_BASE，缺省 /api：
+// 开发期经 vite 代理剥离 /api 转发到后端；部署期由 Nginx 同样剥离 /api（或填真实后端地址）。
+// 后端路由一律不带 /api（见后端 SecurityConfig 注释）。
+// 注：合并双 axios 实例时（删 src/utils/request.ts）统一在此 Honor VITE_API_BASE，
+// 原 31 个 api 模块长期忽略该变量（仅旧 utils/request.ts Honor），属潜在 bug，现一并修复。
 const request = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_BASE || '/api',
   timeout: 15000,
 })
 
