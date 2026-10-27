@@ -56,7 +56,7 @@ export interface ReceiptVO {
   /** 红冲原单号（仅详情回填，展示「原单：SK-xxx」） */
   originalReceiptNo?: string | null
 
-  /** 款项类型（字典 receipt_type：NORMAL 正常收款 / PREPAY 预收款 / OVERPAY 多收款） */
+  /** 款项类型：蓝字单取自 receipt_type（NORMAL 正常收款 / PREPAY 预收款）；红字单取自 receipt_red_type（REFUND 退货退款 / RED 红冲）。V78 拆字典，存库值不变。 */
   receiptType: string | null
   receiptTypeName: string | null
   receiptTypeStyle: string | null
@@ -112,7 +112,7 @@ export interface ReceiptVO {
 export interface ReceiptRequest {
   projectId: number
   receiptAmount: number
-  /** 字典 receipt_type，后端未显式校验必填 */
+  /** 款项类型（receipt_type 蓝字 / receipt_red_type 红字），后端仅校验非空，不限定字典值 */
   receiptType?: string | null
   receiptDate?: string | null
   /** ⚠️ 历史废弃字段：后端自 V62 起不再写入，保留仅为兼容旧请求体 */

@@ -120,6 +120,29 @@ const formatAmount = (v: number | null | undefined): string => {
   return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// ===== 核销分配交互增强（2026-10-27 Q1/Q2）=====
+// Q1：已选应收单禁止在其他分配行重复选择 —— 当前行已选的保留可见，其余行已选的剔除出候选。
+const allocOptionsFor = (idx: number) =>
+  receivableOptions.value.filter(
+    (rv) => !allocations.value.some((a, i) => i !== idx && a.receivableId === rv.id),
+  )
+// Q2：选中应收单后默认回填其「未开票余额」；已手填金额（>0）不覆盖。
+const onAllocationReceivableChange = (idx: number) => {
+  const a = allocations.value[idx]
+  if (!a || a.receivableId == null) return
+  const rv = receivableOptions.value.find((r) => r.id === a.receivableId)
+  if (!rv) return
+  const bal = rv.uninvoicedAmount == null ? 0 : Number(rv.uninvoicedAmount)
+  if (a.amount == null || a.amount === 0) a.amount = Number(bal.toFixed(2))
+}
+// 单行分配金额上限 = 该应收单未开票余额（物理封顶，防止超过）；未选应收单时无限。
+const allocMaxAmount = (idx: number) => {
+  const a = allocations.value[idx]
+  if (!a || a.receivableId == null) return undefined
+  const rv = receivableOptions.value.find((r) => r.id === a.receivableId)
+  return rv?.uninvoicedAmount == null ? undefined : Number(rv.uninvoicedAmount)
+}
+
 // ===== 附件 =====
 
 const beforeUpload = (file: File) => {
@@ -195,18 +218,15 @@ const handleSubmit = async () => {
     .filter((a) => a.receivableId != null && a.amount != null && Number(a.amount) > 0)
     .map((a) => ({ receivableId: a.receivableId, amount: Number(a.amount) }))
   // 填了分配行 → 主应收单取第一行（与后端 create 解析口径一致）；未填 → 必须选主应收单
-  const mainReceivableId = allocs.length ? allocs[0].receivableId : form.receivableId
-  if (!mainReceivableId) {
-    ElMessage.warning('请选择应收单，或添加分配明细（第一行即主应收单）')
+  // 方案A（2026-10-27）：强制核销分配，总额=Σ分配（只读）；无分配则拦截
+  if (allocs.length === 0) {
+    ElMessage.warning('请至少添加一条核销分配明细（第一行即主应收单）')
     return
   }
+  const mainReceivableId = allocs[0].receivableId
   const projectId = receivableOptions.value.find((r) => r.id === mainReceivableId)?.projectId
   if (projectId == null) {
     ElMessage.warning('所选应收单缺少项目信息，请更换')
-    return
-  }
-  if (form.invoiceAmount == null || Number(form.invoiceAmount) <= 0) {
-    ElMessage.warning('请填写大于 0 的开票金额')
     return
   }
   // 开票日期必填（财务凭证关键字段；2026-10-27 实锤空日期曾可提交）
@@ -229,7 +249,7 @@ const handleSubmit = async () => {
         ElMessage.warning(`分配金额超出应收单未开票余额：${rv?.receivableNo ?? ''}（未开票 ${formatAmount(rv?.uninvoicedAmount)}），请调整`)
         return
       }
-    } else if (overLimit(mainReceivableId, Number(form.invoiceAmount))) {
+    } else if (overLimit(mainReceivableId, allocatedTotal.value)) {
       const rv = receivableOptions.value.find((r) => r.id === mainReceivableId)
       ElMessage.warning(`开票金额超出应收单未开票余额：${rv?.receivableNo ?? ''}（未开票 ${formatAmount(rv?.uninvoicedAmount)}），请核实金额`)
       return
@@ -238,7 +258,7 @@ const handleSubmit = async () => {
   // 红冲口径（2026-10-25）：金额 ≤ 原单金额（支持部分红冲），后端同校验
   if (isRedFlush() && redOriginal.value) {
     const max = Number(redOriginal.value.invoiceAmount)
-    if (Number(form.invoiceAmount) > max) {
+    if (allocatedTotal.value > max) {
       ElMessage.warning(`红冲金额不能超过原单金额 ${max}`)
       return
     }
@@ -247,19 +267,15 @@ const handleSubmit = async () => {
     ElMessage.warning('请选择发票类型')
     return
   }
-  // 前端口径提示（后端 saveAllocations 同样强制）：Σ 必须 = 开票金额
-  if (allocs.length) {
-    const sum = allocs.reduce((s, a) => s + a.amount, 0)
-    const total = Number(form.invoiceAmount)
-    if (Number(sum.toFixed(2)) !== Number(total.toFixed(2))) {
-      ElMessage.warning(`分配总额 ${sum.toFixed(2)} 与开票金额 ${total.toFixed(2)} 不一致，请调整`)
-      return
-    }
+  // 总额=Σ分配（只读自动算），Σ=金额的一致性由前端分配与后端 saveAllocations 双重保证，无需再校验
+  if (attachments.value.length === 0) {
+    ElMessage.warning('请上传发票文件')
+    return
   }
   const payload: InvoiceRequest = {
     projectId,
     receivableId: mainReceivableId,
-    invoiceAmount: Number(form.invoiceAmount),
+    invoiceAmount: allocatedTotal.value,
     taxRate: form.taxRate == null ? null : Number(form.taxRate),
     taxAmount: form.taxAmount == null ? null : Number(form.taxAmount),
     invoiceNo: form.invoiceNo || null,
@@ -312,7 +328,9 @@ const loadForEdit = async (id: number, asRedFlush = false) => {
     form.invoiceType = d.invoiceType ?? 'NORMAL'
     form.invoiceAmount = asRedFlush ? null : (d.invoiceAmount ?? null)
     form.taxRate = d.taxRate ?? null
-    form.taxAmount = d.taxAmount ?? null
+    // 税额只读、由税率×金额自动算（2026-10-27）：编辑回填后以 amount×rate 重算，不沿用旧值
+    form.taxAmount = (form.invoiceAmount != null && form.taxRate != null)
+      ? Number((Number(form.invoiceAmount) * Number(form.taxRate)).toFixed(2)) : null
     form.invoiceDate = d.invoiceDate ?? null
     attachments.value = []
     await loadAttachments(id)
@@ -341,6 +359,31 @@ watch(
       resetForm()
     }
   },
+)
+
+// 税额只读 + 税率自动算（2026-10-27）：金额或税率变化即重算 taxAmount = amount × rate
+watch(
+  () => [form.invoiceAmount, form.taxRate],
+  () => {
+    const amt = Number(form.invoiceAmount)
+    const rate = Number(form.taxRate)
+    if (form.invoiceAmount == null || form.taxRate == null || Number.isNaN(amt) || Number.isNaN(rate)) {
+      form.taxAmount = null
+    } else {
+      form.taxAmount = Number((amt * rate).toFixed(2))
+    }
+  },
+)
+
+// 方案A（2026-10-27）：总额强制 = Σ分配（只读）。创建/红冲态分配变化即同步开票金额；
+// 编辑态发票金额法定锁定，保留后端原值，不被分配联动覆盖
+watch(
+  allocatedTotal,
+  (v) => {
+    if (isEdit()) return
+    form.invoiceAmount = v == null ? null : Number(v.toFixed(2))
+  },
+  { immediate: false },
 )
 </script>
 
@@ -397,7 +440,7 @@ watch(
         <el-form-item label="核销分配">
           <div class="alloc-box">
             <div class="alloc-hint muted">
-              选填：一张发票可拆到多张应收单（合并开）；填了分配行则以第一行为主应收单。
+              选填：一张发票可拆到多张应收单（合并开）；填了分配行则以第一行为主应收单。同一应收单不可重复选；选完自动回填未开票余额，金额不得超出该余额。
             </div>
             <div v-for="(a, idx) in allocations" :key="idx" class="alloc-row">
               <el-select
@@ -406,9 +449,10 @@ watch(
                 placeholder="选择应收单"
                 style="flex: 1 1 0; min-width: 0"
                 :loading="loadingReceivables"
+                @change="onAllocationReceivableChange(idx)"
               >
                 <el-option
-                  v-for="rv in receivableOptions"
+                  v-for="rv in allocOptionsFor(idx)"
                   :key="rv.id"
                   :label="`${rv.receivableNo}（未开票 ${formatAmount(rv.uninvoicedAmount)}）`"
                   :value="rv.id"
@@ -417,6 +461,7 @@ watch(
               <el-input-number
                 v-model="a.amount"
                 :min="0"
+                :max="allocMaxAmount(idx)"
                 :precision="2"
                 controls-position="right"
                 placeholder="金额"
@@ -450,12 +495,14 @@ watch(
         <el-form-item label="开票金额" required>
           <el-input-number
             v-model="form.invoiceAmount"
+            :disabled="true"
             :min="0"
             :precision="2"
             controls-position="right"
             class="amount-left"
             style="width: 100%"
           />
+          <div class="muted" style="margin-top: 4px">本金额 = 各核销分配行合计（强制拆分、只读自动算）</div>
         </el-form-item>
 
         <el-form-item label="发票号码">
@@ -469,6 +516,7 @@ watch(
         <el-form-item label="税率">
           <el-input-number
             v-model="form.taxRate"
+            placeholder="如 0.13 = 13%"
             :min="0"
             :max="1"
             :step="0.01"
@@ -477,12 +525,12 @@ watch(
             class="amount-left"
             style="width: 100%"
           />
-          <span class="muted">0.13 = 13%</span>
         </el-form-item>
 
         <el-form-item label="税额">
           <el-input-number
             v-model="form.taxAmount"
+            :disabled="true"
             :min="0"
             :precision="2"
             controls-position="right"
@@ -491,7 +539,7 @@ watch(
           />
         </el-form-item>
 
-        <el-form-item label="开票日期">
+        <el-form-item label="开票日期" required>
           <el-date-picker
             v-model="form.invoiceDate"
             type="date"
@@ -501,7 +549,7 @@ watch(
           />
         </el-form-item>
 
-        <el-form-item label="发票文件">
+        <el-form-item label="发票文件" required>
           <div class="attach-box">
             <el-upload
               :show-file-list="false"
@@ -589,11 +637,6 @@ watch(
 }
 .alloc-warn {
   color: #e6a23c;
-}
-.muted {
-  color: #909399;
-  font-size: 12px;
-  margin-left: 4px;
 }
 .detail-scroll {
   max-height: calc(100vh - 280px);

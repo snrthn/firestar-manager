@@ -20,6 +20,7 @@ import AllocationEditorDialog from '@/components/AllocationEditorDialog.vue'
 import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
 import { useTaskApproval } from '@/composables/useTaskApproval'
 import { useDictLabels } from '@/composables/useDict'
+import { useReceiptTypeLabels } from '@/composables/useReceiptType'
 import { formatDate, formatDateTime } from '@/utils/datetime'
 import { downloadViaBackend } from '@/utils/fileDownload'
 
@@ -77,7 +78,7 @@ const attachFiles = ref<FileVO[]>([])
 const ATTACH_BIZ_TYPE = 'receipt'
 
 const { label: statusLabel, style: statusStyle } = useDictLabels('approval_status')
-const { label: receiptTypeLabel, style: receiptTypeStyle } = useDictLabels('receipt_type')
+const { label: receiptTypeLabel, style: receiptTypeStyle } = useReceiptTypeLabels()
 const { label: docDirectionLabel, style: docDirectionStyle } = useDictLabels('doc_direction')
 
 // ===== 附件（V62 软关联，只读展示 + 下载） =====

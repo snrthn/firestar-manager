@@ -44,6 +44,8 @@ const MAX_ATTACH_MB = 10
 const isEdit = () => props.receiptId != null
 /** 红冲模式：传了 originalReceiptId 即红字单（与编辑态互斥，红冲永远新建） */
 const isRedFlush = () => props.originalReceiptId != null
+/** 预收款模式：款项类型选 PREPAY 时隐藏应收单分配、总额改为手填 */
+const isPrepay = () => form.receiptType === 'PREPAY'
 // 编辑对象本身的单据方向（loadForEdit 回填）：红冲单（RED）做减法，编辑时不得套用蓝字超收拦截
 const editDocDirection = ref<string | null>(null)
 /** 红冲原单数据（预填来源 + 金额上限提示） */
@@ -125,6 +127,29 @@ const formatAmount = (v: number | null | undefined): string => {
   return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// ===== 核销分配交互增强（2026-10-27 Q1/Q2）=====
+// Q1：已选应收单禁止在其他分配行重复选择 —— 当前行已选的保留可见，其余行已选的剔除出候选。
+const allocOptionsFor = (idx: number) =>
+  receivableOptions.value.filter(
+    (rv) => !allocations.value.some((a, i) => i !== idx && a.receivableId === rv.id),
+  )
+// Q2：选中应收单后默认回填其「未回款余额」；已手填金额（>0）不覆盖。
+const onAllocationReceivableChange = (idx: number) => {
+  const a = allocations.value[idx]
+  if (!a || a.receivableId == null) return
+  const rv = receivableOptions.value.find((r) => r.id === a.receivableId)
+  if (!rv) return
+  const bal = rv.unreceivedAmount == null ? 0 : Number(rv.unreceivedAmount)
+  if (a.amount == null || a.amount === 0) a.amount = Number(bal.toFixed(2))
+}
+// 单行分配金额上限 = 该应收单未回款余额（物理封顶，防止超过）；未选应收单时无限。
+const allocMaxAmount = (idx: number) => {
+  const a = allocations.value[idx]
+  if (!a || a.receivableId == null) return undefined
+  const rv = receivableOptions.value.find((r) => r.id === a.receivableId)
+  return rv?.unreceivedAmount == null ? undefined : Number(rv.unreceivedAmount)
+}
+
 // ===== 附件 =====
 
 const beforeUpload = (file: File) => {
@@ -182,7 +207,8 @@ const handlePreview = (f: FileVO) => {
 const resetForm = () => {
   form.projectId = null
   form.receiptAmount = null
-  form.receiptType = null
+  // 新建蓝字收款单默认「正常收款」（必须走应收单分配）；红冲/编辑走各自回填
+  form.receiptType = 'NORMAL'
   form.receiptDate = null
   attachments.value = []
   allocations.value = []
@@ -196,8 +222,35 @@ const handleSubmit = async () => {
     ElMessage.warning('请选择项目')
     return
   }
-  if (form.receiptAmount == null || Number(form.receiptAmount) <= 0) {
-    ElMessage.warning('请填写大于 0 的收款金额')
+  // 方案A（2026-10-27）：有分配 → 总额=Σ分配（必>0 由分配保证）；无分配=预收 → 总额手填必>0
+  const derivedReceiptAmount = allocations.value.length > 0
+    ? allocatedTotal.value
+    : (form.receiptAmount == null ? null : Number(form.receiptAmount))
+  if (derivedReceiptAmount == null || derivedReceiptAmount <= 0) {
+    ElMessage.warning(allocations.value.length > 0 ? '分配金额合计必须大于 0' : '请填写大于 0 的收款金额')
+    return
+  }
+  if (!form.receiptType) {
+    ElMessage.warning('请选择款项类型')
+    return
+  }
+  // 正常收款必须至少分配一条应收单：总额=Σ分配，无分配则总额无来源；
+  // 预收请改用「预收款」模式（PREPAY，不挂应收单、总额手填）。红冲(RED)不受此限。
+  if (
+    !isRedFlush() &&
+    editDocDirection.value !== 'RED' &&
+    form.receiptType === 'NORMAL' &&
+    allocations.value.length === 0
+  ) {
+    ElMessage.warning('正常收款必须至少选择一条应收单进行核销分配')
+    return
+  }
+  if (!form.receiptDate) {
+    ElMessage.warning('请选择收款日期')
+    return
+  }
+  if (attachments.value.length === 0) {
+    ElMessage.warning('请上传银行回单')
     return
   }
   // 红冲口径（2026-10-25）：金额 ≤ 原单金额（支持部分红冲），后端同校验
@@ -215,7 +268,7 @@ const handleSubmit = async () => {
     if (p && p.contractAmount != null && p.collectedAmount != null) {
       const c = Number(p.contractAmount)
       const cur = Number(p.collectedAmount)
-      const inc = Number(form.receiptAmount)
+      const inc = derivedReceiptAmount
       if (inc + cur > c) {
         ElMessage.warning(
           `收款金额将使累计已收（${formatAmount(cur)}）超过合同金额（${formatAmount(c)}），超出 ${formatAmount(inc + cur - c)}。请核实金额，或先红冲超收部分。`,
@@ -228,19 +281,24 @@ const handleSubmit = async () => {
   const allocs: AllocationItem[] = allocations.value
     .filter((a) => a.receivableId != null && a.amount != null && Number(a.amount) > 0)
     .map((a) => ({ receivableId: a.receivableId, amount: Number(a.amount) }))
-  // 前端口径提示（后端 saveAllocations 同样强制）：Σ 必须 = 收款金额
-  if (allocs.length) {
-    const sum = allocs.reduce((s, a) => s + a.amount, 0)
-    const total = Number(form.receiptAmount)
-    if (Number(sum.toFixed(2)) !== Number(total.toFixed(2))) {
-      ElMessage.warning(`分配总额 ${sum.toFixed(2)} 与收款金额 ${total.toFixed(2)} 不一致，请调整`)
+  // 单行分配不得超出该应收单未回款余额（双保险·前端关口，后端 saveAllocations 强制）：
+  // 红冲单（RED）审批通过是做减法，放行；编辑中的红冲草稿同放行。
+  if (!(isRedFlush() || editDocDirection.value === 'RED')) {
+    const bad = allocs.find((a) => {
+      const rv = receivableOptions.value.find((r) => r.id === a.receivableId)
+      return rv?.unreceivedAmount != null && a.amount > Number(rv.unreceivedAmount)
+    })
+    if (bad) {
+      const rv = receivableOptions.value.find((r) => r.id === bad.receivableId)
+      ElMessage.warning(`分配金额超出应收单未回款余额：${rv?.receivableNo ?? ''}（未回款 ${formatAmount(rv?.unreceivedAmount)}），请调整`)
       return
     }
   }
+  // 总额=Σ分配（有分配时只读自动算），Σ=金额一致性由前端分配与后端 saveAllocations 双重保证，无需再校验
   // 日期控件返回 'YYYY-MM-DD'，后端 LocalDate 可直接解析；清空时传 null
   const payload: ReceiptRequest = {
     projectId: form.projectId,
-    receiptAmount: Number(form.receiptAmount),
+    receiptAmount: derivedReceiptAmount,
     receiptType: form.receiptType || null,
     receiptDate: form.receiptDate || null,
     attachmentFileIds: attachments.value.map((f) => f.id),
@@ -284,7 +342,9 @@ const loadForEdit = async (id: number, asRedFlush = false) => {
     editDocDirection.value = asRedFlush ? null : (d.docDirection ?? null)
     form.projectId = d.projectId ?? null
     form.receiptAmount = asRedFlush ? null : (d.receiptAmount ?? null)
-    form.receiptType = d.receiptType ?? null
+    // 红冲模式：款项类型走 receipt_red_type 字典，默认退货退款，不继承原单蓝字类型
+    // （否则红冲单会被标成"正常收款"，与 docDirection=RED 自相矛盾）
+    form.receiptType = asRedFlush ? 'REFUND' : (d.receiptType ?? null)
     form.receiptDate = d.receiptDate ?? null
     attachments.value = []
     await loadAttachments(id)
@@ -328,13 +388,38 @@ watch(
     }
   },
 )
+
+// 款项类型 ↔ 分配状态强绑定（2026-10-27）：
+// NORMAL(正常收款) ⇄ PREPAY(预收款) 互斥。切到任一类型时，分配明细作废并清空：
+// - NORMAL：隐藏预收语义、总额=Σ分配(只读)，需重新选应收单；
+// - PREPAY：放开总额手填，不挂应收单。
+// 总额不清空（保留切换前的金额 / 编辑回填金额，交给 NORMAL 的只读Σ或 PREPAY 的手填接管），
+// 避免「正常收款却带空分配=预收」或「预收款却填了分配=只读」的语义打架。
+watch(
+  () => form.receiptType,
+  (t, prev) => {
+    if (t === prev) return
+    allocations.value = []
+  },
+)
+
+// 方案A（2026-10-27）：有核销分配时，收款总额强制 = Σ分配（只读）；无分配（预收）保留手填
+watch(
+  allocatedTotal,
+  (v) => {
+    if (allocations.value.length > 0) {
+      form.receiptAmount = v == null ? null : Number(v.toFixed(2))
+    }
+  },
+  { immediate: false },
+)
 </script>
 
 <template>
   <el-dialog
     v-model="visible"
     :title="isRedFlush() ? '红冲收款单' : isEdit() ? '编辑回款单' : '新建回款单'"
-    width="640px"
+    width="700px"
     top="7vh"
   >
     <div class="detail-scroll">
@@ -378,20 +463,24 @@ watch(
         <el-form-item label="收款金额" required>
           <el-input-number
             v-model="form.receiptAmount"
+            :disabled="form.receiptType === 'NORMAL'"
             :min="0"
             :precision="2"
             controls-position="right"
             class="amount-left"
             style="width: 100%"
           />
+          <div class="muted" style="margin-top: 4px">
+            正常收款：金额按应收单分配自动合计（只读）；切到「预收款」：隐藏分配、可手动填写金额。
+          </div>
         </el-form-item>
 
-        <!-- 核销分配（V65 双向拆分）：选填，把收款金额拆到具体应收单（可拆多张）；
-             不填 = 预收，系统只记项目已收。Σ 必须 = 收款金额（前端提示，后端强制）。 -->
-        <el-form-item label="核销分配">
+        <!-- 核销分配（V65 双向拆分）：仅「正常收款」显示；预收款(PREPAY)隐藏且不挂应收单。
+             把收款金额拆到具体应收单（可拆多张），Σ 必须 = 收款金额（前端提示，后端强制）。 -->
+        <el-form-item label="核销分配" v-if="!isPrepay()">
           <div class="alloc-box">
             <div class="alloc-hint muted">
-              选填：一笔收款可拆到多张应收单（分期核销）；不填 = 预收，之后再核销。
+              正常收款需将金额分配到应收单（可拆多张）；同一应收单不可重复选；选完自动回填未回款余额，金额不得超出该余额。切到「预收款」将隐藏本区。
             </div>
             <div v-for="(a, idx) in allocations" :key="idx" class="alloc-row">
               <el-select
@@ -400,9 +489,10 @@ watch(
                 placeholder="选择应收单"
                 style="flex: 1 1 0; min-width: 0"
                 :loading="loadingReceivables"
+                @change="onAllocationReceivableChange(idx)"
               >
                 <el-option
-                  v-for="rv in receivableOptions"
+                  v-for="rv in allocOptionsFor(idx)"
                   :key="rv.id"
                   :label="`${rv.receivableNo}（未回款 ${formatAmount(rv.unreceivedAmount)}）`"
                   :value="rv.id"
@@ -411,6 +501,7 @@ watch(
               <el-input-number
                 v-model="a.amount"
                 :min="0"
+                :max="allocMaxAmount(idx)"
                 :precision="2"
                 controls-position="right"
                 placeholder="金额"
@@ -434,16 +525,16 @@ watch(
           </div>
         </el-form-item>
 
-        <el-form-item label="款项类型">
-          <DictSelect
-            v-model="form.receiptType"
-            type-code="receipt_type"
-            placeholder="选择款项类型"
-            class="w-full"
-          />
-        </el-form-item>
+            <el-form-item label="款项类型" required>
+              <DictSelect
+                v-model="form.receiptType"
+                :type-code="isRedFlush() || editDocDirection === 'RED' ? 'receipt_red_type' : 'receipt_type'"
+                :placeholder="isRedFlush() || editDocDirection === 'RED' ? '选择红冲款项类型' : '选择款项类型'"
+                class="w-full"
+              />
+            </el-form-item>
 
-        <el-form-item label="收款日期">
+        <el-form-item label="收款日期" required>
           <el-date-picker
             v-model="form.receiptDate"
             type="date"
@@ -453,7 +544,7 @@ watch(
           />
         </el-form-item>
 
-        <el-form-item label="银行回单">
+        <el-form-item label="银行回单" required>
           <div class="attach-box">
             <el-upload
               :show-file-list="false"

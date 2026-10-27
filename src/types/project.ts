@@ -49,6 +49,8 @@ export interface ProjectVO {
   invoicedAmount: number | null
   /** 应收金额合计（Σ 有效应收单 receivable_amount，V65） */
   receivableAmount: number | null
+  /** 是否允许回款前开出发票（V77，票款勾稽开关；true=允许默认，false=强制票款勾稽） */
+  allowInvoiceBeforeReceipt?: boolean | null
   /**
    * 累计已收货金额（Σ fin_shipment.received_amount）——⚠️ V65 起废弃口径（恒 0），
    * 保留仅为兼容；页面展示请用 collectedAmount
@@ -95,6 +97,8 @@ export interface ProjectFormData {
   customerName?: string
   salesManagerId?: number
   contractAmount?: number
+  /** 是否允许回款前开出发票（V77，票款勾稽开关；true=允许默认，false=强制票款勾稽） */
+  allowInvoiceBeforeReceipt?: boolean
   /** 货物明细（方案2：立项带行） */
   items?: ProjectItemForm[]
 }

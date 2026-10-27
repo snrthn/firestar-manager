@@ -88,6 +88,7 @@ const emptyForm = (): ProjectFormData => ({
   customerName: '',
   salesManagerId: undefined,
   contractAmount: undefined,
+  allowInvoiceBeforeReceipt: true,
   items: [],
 })
 
@@ -155,6 +156,8 @@ const openEdit = async (row: ProjectVO) => {
       customerName: detail.customerName ?? undefined,
       salesManagerId: detail.salesManagerId ?? undefined,
       contractAmount: detail.contractAmount ?? undefined,
+      // V77：票款勾稽开关回填（后端缺省视为允许，故空时按 true 显示）
+      allowInvoiceBeforeReceipt: detail.allowInvoiceBeforeReceipt ?? true,
       // 方案2：立项带行 —— 编辑回填货物明细（detail.items → 表单行）
       items: (detail.items ?? []).map((it) => ({
         itemName: it.itemName ?? '',
@@ -514,7 +517,7 @@ onMounted(loadList)
        明细表长时不至于把 footer 顶出屏幕 -->
   <el-dialog v-model="dialogVisible" :title="dialogTitle" width="1000px" top="7vh">
     <div class="dialog-scroll">
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" @submit.prevent>
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="110px" @submit.prevent>
       <!-- 顶部 4 项两列布局（2026-10-24 虎哥）：CSS grid 而非 el-row/el-col，
            少一层组件注册依赖；列间距 24px 与 EP 表单行距对齐 -->
       <div class="form-grid">
@@ -555,6 +558,15 @@ onMounted(loadList)
         <el-form-item label="合同金额">
           <el-input-number v-model="form.contractAmount" :min="0" :precision="2" :step="1000"
                            class="amount-left" controls-position="right" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="允许回款前开票">
+          <el-switch
+            v-model="form.allowInvoiceBeforeReceipt"
+            active-text="允许"
+            inactive-text="不允许"
+            inline-prompt
+          />
+          <span class="muted" style="margin-left: 8px">关 = 强制票款勾稽：开票额不得超已回款额</span>
         </el-form-item>
       </div>
 

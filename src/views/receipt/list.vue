@@ -11,6 +11,7 @@ import type { ReceiptVO } from '@/types/receipt'
 import type { ProjectVO } from '@/types/project'
 import DictSelect from '@/components/DictSelect.vue'
 import { useDictLabels } from '@/composables/useDict'
+import { useReceiptTypeLabels } from '@/composables/useReceiptType'
 import { formatDate, formatDateTime } from '@/utils/datetime'
 import ReceiptCreateDialog from './ReceiptCreateDialog.vue'
 import ReceiptDetailDialog from './ReceiptDetailDialog.vue'
@@ -85,7 +86,7 @@ const formatAmount = (v: number | null | undefined): string => {
 
 // 字典翻译（收款状态 / 款项类型；字典维护页改色即生效）
 const { label: statusLabel, style: statusStyle } = useDictLabels('approval_status')
-const { label: typeLabel, style: typeStyle } = useDictLabels('receipt_type')
+const { label: typeLabel, style: typeStyle } = useReceiptTypeLabels()
 
 // ===== 弹窗 =====
 const createVisible = ref(false)

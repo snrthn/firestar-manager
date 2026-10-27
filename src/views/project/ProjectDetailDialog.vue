@@ -183,6 +183,9 @@ const itemsTotal = computed(() =>
             </el-tooltip>
           </el-descriptions-item>
           <el-descriptions-item label="累计开票">{{ formatAmount(detail.invoicedAmount) }}</el-descriptions-item>
+          <el-descriptions-item label="回款前开票">
+            {{ detail.allowInvoiceBeforeReceipt === false ? '不允许（强制票款勾稽）' : '允许' }}
+          </el-descriptions-item>
           <el-descriptions-item label="应收合计">{{ formatAmount(detail.receivableAmount) }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.contractSignedAt" label="签约时间">
             {{ formatDateTime(detail.contractSignedAt) }}
