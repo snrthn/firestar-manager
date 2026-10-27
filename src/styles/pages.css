@@ -41,12 +41,30 @@
 
 /* 日期控件宽度收口（虎哥 2026-10-16：上面三条漏了 el-date-editor —— daterange
    掉回 EP 默认 360px，窄屏下查询区整行换行，观感割裂）。
-   单日期 240px、日期区间 300px：比默认收一截，又保留「至」分隔符的呼吸感。 */
-.query-bar .el-date-editor {
-  width: 240px;
-}
+   2026-10-28 再收一档：单日期 240px / 区间 300px → 全部 200px，与输入框、下拉完全一致。
+   日期区间压到 200px 后「至」分隔符两侧各剩约 80px，靠 el-range-input 字号
+   与 padding 微调兜底（见下一条），避免日期被挤成省略号。 */
+.query-bar .el-date-editor,
 .query-bar .el-date-editor--daterange {
-  width: 300px;
+  width: 200px;
+}
+
+/* 区间输入在 200px 内的可读性兜底：缩字号 + 收内边距，给两个日期各留足 10 字符位。 */
+.query-bar .el-date-editor--daterange .el-range-input {
+  font-size: 12px;
+}
+.query-bar .el-date-editor--daterange .el-range-separator {
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+/* 查询区标签定宽右对齐（虎哥 2026-10-28：label 字数 2~4 字不等，控件起始位
+   参差不齐——「项目」贴着框、「应收单号」顶出去一截，一列扫下来对不齐）。
+   取 72px = 4 个汉字 + 冒号 + 内边距的安全宽度：短标签补齐到同一列，
+   个别超 4 字的标签由 min-width 自然撑开（宁可那一行长一点，也不截断文字）。 */
+.query-bar .el-form-item__label {
+  min-width: 72px;
+  justify-content: flex-end;
 }
 
 /* 金额/数值输入内容左对齐（el-input-number 默认居中偏右；

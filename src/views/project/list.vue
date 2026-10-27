@@ -19,11 +19,16 @@ import type { CustomerOptionVO } from '@/types/customer'
 import type { GoodsOptionVO } from '@/types/goods'
 import { useDictLabels } from '@/composables/useDict'
 
-// ===== 查询条件 =====
+// ===== 查询条件（2026-10-28 补齐，口径对齐核销台账） =====
+// 项目编号 / 项目名称 / 客户名称 模糊；审批状态 / 合同状态 / 销售经理 精确；创建时间闭区间
 const query = reactive({
   projectNo: '',
   projectName: '',
+  customerName: '',
   approvalStatus: '',
+  contractStatus: '',
+  salesManagerId: null as number | null,
+  dateRange: null as [string, string] | null,
 })
 
 const handleQuery = () => {
@@ -34,7 +39,11 @@ const handleQuery = () => {
 const resetQuery = () => {
   query.projectNo = ''
   query.projectName = ''
+  query.customerName = ''
   query.approvalStatus = ''
+  query.contractStatus = ''
+  query.salesManagerId = null
+  query.dateRange = null
   pageNum.value = 1
   loadList()
 }
@@ -50,9 +59,14 @@ const loadList = async () => {
   loading.value = true
   try {
     const page = await projectPage(pageNum.value, pageSize.value, {
-      projectNo: query.projectNo || undefined,
-      projectName: query.projectName || undefined,
+      projectNo: query.projectNo.trim() || undefined,
+      projectName: query.projectName.trim() || undefined,
+      customerName: query.customerName.trim() || undefined,
       approvalStatus: query.approvalStatus || undefined,
+      contractStatus: query.contractStatus || undefined,
+      salesManagerId: query.salesManagerId ?? undefined,
+      dateFrom: query.dateRange?.[0],
+      dateTo: query.dateRange?.[1],
     })
     list.value = page.records
     total.value = page.total
@@ -370,7 +384,12 @@ const signInfo = (row: ProjectVO): string => {
 // useDictLabels 兜底：空值 '—'、未命中显示原值、style 缺失调用方兜 'info'
 const { label: contractStatusLabel, style: contractStatusStyle } = useDictLabels('project_contract_status')
 
-onMounted(loadList)
+// 查询区「销售经理」下拉需要用户选项，进页面就拉一次（开窗时的懒加载 ensureUserOptions
+// 只服务表单，查询区不等开窗）；列表与下拉并行加载，不串行阻塞。
+onMounted(() => {
+  ensureUserOptions()
+  loadList()
+})
 </script>
 
 <template>
@@ -383,9 +402,39 @@ onMounted(loadList)
       <el-form-item label="项目名称">
         <el-input v-model="query.projectName" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
+      <el-form-item label="客户名称">
+        <el-input v-model="query.customerName" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
+      </el-form-item>
       <el-form-item label="审批状态">
         <!-- 宽度走 pages.css 的 .query-bar 统一规范（200px），不再内联绕过 -->
         <DictSelect v-model="query.approvalStatus" type-code="approval_status" placeholder="全部" />
+      </el-form-item>
+      <el-form-item label="合同状态">
+        <DictSelect
+          v-model="query.contractStatus"
+          type-code="project_contract_status"
+          placeholder="全部"
+        />
+      </el-form-item>
+      <el-form-item label="销售经理">
+        <el-select v-model="query.salesManagerId" filterable clearable placeholder="全部">
+          <el-option
+            v-for="u in userOptions"
+            :key="u.id"
+            :label="u.nickname"
+            :value="u.id"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="创建时间">
+        <el-date-picker
+          v-model="query.dateRange"
+          type="daterange"
+          range-separator="~"
+          start-placeholder="开始"
+          end-placeholder="结束"
+          value-format="YYYY-MM-DD"
+        />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>

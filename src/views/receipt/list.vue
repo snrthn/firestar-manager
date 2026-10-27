@@ -16,9 +16,20 @@ import { formatDate, formatDateTime } from '@/utils/datetime'
 import ReceiptCreateDialog from './ReceiptCreateDialog.vue'
 import ReceiptDetailDialog from './ReceiptDetailDialog.vue'
 
-// 查询条件：后端 ReceiptController.page 只声明 projectId / status 两个业务参数
-// （@RequestParam 未声明的键会被忽略），故这里不做单号/项目名模糊查询，避免「看起来能搜其实无效」。
-const query = reactive({ projectId: null as number | null, status: '' })
+// 查询条件（2026-10-28 补齐，口径对齐核销台账）：项目 / 收款单号 / 项目名称 /
+// 款项类型 / 单据方向 / 收款状态 / 收款日期区间。后端 ReceiptController.page 已声明
+// 全部参数（未声明的键会被忽略）——按需传即可。
+// 注：款项类型选 receipt_type（蓝字：正常收款/预收款）；红冲类型归 receipt_red_type，
+//     要筛红冲单用「单据方向 = 红字」，两个维度互不干扰。
+const query = reactive({
+  projectId: null as number | null,
+  receiptNo: '',
+  projectName: '',
+  receiptType: '',
+  docDirection: '',
+  status: '',
+  dateRange: null as [string, string] | null,
+})
 
 const handleQuery = () => {
   pageNum.value = 1
@@ -26,7 +37,12 @@ const handleQuery = () => {
 }
 const resetQuery = () => {
   query.projectId = null
+  query.receiptNo = ''
+  query.projectName = ''
+  query.receiptType = ''
+  query.docDirection = ''
   query.status = ''
+  query.dateRange = null
   pageNum.value = 1
   loadList()
 }
@@ -43,7 +59,13 @@ const loadList = async () => {
   try {
     const page = await receiptPage(pageNum.value, pageSize.value, {
       projectId: query.projectId ?? undefined,
+      receiptNo: query.receiptNo.trim() || undefined,
+      projectName: query.projectName.trim() || undefined,
+      receiptType: query.receiptType || undefined,
+      docDirection: query.docDirection || undefined,
       status: query.status || undefined,
+      dateFrom: query.dateRange?.[0],
+      dateTo: query.dateRange?.[1],
     })
     list.value = page.records
     total.value = page.total
@@ -135,7 +157,7 @@ onMounted(() => {
   <el-card shadow="never">
     <!-- 查询区 -->
     <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
-      <el-form-item label="项目">
+      <el-form-item label="关联项目">
         <el-select
           v-model="query.projectId"
           filterable
@@ -150,8 +172,40 @@ onMounted(() => {
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="收款单号">
+        <el-input
+          v-model="query.receiptNo"
+          placeholder="模糊匹配"
+          clearable
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="项目名称">
+        <el-input
+          v-model="query.projectName"
+          placeholder="模糊匹配"
+          clearable
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="款项类型">
+        <DictSelect v-model="query.receiptType" type-code="receipt_type" placeholder="全部" />
+      </el-form-item>
+      <el-form-item label="单据方向">
+        <DictSelect v-model="query.docDirection" type-code="doc_direction" placeholder="全部" />
+      </el-form-item>
       <el-form-item label="收款状态">
         <DictSelect v-model="query.status" type-code="approval_status" placeholder="全部" />
+      </el-form-item>
+      <el-form-item label="收款日期">
+        <el-date-picker
+          v-model="query.dateRange"
+          type="daterange"
+          range-separator="~"
+          start-placeholder="开始"
+          end-placeholder="结束"
+          value-format="YYYY-MM-DD"
+        />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>

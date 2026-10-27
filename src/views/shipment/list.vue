@@ -13,8 +13,18 @@ import { formatDateTime } from '@/utils/datetime'
 import ShipmentCreateDialog from './ShipmentCreateDialog.vue'
 import ShipmentDetailDialog from './ShipmentDetailDialog.vue'
 
-// 查询条件（批次号 / 项目名 模糊、状态精确；后端 /shipment/page 对齐）
-const query = reactive({ batchNo: '', projectName: '', status: '' })
+// 查询条件（2026-10-28 修正 + 补齐，口径对齐核销台账）：批次号 / 项目编号 / 项目名称
+// 模糊、发货状态 / 审批状态精确、发货日期区间。
+// ⚠️ 此前后端只声明 projectNo 却把实现接到 .like(batch_no)，「批次号」框是死查询、
+//    「项目编号」也查不到；现后端新增真正的 batchNo 参数，两个框都回归本义。
+const query = reactive({
+  batchNo: '',
+  projectNo: '',
+  projectName: '',
+  status: '',
+  approvalStatus: '',
+  dateRange: null as [string, string] | null,
+})
 
 const handleQuery = () => {
   pageNum.value = 1
@@ -22,8 +32,11 @@ const handleQuery = () => {
 }
 const resetQuery = () => {
   query.batchNo = ''
+  query.projectNo = ''
   query.projectName = ''
   query.status = ''
+  query.approvalStatus = ''
+  query.dateRange = null
   pageNum.value = 1
   loadList()
 }
@@ -39,9 +52,13 @@ const loadList = async () => {
   loading.value = true
   try {
     const page = await shipmentPage(pageNum.value, pageSize.value, {
-      batchNo: query.batchNo || undefined,
-      projectName: query.projectName || undefined,
+      batchNo: query.batchNo.trim() || undefined,
+      projectNo: query.projectNo.trim() || undefined,
+      projectName: query.projectName.trim() || undefined,
       status: query.status || undefined,
+      approvalStatus: query.approvalStatus || undefined,
+      dateFrom: query.dateRange?.[0],
+      dateTo: query.dateRange?.[1],
     })
     list.value = page.records
     total.value = page.total
@@ -116,11 +133,27 @@ onMounted(() => {
       <el-form-item label="批次号">
         <el-input v-model="query.batchNo" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
+      <el-form-item label="项目编号">
+        <el-input v-model="query.projectNo" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
+      </el-form-item>
       <el-form-item label="项目名称">
         <el-input v-model="query.projectName" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="发货状态">
         <DictSelect v-model="query.status" type-code="shipment_status" placeholder="全部" />
+      </el-form-item>
+      <el-form-item label="审批状态">
+        <DictSelect v-model="query.approvalStatus" type-code="approval_status" placeholder="全部" />
+      </el-form-item>
+      <el-form-item label="发货日期">
+        <el-date-picker
+          v-model="query.dateRange"
+          type="daterange"
+          range-separator="~"
+          start-placeholder="开始"
+          end-placeholder="结束"
+          value-format="YYYY-MM-DD"
+        />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>

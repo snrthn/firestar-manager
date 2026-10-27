@@ -197,7 +197,7 @@ onMounted(() => {
       <!-- ===== 核销台账 ===== -->
       <el-tab-pane label="核销台账" name="ledger">
         <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
-          <el-form-item label="项目">
+          <el-form-item label="关联项目">
             <el-select v-model="query.projectId" filterable clearable placeholder="全部项目">
               <el-option
                 v-for="p in projectOptions"
@@ -321,7 +321,7 @@ onMounted(() => {
       <!-- ===== 差异池 ===== -->
       <el-tab-pane label="差异池" name="pool">
         <el-form :inline="true" class="query-bar" @submit.prevent>
-          <el-form-item label="项目">
+          <el-form-item label="关联项目">
             <el-select v-model="query.projectId" filterable clearable placeholder="全部项目" @change="loadPool">
               <el-option
                 v-for="p in projectOptions"

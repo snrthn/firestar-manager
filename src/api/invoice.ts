@@ -8,13 +8,24 @@ import type { TimelineNodeVO } from '@/types/project'
 /**
  * 分页发票列表。
  *
- * 后端 InvoiceController.page 只声明 pageNum/pageSize/projectId/receivableId/status，
- * 其余键会被忽略（@RequestParam 未声明）——故这里不传 invoiceNo/projectName 等模糊条件。
+ * 2026-10-28 补齐查询条件（口径对齐核销台账）：projectId/receivableId/status/invoiceType/
+ * docDirection 精确、invoiceNo / projectName 模糊、dateFrom~dateTo 按开票日期闭区间。
+ * 后端 InvoiceController.page 已声明全部参数，未声明的键会被忽略——按需传即可。
  */
 export function invoicePage(
   pageNum = 1,
   pageSize = 10,
-  params: { projectId?: number; receivableId?: number; status?: string } = {},
+  params: {
+    projectId?: number
+    receivableId?: number
+    status?: string
+    invoiceNo?: string
+    projectName?: string
+    invoiceType?: string
+    docDirection?: string
+    dateFrom?: string
+    dateTo?: string
+  } = {},
 ) {
   return request
     .get<ApiResult<InvoicePageVO>>('/invoice/page', { params: { pageNum, pageSize, ...params } })

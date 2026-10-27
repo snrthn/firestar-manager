@@ -16,10 +16,15 @@ const createVisible = ref(false)
 const detailVisible = ref(false)
 const currentId = ref<number | null>(null)
 
+// 查询条件（2026-10-28 补齐，口径对齐核销台账）：项目编号 / 项目名称 / 退货单号 模糊、
+// 审批状态 / 执行状态精确、申请时间区间
 const query = reactive({
   projectNo: '',
   projectName: '',
+  returnNo: '',
   status: '',
+  executeStatus: '',
+  dateRange: null as [string, string] | null,
 })
 
 const loading = ref(false)
@@ -40,7 +45,11 @@ const load = async () => {
     const page = await returnPage(pageNum.value, pageSize.value, {
       projectNo: query.projectNo.trim() || undefined,
       projectName: query.projectName.trim() || undefined,
+      returnNo: query.returnNo.trim() || undefined,
       status: query.status || undefined,
+      executeStatus: query.executeStatus || undefined,
+      dateFrom: query.dateRange?.[0],
+      dateTo: query.dateRange?.[1],
     })
     list.value = page.records
     total.value = page.total
@@ -58,7 +67,10 @@ const handleQuery = () => {
 const handleReset = () => {
   query.projectNo = ''
   query.projectName = ''
+  query.returnNo = ''
   query.status = ''
+  query.executeStatus = ''
+  query.dateRange = null
   handleQuery()
 }
 
@@ -107,12 +119,38 @@ onMounted(load)
       <el-form-item label="项目名称">
         <el-input v-model="query.projectName" placeholder="支持模糊" clearable />
       </el-form-item>
+      <el-form-item label="退货单号">
+        <el-input
+          v-model="query.returnNo"
+          placeholder="支持模糊"
+          clearable
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
       <el-form-item label="审批状态">
         <DictSelect
           v-model="query.status"
           type-code="approval_status"
           placeholder="全部"
           clearable
+        />
+      </el-form-item>
+      <el-form-item label="执行状态">
+        <DictSelect
+          v-model="query.executeStatus"
+          type-code="return_execute_status"
+          placeholder="全部"
+          clearable
+        />
+      </el-form-item>
+      <el-form-item label="申请时间">
+        <el-date-picker
+          v-model="query.dateRange"
+          type="daterange"
+          range-separator="~"
+          start-placeholder="开始"
+          end-placeholder="结束"
+          value-format="YYYY-MM-DD"
         />
       </el-form-item>
       <el-form-item>

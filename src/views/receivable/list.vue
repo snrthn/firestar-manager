@@ -16,9 +16,17 @@ import ReceivableDetailDialog from './ReceivableDetailDialog.vue'
 // 应收管理列表页（只读）。
 // 应收单由发货「客户已收货」时点自动生成，1 发货 = 1 应收单，后端不暴露写接口，
 // 故本页不提供新建/编辑，只做列表 + 详情。
-// 查询条件：后端 ReceivableController.page 只声明 projectId / status
-// （@RequestParam 未声明的键会被忽略），不做单号模糊查询。
-const query = reactive({ projectId: null as number | null, status: '' })
+// 查询条件（2026-10-28 补齐，口径对齐核销台账）：项目 / 应收单号 / 项目名称 /
+// 来源类型 / 应收状态 / 应收日期区间。后端 ReceivableController.page 已声明全部参数，
+// 未声明的键会被忽略（@RequestParam 未声明）——按需传即可。
+const query = reactive({
+  projectId: null as number | null,
+  receivableNo: '',
+  projectName: '',
+  sourceType: '',
+  status: '',
+  dateRange: null as [string, string] | null,
+})
 
 const handleQuery = () => {
   pageNum.value = 1
@@ -26,7 +34,11 @@ const handleQuery = () => {
 }
 const resetQuery = () => {
   query.projectId = null
+  query.receivableNo = ''
+  query.projectName = ''
+  query.sourceType = ''
   query.status = ''
+  query.dateRange = null
   pageNum.value = 1
   loadList()
 }
@@ -42,7 +54,12 @@ const loadList = async () => {
   try {
     const page = await receivablePage(pageNum.value, pageSize.value, {
       projectId: query.projectId ?? undefined,
+      receivableNo: query.receivableNo.trim() || undefined,
+      projectName: query.projectName.trim() || undefined,
+      sourceType: query.sourceType || undefined,
       status: query.status || undefined,
+      dateFrom: query.dateRange?.[0],
+      dateTo: query.dateRange?.[1],
     })
     list.value = page.records
     total.value = page.total
@@ -93,7 +110,7 @@ onMounted(() => {
 <template>
   <el-card shadow="never">
     <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
-      <el-form-item label="项目">
+      <el-form-item label="关联项目">
         <el-select
           v-model="query.projectId"
           filterable
@@ -108,8 +125,37 @@ onMounted(() => {
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="应收单号">
+        <el-input
+          v-model="query.receivableNo"
+          placeholder="模糊匹配"
+          clearable
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="项目名称">
+        <el-input
+          v-model="query.projectName"
+          placeholder="模糊匹配"
+          clearable
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="来源类型">
+        <DictSelect v-model="query.sourceType" type-code="receivable_source" placeholder="全部" />
+      </el-form-item>
       <el-form-item label="应收状态">
         <DictSelect v-model="query.status" type-code="receivable_status" placeholder="全部" />
+      </el-form-item>
+      <el-form-item label="应收日期">
+        <el-date-picker
+          v-model="query.dateRange"
+          type="daterange"
+          range-separator="~"
+          start-placeholder="开始"
+          end-placeholder="结束"
+          value-format="YYYY-MM-DD"
+        />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>

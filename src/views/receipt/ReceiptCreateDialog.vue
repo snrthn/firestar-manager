@@ -63,9 +63,28 @@ const uploading = ref(false)
 // 每行 ≤ 该应收单未回款余额（后端强制，前端只展示余额供参考）。
 const receivableOptions = ref<ReceivableVO[]>([])
 const loadingReceivables = ref(false)
-/** 分配行 + 自动填充标记：autoBal = 上次由系统回填的余额，用于判断金额是否被用户手改过 */
-type AllocationRow = AllocationItem & { autoBal?: number | null }
+/**
+ * 分配行 + 自动填充标记。
+ *
+ * - `autoBal` 最近一次由系统回填的余额（展示/调试用）；
+ * - `userEdited` 金额是否被**用户手动**改过（el-input-number 的 @change 只由用户操作触发，
+ *   程序化改 v-model 不会触发），为 true 时换应收单不再覆盖手填值。
+ *
+ * ⚠️ 2026-10-28 二次修复：此前用「金额是否等于 autoBal」反推用户有没有手改，在编辑态
+ *    恒不成立 —— 后端 unreceivedAmount 是**已扣掉本单占用**的余额（ReceiptServiceImpl
+ *    核销时 subtract(amount)），本行已存 600 时该单余额只剩 400，金额 ≠ 余额 → 被判成
+ *    "手改过" → 换应收单金额永远不刷新。改用显式布尔标记，新增/编辑两态判据统一。
+ */
+type AllocationRow = AllocationItem & { autoBal?: number | null; userEdited?: boolean }
 const allocations = ref<AllocationRow[]>([])
+
+/**
+ * 编辑态打开时该单**本来就没有分配行**（V65 之前「主应收单独享」的历史单，后端
+ * allocationVOs 查不到 write_off 返回空数组）。此时不能因为分配行是空的就把金额清零，
+ * 否则打开编辑再保存 = 把历史单金额改成 0。用户一旦自己增删过分配行就置 false，
+ * 之后删光才按新增口径清零。
+ */
+const allocLoadedEmpty = ref(false)
 
 const allocatedTotal = computed(() =>
   allocations.value.reduce((s, a) => s + (a.amount == null ? 0 : Number(a.amount)), 0),
@@ -94,11 +113,15 @@ const addAllocation = () => {
     receivableId: null as unknown as number,
     amount: null as unknown as number,
     autoBal: null,
+    userEdited: false,
   })
+  // 用户主动加行 → 解除「历史单无分配行」保护，之后删光按新增口径清零
+  allocLoadedEmpty.value = false
 }
 
 const removeAllocation = (idx: number) => {
   allocations.value.splice(idx, 1)
+  allocLoadedEmpty.value = false
 }
 
 const form = reactive<{
@@ -146,27 +169,46 @@ const onAllocationReceivableChange = (idx: number) => {
   const rv = receivableOptions.value.find((r) => r.id === a.receivableId)
   if (!rv) return
   const bal = Number((rv.unreceivedAmount == null ? 0 : Number(rv.unreceivedAmount)).toFixed(2))
-  // 换单也要刷新金额（2026-10-28 修复）：原判据只在金额为空/0 时回填，首次填满后金额 >0，
-  // 再换单就永远不更新。改为「金额是否仍是上次系统回填的值」来判断用户有没有手改过：
-  // - 未手改（空 / 0 / 等于上次回填值）→ 跟随新应收单余额刷新；
-  // - 已手改（金额 ≠ 上次回填值）→ 尊重手填值，并解除自动回填标记。
-  const untouched =
-    a.amount == null ||
-    Number(a.amount) === 0 ||
-    (a.autoBal != null && Number(a.amount) === a.autoBal)
+  // 换单即刷新（新增/编辑同口径，2026-10-28 二次修复）：
+  // - 用户没手改过金额（空 / 0 / 上次由系统填的）→ 跟随新应收单的未回款余额刷新；
+  // - 用户手改过（userEdited）→ 尊重手填值，并解除自动回填标记。
+  // 用显式布尔标记而非「金额 == 余额」反推：编辑态余额已被本单占用扣减，反推恒判为手改。
+  const untouched = !a.userEdited || a.amount == null || Number(a.amount) === 0
   if (untouched) {
     a.amount = bal
     a.autoBal = bal
+    a.userEdited = false
   } else {
     a.autoBal = null
   }
+  allocLoadedEmpty.value = false
+}
+
+/** 用户手动改金额：el-input-number 的 change 只在用户交互时 emit（程序改 v-model 不触发） */
+const onAllocationAmountChange = (idx: number) => {
+  const a = allocations.value[idx]
+  if (!a) return
+  a.userEdited = true
+  a.autoBal = null
 }
 // 单行分配金额上限 = 该应收单未回款余额（物理封顶，防止超过）；未选应收单时无限。
+// ⚠️ 编辑态兜底：余额已扣掉本单占用，直接拿它当上限会把本行已存金额压掉（EP input-number
+//    对超限的 modelValue 会钳住显示值，出现「显示 400 / 提交 600」）。故上限取
+//    max(余额, 当前值)，保证已存金额永远放得下；新增态当前值恒 ≤ 余额，等价原逻辑。
 const allocMaxAmount = (idx: number) => {
   const a = allocations.value[idx]
   if (!a || a.receivableId == null) return undefined
   const rv = receivableOptions.value.find((r) => r.id === a.receivableId)
-  return rv?.unreceivedAmount == null ? undefined : Number(rv.unreceivedAmount)
+  if (rv?.unreceivedAmount == null) return undefined
+  const bal = Number(rv.unreceivedAmount)
+  const cur = a.amount == null ? 0 : Number(a.amount)
+  return Math.max(bal, cur)
+}
+/** 某应收单的未回款余额（编辑回填时给分配行打 autoBal 标记用；查不到返回 null） */
+const balanceOfReceivable = (receivableId: number | null | undefined): number | null => {
+  if (receivableId == null) return null
+  const rv = receivableOptions.value.find((r) => r.id === receivableId)
+  return rv?.unreceivedAmount == null ? null : Number(Number(rv.unreceivedAmount).toFixed(2))
 }
 
 // ===== 附件 =====
@@ -231,6 +273,7 @@ const resetForm = () => {
   form.receiptDate = null
   attachments.value = []
   allocations.value = []
+  allocLoadedEmpty.value = false
   receivableOptions.value = []
   redOriginal.value = null
   editDocDirection.value = null
@@ -373,11 +416,22 @@ const loadForEdit = async (id: number, asRedFlush = false) => {
     await loadAttachments(id)
     // 等 projectId 的 watch 先跑（会清空 allocations 并加载应收单），再回填，
     // 否则回填值会被 watch 的清空动作覆盖
+    // ⚠️ 2026-10-28 修复：watch 里的 loadReceivables 是异步的，await nextTick() 只等一个
+    // 微任务、等不到 HTTP 返回 → 下拉此时还是空的，autoBal 恒为 undefined，
+    // 「金额是否仍等于系统回填值」的判据在编辑态永远不成立 → 换应收单金额不刷新。
+    // 这里显式 await 一次再回填，并按当前应收单余额给每行打上 autoBal 标记。
     await nextTick()
-    allocations.value = (d.allocations || []).map((a) => ({
+    if (d.projectId != null) await loadReceivables(d.projectId)
+    const loaded = d.allocations || []
+    // 编辑态打开即视为「系统填的」，用户没手改过 → 之后换应收单会跟随余额刷新（与新增一致）
+    allocations.value = loaded.map((a) => ({
       receivableId: a.receivableId,
       amount: a.amount,
+      autoBal: balanceOfReceivable(a.receivableId),
+      userEdited: false,
     }))
+    // V65 之前的历史单本来就没有分配行：置保护位，避免金额联动把它清零
+    allocLoadedEmpty.value = loaded.length === 0
   } catch (e) {
     ElMessage.error((e as Error).message)
   }
@@ -433,6 +487,8 @@ watch(
   () => [allocatedTotal.value, allocations.value.length],
   ([v, n]) => {
     if (isPrepay()) return
+    // 编辑态打开时本就没有分配行的历史单：不清零，保住后端原金额（见 allocLoadedEmpty 注释）
+    if (n === 0 && allocLoadedEmpty.value) return
     form.receiptAmount = n === 0 ? 0 : Number(Number(v ?? 0).toFixed(2))
   },
   { immediate: false },
@@ -526,6 +582,7 @@ watch(
                 controls-position="right"
                 placeholder="金额"
                 style="width: 150px"
+                @change="onAllocationAmountChange(idx)"
               />
               <el-button link type="danger" size="small" @click="removeAllocation(idx)">
                 删除

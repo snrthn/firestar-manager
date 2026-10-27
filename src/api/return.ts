@@ -12,11 +12,19 @@ import type { TimelineNodeVO } from '@/types/project'
 // 三级审批（return_approval：主管→财务→销售经理）末节点通过后，
 // 后端自动执行三冲减链（红字应收单/红字发票/退款单+反向核销），前端只展示结果。
 
-/** 退货列表（分页 + 项目号/项目名模糊、审批状态精确） */
+/** 退货列表（分页 + 项目号/项目名/退货单号模糊、审批状态+执行状态精确、申请时间闭区间） */
 export function returnPage(
   pageNum = 1,
   pageSize = 10,
-  params: { projectNo?: string; projectName?: string; status?: string } = {},
+  params: {
+    projectNo?: string
+    projectName?: string
+    returnNo?: string
+    status?: string
+    executeStatus?: string
+    dateFrom?: string
+    dateTo?: string
+  } = {},
 ) {
   return request
     .get<ApiResult<ReturnPageVO>>('/return/page', { params: { pageNum, pageSize, ...params } })

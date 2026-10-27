@@ -15,9 +15,18 @@ import { formatDate, formatDateTime } from '@/utils/datetime'
 import InvoiceCreateDialog from './InvoiceCreateDialog.vue'
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue'
 
-// 查询条件：后端 InvoiceController.page 只声明 projectId / receivableId / status
-// （@RequestParam 未声明的键会被忽略），故这里不做发票号/项目名模糊查询，避免「看起来能搜其实无效」。
-const query = reactive({ projectId: null as number | null, status: '' })
+// 查询条件（2026-10-28 补齐，口径对齐核销台账）：项目 / 发票号码 / 项目名称 /
+// 发票类型 / 单据方向 / 开票状态 / 开票日期区间。后端 InvoiceController.page 已声明
+// 全部参数（未声明的键会被忽略）——按需传即可。
+const query = reactive({
+  projectId: null as number | null,
+  invoiceNo: '',
+  projectName: '',
+  invoiceType: '',
+  docDirection: '',
+  status: '',
+  dateRange: null as [string, string] | null,
+})
 
 const handleQuery = () => {
   pageNum.value = 1
@@ -25,7 +34,12 @@ const handleQuery = () => {
 }
 const resetQuery = () => {
   query.projectId = null
+  query.invoiceNo = ''
+  query.projectName = ''
+  query.invoiceType = ''
+  query.docDirection = ''
   query.status = ''
+  query.dateRange = null
   pageNum.value = 1
   loadList()
 }
@@ -42,7 +56,13 @@ const loadList = async () => {
   try {
     const page = await invoicePage(pageNum.value, pageSize.value, {
       projectId: query.projectId ?? undefined,
+      invoiceNo: query.invoiceNo.trim() || undefined,
+      projectName: query.projectName.trim() || undefined,
+      invoiceType: query.invoiceType || undefined,
+      docDirection: query.docDirection || undefined,
       status: query.status || undefined,
+      dateFrom: query.dateRange?.[0],
+      dateTo: query.dateRange?.[1],
     })
     list.value = page.records
     total.value = page.total
@@ -134,7 +154,7 @@ onMounted(() => {
   <el-card shadow="never">
     <!-- 查询区 -->
     <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
-      <el-form-item label="项目">
+      <el-form-item label="关联项目">
         <el-select
           v-model="query.projectId"
           filterable
@@ -149,8 +169,40 @@ onMounted(() => {
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="发票号码">
+        <el-input
+          v-model="query.invoiceNo"
+          placeholder="模糊匹配"
+          clearable
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="项目名称">
+        <el-input
+          v-model="query.projectName"
+          placeholder="模糊匹配"
+          clearable
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="发票类型">
+        <DictSelect v-model="query.invoiceType" type-code="invoice_type" placeholder="全部" />
+      </el-form-item>
+      <el-form-item label="单据方向">
+        <DictSelect v-model="query.docDirection" type-code="doc_direction" placeholder="全部" />
+      </el-form-item>
       <el-form-item label="开票状态">
         <DictSelect v-model="query.status" type-code="approval_status" placeholder="全部" />
+      </el-form-item>
+      <el-form-item label="开票日期">
+        <el-date-picker
+          v-model="query.dateRange"
+          type="daterange"
+          range-separator="~"
+          start-placeholder="开始"
+          end-placeholder="结束"
+          value-format="YYYY-MM-DD"
+        />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :icon="Search" @click="handleQuery">查询</el-button>
