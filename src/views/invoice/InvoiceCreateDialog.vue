@@ -43,6 +43,8 @@ const MAX_ATTACH_MB = 10
 const isEdit = () => props.invoiceId != null
 /** 红冲模式：传了 originalInvoiceId 即红字单（与编辑态互斥，红冲永远新建） */
 const isRedFlush = () => props.originalInvoiceId != null
+// 编辑对象本身的单据方向（loadForEdit 回填）：红冲单（RED）做减法，编辑时不得套用蓝字超开拦截
+const editDocDirection = ref<string | null>(null)
 /** 红冲原单数据（预填来源 + 金额上限提示） */
 const redOriginal = ref<InvoiceVO | null>(null)
 
@@ -175,6 +177,7 @@ const handlePreview = (f: FileVO) => {
 const resetForm = () => {
   form.receivableId = null
   form.invoiceNo = ''
+  editDocDirection.value = null
   form.invoiceCode = ''
   form.invoiceType = 'NORMAL'
   form.invoiceAmount = null
@@ -205,6 +208,32 @@ const handleSubmit = async () => {
   if (form.invoiceAmount == null || Number(form.invoiceAmount) <= 0) {
     ElMessage.warning('请填写大于 0 的开票金额')
     return
+  }
+  // 开票日期必填（财务凭证关键字段；2026-10-27 实锤空日期曾可提交）
+  if (!form.invoiceDate) {
+    ElMessage.warning('请选择开票日期')
+    return
+  }
+  // 超开拦截（双保险·前端关口）：蓝字开票不得使应收单未开票余额转负；
+  // 红冲单（RED）审批通过后是加回额度，不拦；编辑中的红冲草稿同放行。后端 saveAllocations/审批回写兜底。
+  // 注：前端拿不到"在途占用"（审批中其他发票），此处是第一道粗滤，最终以审批时后端校验为准。
+  if (!(isRedFlush() || editDocDirection.value === 'RED')) {
+    const overLimit = (rid: number, amt: number): boolean => {
+      const rv = receivableOptions.value.find((r) => r.id === rid)
+      return rv?.uninvoicedAmount != null && amt > Number(rv.uninvoicedAmount)
+    }
+    if (allocs.length) {
+      const bad = allocs.find((a) => overLimit(a.receivableId, a.amount))
+      if (bad) {
+        const rv = receivableOptions.value.find((r) => r.id === bad.receivableId)
+        ElMessage.warning(`分配金额超出应收单未开票余额：${rv?.receivableNo ?? ''}（未开票 ${formatAmount(rv?.uninvoicedAmount)}），请调整`)
+        return
+      }
+    } else if (overLimit(mainReceivableId, Number(form.invoiceAmount))) {
+      const rv = receivableOptions.value.find((r) => r.id === mainReceivableId)
+      ElMessage.warning(`开票金额超出应收单未开票余额：${rv?.receivableNo ?? ''}（未开票 ${formatAmount(rv?.uninvoicedAmount)}），请核实金额`)
+      return
+    }
   }
   // 红冲口径（2026-10-25）：金额 ≤ 原单金额（支持部分红冲），后端同校验
   if (isRedFlush() && redOriginal.value) {
@@ -275,6 +304,8 @@ const loadForEdit = async (id: number, asRedFlush = false) => {
   try {
     const d = await invoiceDetail(id)
     if (asRedFlush) redOriginal.value = d
+    // 仅编辑态记录本单方向；红冲态 d 是原单（蓝字），不可拿来当"本单方向"用
+    editDocDirection.value = asRedFlush ? null : (d.docDirection ?? null)
     form.receivableId = d.receivableId ?? null
     form.invoiceNo = asRedFlush ? '' : (d.invoiceNo ?? '')
     form.invoiceCode = asRedFlush ? '' : (d.invoiceCode ?? '')
@@ -428,7 +459,7 @@ watch(
         </el-form-item>
 
         <el-form-item label="发票号码">
-          <el-input v-model="form.invoiceNo" placeholder="选填" style="width: 100%" />
+          <el-input v-model="form.invoiceNo" placeholder="留空自动生成单号；填纸质发票票号" style="width: 100%" />
         </el-form-item>
 
         <el-form-item label="发票代码">

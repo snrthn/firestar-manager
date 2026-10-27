@@ -55,6 +55,9 @@ import ElNotification from 'element-plus/es/components/notification/index.mjs'
 // 参考按钮被淹没、点选/回显交互全废（2026-10-14 虎哥截图实锤）。
 // 内部由 ElTooltip 承载定位与箭头，tooltip 样式需一并引入。
 import ElPopover from 'element-plus/es/components/popover/index.mjs'
+// ElTooltip：超收标记的精致悬浮气泡（虎哥 2026-10-27 要求）。此前只引了 style/css 漏了
+// 组件本体，导致 <el-tooltip> 运行时是未注册标签、气泡永不弹。popover 内部定位/箭头也复用它。
+import ElTooltip from 'element-plus/es/components/tooltip/index.mjs'
 // 分页器（字典数据页标准分页）：独立包目录，内部只依赖 icon（已注册）
 import ElPagination from 'element-plus/es/components/pagination/index.mjs'
 // ElOption 与 ElSelect 同入口具名导出（官方 select/index.ts：
@@ -207,6 +210,7 @@ app.use(ElMessageBox)
 app.use(ElNotification)
 app.use(ElPagination)
 app.use(ElPopover)
+app.use(ElTooltip)
 app.use(ElSelect)
 app.use(ElOption)
 app.use(ElRadio)

@@ -331,6 +331,25 @@ const formatAmount = (v: number | null | undefined): string => {
   return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// 超收标记（虎哥 2026-10-27 采纳）：累计已收 > 合同金额即判定超收，列表「已收金额」列打红标。
+const isOverCollected = (row: {
+  collectedAmount?: number | null
+  contractAmount?: number | null
+}): boolean =>
+  row != null &&
+  row.collectedAmount != null &&
+  row.contractAmount != null &&
+  Number(row.collectedAmount) > Number(row.contractAmount)
+
+// 超收金额（合同金额已收溢出部分），供「小三角 hover 提示」展示完整信息。
+const overAmount = (row: {
+  collectedAmount?: number | null
+  contractAmount?: number | null
+}): number =>
+  row != null && row.collectedAmount != null && row.contractAmount != null
+    ? Math.max(0, Number(row.collectedAmount) - Number(row.contractAmount))
+    : 0
+
 // 合同状态标签悬浮详情（c 拍板：展示签约时间/人；未签约给出提示文案）。
 // 列表列宽放不下多行信息，用原生 title 悬浮展示，鼠标停留即可看全
 const signInfo = (row: ProjectVO): string => {
@@ -404,8 +423,13 @@ onMounted(loadList)
       <el-table-column label="已发金额" width="130" align="right">
         <template #default="{ row }">{{ formatAmount(row.shippedAmount) }}</template>
       </el-table-column>
-      <el-table-column label="已收金额" width="130" align="right">
-        <template #default="{ row }">{{ formatAmount(row.collectedAmount) }}</template>
+      <el-table-column label="已收金额" width="150" align="right">
+        <template #default="{ row }">
+          <span :style="isOverCollected(row) ? 'color:#f56c6c;font-weight:600' : ''">{{ formatAmount(row.collectedAmount) }}</span>
+          <el-tooltip v-if="isOverCollected(row)" :content="`⚠ 超收 ${formatAmount(overAmount(row))}，累计已收已超过合同金额`" placement="top">
+            <span style="color:#e6a23c;margin-left:4px;font-size:13px;line-height:1;cursor:pointer">⚠</span>
+          </el-tooltip>
+        </template>
       </el-table-column>
       <el-table-column label="退货金额" width="130" align="right">
         <template #default="{ row }">{{ formatAmount(row.returnedAmount) }}</template>

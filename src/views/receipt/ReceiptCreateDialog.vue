@@ -44,6 +44,8 @@ const MAX_ATTACH_MB = 10
 const isEdit = () => props.receiptId != null
 /** 红冲模式：传了 originalReceiptId 即红字单（与编辑态互斥，红冲永远新建） */
 const isRedFlush = () => props.originalReceiptId != null
+// 编辑对象本身的单据方向（loadForEdit 回填）：红冲单（RED）做减法，编辑时不得套用蓝字超收拦截
+const editDocDirection = ref<string | null>(null)
 /** 红冲原单数据（预填来源 + 金额上限提示） */
 const redOriginal = ref<ReceiptVO | null>(null)
 
@@ -186,6 +188,7 @@ const resetForm = () => {
   allocations.value = []
   receivableOptions.value = []
   redOriginal.value = null
+  editDocDirection.value = null
 }
 
 const handleSubmit = async () => {
@@ -203,6 +206,22 @@ const handleSubmit = async () => {
     if (Number(form.receiptAmount) > max) {
       ElMessage.warning(`红冲金额不能超过原单金额 ${max}`)
       return
+    }
+  }
+  // 超收拦截（双保险·前端关口）：蓝字收款不得使累计已收超过合同金额；后端 create/审批回写亦会拦截
+  // 编辑对象本身是红冲单（RED）时放行：红冲审批通过后做减法，只会让累计已收回落（2026-10-27 误拦实锤）
+  if (!isRedFlush() && editDocDirection.value !== 'RED') {
+    const p = selectedProject()
+    if (p && p.contractAmount != null && p.collectedAmount != null) {
+      const c = Number(p.contractAmount)
+      const cur = Number(p.collectedAmount)
+      const inc = Number(form.receiptAmount)
+      if (inc + cur > c) {
+        ElMessage.warning(
+          `收款金额将使累计已收（${formatAmount(cur)}）超过合同金额（${formatAmount(c)}），超出 ${formatAmount(inc + cur - c)}。请核实金额，或先红冲超收部分。`,
+        )
+        return
+      }
     }
   }
   // 核销分配（V65）：过滤未填完整的行；空列表 = 预收未指定
@@ -261,6 +280,8 @@ const loadForEdit = async (id: number, asRedFlush = false) => {
   try {
     const d = await receiptDetail(id)
     if (asRedFlush) redOriginal.value = d
+    // 仅编辑态记录本单方向；红冲态 d 是原单（蓝字），不可拿来当"本单方向"用
+    editDocDirection.value = asRedFlush ? null : (d.docDirection ?? null)
     form.projectId = d.projectId ?? null
     form.receiptAmount = asRedFlush ? null : (d.receiptAmount ?? null)
     form.receiptType = d.receiptType ?? null

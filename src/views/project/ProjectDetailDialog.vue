@@ -71,6 +71,20 @@ const detail = ref<ProjectVO | null>(null)
 const timeline = ref<TimelineNodeVO[]>([])
 const acting = ref(false)
 
+// 超收标记（虎哥 2026-10-27 采纳）：累计已收 > 合同金额时，详情/列表打红色「⚠ 超收」标记，
+// 让历史脏数据（如录入整份合同额的收款单）可见、可审计，而非藏在水下。前端同源判断，
+// 用页面已展示的 collectedAmount 与 contractAmount 比较，避免引入新口径。
+const isOverCollected = computed(() => {
+  const d = detail.value
+  if (!d || d.collectedAmount == null || d.contractAmount == null) return false
+  return Number(d.collectedAmount) > Number(d.contractAmount)
+})
+const overAmount = computed(() => {
+  const d = detail.value
+  if (!d || d.collectedAmount == null || d.contractAmount == null) return 0
+  return Math.max(0, Number(d.collectedAmount) - Number(d.contractAmount))
+})
+
 const { label: statusLabel, style: statusStyle } = useDictLabels('approval_status')
 const { label: contractStatusLabel } = useDictLabels('project_contract_status')
 
@@ -162,7 +176,12 @@ const itemsTotal = computed(() =>
           </el-descriptions-item>
           <el-descriptions-item label="合同金额">{{ formatAmount(detail.contractAmount) }}</el-descriptions-item>
           <el-descriptions-item label="累计发货">{{ formatAmount(detail.shippedAmount) }}</el-descriptions-item>
-          <el-descriptions-item label="累计已收">{{ formatAmount(detail.collectedAmount) }}</el-descriptions-item>
+          <el-descriptions-item label="累计已收">
+            <span :style="isOverCollected ? 'color:#f56c6c;font-weight:600' : ''">{{ formatAmount(detail.collectedAmount) }}</span>
+            <el-tooltip v-if="isOverCollected" :content="`⚠ 超收 ${formatAmount(overAmount)}，累计已收已超过合同金额`" placement="top">
+              <span style="color:#e6a23c;margin-left:6px;font-size:13px;line-height:1;cursor:pointer">⚠</span>
+            </el-tooltip>
+          </el-descriptions-item>
           <el-descriptions-item label="累计开票">{{ formatAmount(detail.invoicedAmount) }}</el-descriptions-item>
           <el-descriptions-item label="应收合计">{{ formatAmount(detail.receivableAmount) }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.contractSignedAt" label="签约时间">
