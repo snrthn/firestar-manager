@@ -172,7 +172,7 @@ onMounted(() => {
       <el-table-column label="应收单号" min-width="170" show-overflow-tooltip>
         <template #default="{ row }">{{ row.receivableNo || '—' }}</template>
       </el-table-column>
-      <el-table-column label="项目编号" min-width="130" show-overflow-tooltip>
+      <el-table-column label="项目编号" min-width="160" show-overflow-tooltip>
         <template #default="{ row }">{{ row.projectNo || '—' }}</template>
       </el-table-column>
       <el-table-column label="项目名称" min-width="180" show-overflow-tooltip>
