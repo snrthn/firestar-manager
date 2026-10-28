@@ -416,7 +416,7 @@ const handleWithdraw = async () => {
       <template v-else>
         <!-- 头部信息 -->
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
-          <el-descriptions-item label="批次号">{{ detail.batchNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="批次编号">{{ detail.batchNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="项目编号">{{ detail.projectNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="项目名称">{{ detail.projectName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="客户">{{ detail.customerName || '—' }}</el-descriptions-item>

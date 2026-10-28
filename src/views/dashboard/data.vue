@@ -5,6 +5,8 @@ import type { StatsQuery } from '@/types/stats'
 import { customerOptions } from '@/api/customer'
 import { goodsOptions } from '@/api/goods'
 import { listUserOptions } from '@/api/user'
+import { projectOptions } from '@/api/project'
+import type { ProjectOptionVO } from '@/types/project'
 import type { CustomerOptionVO } from '@/types/customer'
 import type { GoodsOptionVO } from '@/types/goods'
 import type { UserOptionVO } from '@/types/user'
@@ -19,6 +21,7 @@ const query = reactive<StatsQuery>({ periodPreset: 'THIS_YEAR' })
 const customerOpts = ref<CustomerOptionVO[]>([])
 const goodsOpts = ref<GoodsOptionVO[]>([])
 const managerOpts = ref<UserOptionVO[]>([])
+const projectOpts = ref<ProjectOptionVO[]>([])
 
 const presetOptions = [
   { value: 'THIS_MONTH', label: '本月' },
@@ -30,10 +33,11 @@ const presetOptions = [
 
 const loadOptions = async () => {
   try {
-    const [c, g, m] = await Promise.all([customerOptions(), goodsOptions(), listUserOptions()])
+    const [c, g, m, p] = await Promise.all([customerOptions(), goodsOptions(), listUserOptions(), projectOptions()])
     customerOpts.value = c ?? []
     goodsOpts.value = g ?? []
     managerOpts.value = m ?? []
+    projectOpts.value = p ?? []
   } catch {
     // 下拉加载失败不阻断看板主流程
   }
@@ -64,6 +68,16 @@ onMounted(loadOptions)
       <el-form-item label="统计期间">
         <el-select v-model="query.periodPreset">
           <el-option v-for="o in presetOptions" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="项目">
+        <el-select
+          v-model="query.projectId"
+          filterable
+          clearable
+          placeholder="全部项目"
+        >
+          <el-option v-for="p in projectOpts" :key="p.id" :label="`${p.projectNo} ${p.projectName}`" :value="p.id" />
         </el-select>
       </el-form-item>
       <el-form-item label="客户">

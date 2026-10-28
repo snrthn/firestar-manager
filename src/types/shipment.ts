@@ -13,11 +13,11 @@ export interface ShipmentPageVO {
 export interface ShipmentVO {
   id: number
   projectId: number
-  /** 项目编号（批次号 FH-{projectNo}-NNN 取自此处） */
+  /** 项目编号（批次编号 FH-{projectNo}-NNN 取自此处） */
   projectNo: string | null
   projectName: string | null
   customerName: string | null
-  /** 批次号（FH-项目编号-NNN，决策#5） */
+  /** 批次编号（FH-项目编号-NNN，决策#5） */
   batchNo: string | null
   /** 发货时间（标记已发货时写入） */
   shipmentDate: string | null

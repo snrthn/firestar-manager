@@ -13,9 +13,9 @@ import { formatDateTime } from '@/utils/datetime'
 import ShipmentCreateDialog from './ShipmentCreateDialog.vue'
 import ShipmentDetailDialog from './ShipmentDetailDialog.vue'
 
-// 查询条件（2026-10-28 修正 + 补齐，口径对齐核销台账）：批次号 / 项目编号 / 项目名称
+// 查询条件（2026-10-28 修正 + 补齐，口径对齐核销台账）：批次编号 / 项目编号 / 项目名称
 // 模糊、发货状态 / 审批状态精确、发货日期区间。
-// ⚠️ 此前后端只声明 projectNo 却把实现接到 .like(batch_no)，「批次号」框是死查询、
+// ⚠️ 此前后端只声明 projectNo 却把实现接到 .like(batch_no)，「批次编号」框是死查询、
 //    「项目编号」也查不到；现后端新增真正的 batchNo 参数，两个框都回归本义。
 const query = reactive({
   batchNo: '',
@@ -130,7 +130,7 @@ onMounted(() => {
   <el-card shadow="never">
     <!-- 查询区 -->
     <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
-      <el-form-item label="批次号">
+      <el-form-item label="批次编号">
         <el-input v-model="query.batchNo" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="项目编号">
@@ -167,7 +167,7 @@ onMounted(() => {
     </div>
 
     <el-table v-loading="loading" :data="list" border>
-      <el-table-column prop="batchNo" label="批次号" min-width="200" show-overflow-tooltip>
+      <el-table-column prop="batchNo" label="批次编号" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">{{ row.batchNo || '—' }}</template>
       </el-table-column>
       <el-table-column prop="projectNo" label="项目编号" min-width="160" show-overflow-tooltip>

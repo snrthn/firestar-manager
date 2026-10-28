@@ -16,7 +16,7 @@ const visible = defineModel<boolean>('visible', { required: true })
 
 const loading = ref(false)
 const detail = ref<ReceivableVO | null>(null)
-// 来源发货单可读批次号（FH-PJ-xxxx-NNN）；取号失败 / 发货单已删则回退到裸 id
+// 来源发货单可读批次编号（FH-PJ-xxxx-NNN）；取号失败 / 发货单已删则回退到裸 id
 const shipmentNo = ref<string | null>(null)
 
 const { label: statusLabel, style: statusStyle } = useDictLabels('receivable_status')
@@ -34,7 +34,7 @@ const load = async (id: number) => {
   try {
     const vo = await receivableDetail(id)
     detail.value = vo
-    // 来源发货单：取可读批次号，而非裸 FK id；发货单已删 / 取号失败则回退到 id
+    // 来源发货单：取可读批次编号，而非裸 FK id；发货单已删 / 取号失败则回退到 id
     if (vo.shipmentId != null) {
       shipmentDetail(vo.shipmentId)
         .then((s) => {

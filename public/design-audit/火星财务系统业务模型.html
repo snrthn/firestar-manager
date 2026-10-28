@@ -792,7 +792,7 @@
                     <li><span class="field-name">尾差标记</span><span class="field-type">tinyint</span></li>
                     <li><span class="field-name">计划状态</span><span class="field-type">enum</span></li>
                     <li><span class="field-name">确认时间</span><span class="field-type">datetime</span></li>
-                    <li><span class="field-name">确认批次号</span><span class="field-type">varchar</span></li>
+                    <li><span class="field-name">确认批次编号</span><span class="field-type">varchar</span></li>
                 </ul>
             </div>
 
@@ -809,7 +809,7 @@
                     <li><span class="field-name">确认金额</span><span class="field-type">decimal</span></li>
                     <li><span class="field-name">确认时间</span><span class="field-type">datetime</span></li>
                     <li><span class="field-name">触发方式</span><span class="field-type">enum</span></li>
-                    <li><span class="field-name">批次号</span><span class="field-type">varchar</span></li>
+                    <li><span class="field-name">批次编号</span><span class="field-type">varchar</span></li>
                     <li><span class="field-name">操作人</span><span class="field-type">ref</span></li>
                     <li><span class="field-name">冲销标记</span><span class="field-type">tinyint</span></li>
                 </ul>
@@ -830,7 +830,7 @@
                     <li><span class="field-name">发货状态</span><span class="field-type">enum</span></li>
                     <li><span class="field-name">关联应收单ID</span><span class="field-type">ref</span></li>
                     <li><span class="field-name">申请/发货/确认人</span><span class="field-type">ref</span></li>
-                    <li><span class="field-name">批次号</span><span class="field-type">varchar</span></li>
+                    <li><span class="field-name">批次编号</span><span class="field-type">varchar</span></li>
                 </ul>
             </div>
 
@@ -1766,7 +1766,7 @@
                     <li>每批发货需关联具体的货物明细行</li>
                     <li>同一货物明细可分多次发出</li>
                     <li>每批发货数量 ≤ 该货物剩余未发数量</li>
-                    <li>批次号自动生成：FH-项目编号-001</li>
+                    <li>批次编号自动生成：FH-项目编号-001</li>
                     <li>每批发货对应一张应收单</li>
                 </ul>
             </div>

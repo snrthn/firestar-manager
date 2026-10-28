@@ -64,27 +64,28 @@ const option = computed<Record<string, unknown>>(() => {
 <template>
   <div v-loading="loading">
     <el-row :gutter="12" class="kpi-grid">
-      <el-col :span="6"><StatCard label="合同签约额 (F-01)" :value="formatMoney(data?.contractAmount)" /></el-col>
-      <el-col :span="6"><StatCard label="本期发货额 (F-02)" :value="formatMoney(data?.shipmentAmount)" /></el-col>
-      <el-col :span="6"><StatCard label="本期应收发生 (F-03)" :value="formatMoney(data?.receivableOccurred)" /></el-col>
-      <el-col :span="6"><StatCard label="本期开票额 (F-04)" :value="formatMoney(data?.invoiceAmount)" /></el-col>
-      <el-col :span="6"><StatCard label="本期税额 (F-06)" :value="formatMoney(data?.taxAmount)" /></el-col>
-      <el-col :span="6"><StatCard label="本期回款额 (F-07)" :value="formatMoney(data?.receiptAmount)" accent="#67c23a" /></el-col>
-      <el-col :span="6"><StatCard label="本期核销额 (F-08)" :value="formatMoney(data?.writeOffAmount)" accent="#67c23a" /></el-col>
+      <el-col :span="6"><StatCard label="合同签约额 (F-01)" :value="data?.contractAmount" :format="formatMoney" /></el-col>
+      <el-col :span="6"><StatCard label="本期发货额 (F-02)" :value="data?.shipmentAmount" :format="formatMoney" /></el-col>
+      <el-col :span="6"><StatCard label="本期应收发生 (F-03)" :value="data?.receivableOccurred" :format="formatMoney" /></el-col>
+      <el-col :span="6"><StatCard label="本期开票额 (F-04)" :value="data?.invoiceAmount" :format="formatMoney" /></el-col>
+      <el-col :span="6"><StatCard label="本期税额 (F-06)" :value="data?.taxAmount" :format="formatMoney" /></el-col>
+      <el-col :span="6"><StatCard label="本期回款额 (F-07)" :value="data?.receiptAmount" :format="formatMoney" accent="#67c23a" /></el-col>
+      <el-col :span="6"><StatCard label="本期核销额 (F-08)" :value="data?.writeOffAmount" :format="formatMoney" accent="#67c23a" /></el-col>
       <el-col :span="6">
         <StatCard
           label="差异池 (F-09)"
-          :value="formatMoney(data?.diffPool)"
+          :value="data?.diffPool"
+          :format="formatMoney"
           :accent="(data?.diffPool ?? 0) < 0 ? '#e6a23c' : '#909399'"
           :sub="(data?.diffPool ?? 0) < 0 ? '收款未核销' : '—'"
         />
       </el-col>
-      <el-col :span="6"><StatCard label="应收余额 (B-01)" :value="formatMoney(data?.arBalance)" accent="#f56c6c" /></el-col>
-      <el-col :span="6"><StatCard label="待开票余额 (B-02)" :value="formatMoney(data?.uninvoicedBalance)" accent="#e6a23c" /></el-col>
-      <el-col :span="6"><StatCard label="逾期金额 (B-03)" :value="formatMoney(data?.overdueAmount)" accent="#f56c6c" /></el-col>
-      <el-col :span="6"><StatCard label="项目总数" :value="formatNumber(data?.projectCount)" /></el-col>
-      <el-col :span="6"><StatCard label="客户总数" :value="formatNumber(data?.customerCount)" /></el-col>
-      <el-col :span="6"><StatCard label="货物总数" :value="formatNumber(data?.goodsCount)" /></el-col>
+      <el-col :span="6"><StatCard label="应收余额 (B-01)" :value="data?.arBalance" :format="formatMoney" accent="#f56c6c" /></el-col>
+      <el-col :span="6"><StatCard label="待开票余额 (B-02)" :value="data?.uninvoicedBalance" :format="formatMoney" accent="#e6a23c" /></el-col>
+      <el-col :span="6"><StatCard label="逾期金额 (B-03)" :value="data?.overdueAmount" :format="formatMoney" accent="#f56c6c" /></el-col>
+      <el-col :span="6"><StatCard label="项目总数" :value="data?.projectCount" :format="formatNumber" /></el-col>
+      <el-col :span="6"><StatCard label="客户总数" :value="data?.customerCount" :format="formatNumber" /></el-col>
+      <el-col :span="6"><StatCard label="货物总数" :value="data?.goodsCount" :format="formatNumber" /></el-col>
     </el-row>
 
     <el-card shadow="never" class="chart-card">

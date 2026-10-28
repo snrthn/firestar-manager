@@ -1,6 +1,6 @@
 import request from './request'
 import type { ApiResult } from '@/types/auth'
-import type { ProjectPageVO, ProjectFormData, ProjectSignFormData, ProjectVO, TimelineNodeVO } from '@/types/project'
+import type { ProjectPageVO, ProjectFormData, ProjectSignFormData, ProjectVO, TimelineNodeVO, ProjectOptionVO } from '@/types/project'
 
 // 立项管理接口（后端 /project/**）
 
@@ -22,6 +22,13 @@ export function projectPage(
 ) {
   return request
     .get<ApiResult<ProjectPageVO>>('/project/page', { params: { pageNum, pageSize, ...params } })
+    .then((r) => r.data.data!)
+}
+
+/** 项目下拉选项（看板「按项目筛选」用，V80；仿 customerOptions，返回 id/projectNo/projectName） */
+export function projectOptions() {
+  return request
+    .get<ApiResult<ProjectOptionVO[]>>('/project/options')
     .then((r) => r.data.data!)
 }
 

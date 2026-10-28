@@ -54,13 +54,13 @@ const option = computed<Record<string, unknown>>(() => {
 <template>
   <div v-loading="loading">
     <el-row :gutter="12" class="kpi-grid">
-      <el-col :span="6"><StatCard label="本期开票额 (F-04)" :value="formatMoney(data?.invoiceAmount)" /></el-col>
-      <el-col :span="6"><StatCard label="本期税额 (F-06)" :value="formatMoney(data?.taxAmount)" accent="#e6a23c" /></el-col>
-      <el-col :span="6"><StatCard label="不含税开票额 (F-05)" :value="formatMoney(data?.invoiceAmountNet)" /></el-col>
-      <el-col :span="6"><StatCard label="待开票余额 (B-02)" :value="formatMoney(data?.uninvoicedBalance)" accent="#e6a23c" /></el-col>
-      <el-col :span="6"><StatCard label="开票率 (D-02)" :value="formatPercent(data?.invoiceRate)" accent="#409eff" /></el-col>
-      <el-col :span="6"><StatCard label="红字发票率 (D-10)" :value="formatPercent(data?.redInvoiceRate)" accent="#f56c6c" /></el-col>
-      <el-col :span="6"><StatCard label="本期回款额 (F-07)" :value="formatMoney(data?.receiptAmount)" accent="#67c23a" /></el-col>
+      <el-col :span="6"><StatCard label="本期开票额 (F-04)" :value="data?.invoiceAmount" :format="formatMoney" /></el-col>
+      <el-col :span="6"><StatCard label="本期税额 (F-06)" :value="data?.taxAmount" :format="formatMoney" accent="#e6a23c" /></el-col>
+      <el-col :span="6"><StatCard label="不含税开票额 (F-05)" :value="data?.invoiceAmountNet" :format="formatMoney" /></el-col>
+      <el-col :span="6"><StatCard label="待开票余额 (B-02)" :value="data?.uninvoicedBalance" :format="formatMoney" accent="#e6a23c" /></el-col>
+      <el-col :span="6"><StatCard label="开票率 (D-02)" :value="data?.invoiceRate" :format="formatPercent" accent="#409eff" /></el-col>
+      <el-col :span="6"><StatCard label="红字发票率 (D-10)" :value="data?.redInvoiceRate" :format="formatPercent" accent="#f56c6c" /></el-col>
+      <el-col :span="6"><StatCard label="本期回款额 (F-07)" :value="data?.receiptAmount" :format="formatMoney" accent="#67c23a" /></el-col>
     </el-row>
 
     <el-card shadow="never" class="chart-card">

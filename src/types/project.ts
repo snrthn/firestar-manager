@@ -10,6 +10,13 @@ export interface ProjectPageVO {
   pages: number
 }
 
+/** 项目下拉选项（看板「按项目筛选」用，V80；对齐后端 ProjectOptionVO） */
+export interface ProjectOptionVO {
+  id: number
+  projectNo: string
+  projectName: string
+}
+
 /** 立项列表行（/project/page） */
 export interface ProjectVO {
   id: number
@@ -58,6 +65,12 @@ export interface ProjectVO {
   receivedAmount: number | null
   /** 累计退货金额（Σ fin_shipment.returned_amount） */
   returnedAmount: number | null
+  /** 红冲收款额（docDirection=RED 的收款单金额绝对值汇总，V80；与 collectedAmount 净额并列展示红字行） */
+  redReceivedAmount?: number | null
+  /** 红冲开票额（docDirection=RED 的发票金额绝对值汇总，V80；与 invoicedAmount 净额并列展示红字行） */
+  redInvoicedAmount?: number | null
+  /** 红冲应收额（docDirection=RED 的应收单金额绝对值汇总，含退货生成的红字应收，V80；与 receivableAmount 净额并列展示红字行） */
+  redReceivableAmount?: number | null
   /** 签约描述/签约留言（签约时补录，非必填；V46） */
   contractDesc: string | null
   /** 签约时间（V46） */

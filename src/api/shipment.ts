@@ -14,7 +14,7 @@ import type { TimelineNodeVO } from '@/types/project'
 /** 分页发货列表（batchNo / projectNo / projectName 模糊、status(发货状态)精确、
  *  approvalStatus(审批状态)精确、dateFrom~dateTo 按发货日期闭区间；默认每页 10 条）
  *  ⚠️ status=发货生命周期状态；approvalStatus=审批状态(APPROVED 等)。退货弹窗用 approvalStatus，勿混用。
- *  ⚠️ 2026-10-28 修正：后端此前只声明 projectNo 却把实现接到 .like(batch_no)，批次号查询框是死的；
+ *  ⚠️ 2026-10-28 修正：后端此前只声明 projectNo 却把实现接到 .like(batch_no)，批次编号查询框是死的；
  *     现后端已新增真正的 batchNo 参数，projectNo 回归「项目编号模糊」语义。 */
 export function shipmentPage(
   pageNum = 1,

@@ -56,18 +56,18 @@ const option = computed<Record<string, unknown>>(() => {
 <template>
   <div v-loading="loading">
     <el-row :gutter="12" class="kpi-grid">
-      <el-col :span="6"><StatCard label="应收余额 (B-01)" :value="formatMoney(ar?.arBalance)" accent="#f56c6c" /></el-col>
-      <el-col :span="6"><StatCard label="逾期金额 (B-03)" :value="formatMoney(ar?.overdueAmount)" accent="#f56c6c" /></el-col>
-      <el-col :span="6"><StatCard label="逾期率" :value="formatPercent(ar?.overdueRate)" accent="#f56c6c" /></el-col>
-      <el-col :span="6"><StatCard label="平均逾期天数 (ADD)" :value="formatNumber(ageing?.add)" suffix="天" /></el-col>
-      <el-col :span="6"><StatCard label="逾期笔数" :value="formatNumber(ageing?.overdueCount)" suffix="笔" /></el-col>
-      <el-col :span="6"><StatCard label="本期回款·单据 (F-07)" :value="formatMoney(ar?.receiptPeriod)" accent="#67c23a" /></el-col>
-      <el-col :span="6"><StatCard label="本期应收发生 (F-03)" :value="formatMoney(ar?.receivablePeriod)" /></el-col>
-      <el-col :span="6"><StatCard label="回款率 (D-01)" :value="formatPercent(ar?.collectionRate)" accent="#67c23a" /></el-col>
-      <el-col :span="6"><StatCard label="本期核销额 (F-08)" :value="formatMoney(ar?.writeOffPeriod)" accent="#67c23a" /></el-col>
-      <el-col :span="6"><StatCard label="差异池 (F-09)" :value="formatMoney(ar?.diffPool)" :accent="(ar?.diffPool ?? 0) < 0 ? '#e6a23c' : '#909399'" /></el-col>
-      <el-col :span="6"><StatCard label="DSO 应收周转天数 (D-03)" :value="formatNumber(ageing?.dso)" suffix="天" accent="#409eff" /></el-col>
-      <el-col :span="6"><StatCard label="年化周转率 (D-04)" :value="formatNumber(ageing?.turnover)" suffix="次" accent="#409eff" /></el-col>
+      <el-col :span="6"><StatCard label="应收余额 (B-01)" :value="ar?.arBalance" :format="formatMoney" accent="#f56c6c" /></el-col>
+      <el-col :span="6"><StatCard label="逾期金额 (B-03)" :value="ar?.overdueAmount" :format="formatMoney" accent="#f56c6c" /></el-col>
+      <el-col :span="6"><StatCard label="逾期率" :value="ar?.overdueRate" :format="formatPercent" accent="#f56c6c" /></el-col>
+      <el-col :span="6"><StatCard label="平均逾期天数 (ADD)" :value="ageing?.add" :format="formatNumber" suffix="天" /></el-col>
+      <el-col :span="6"><StatCard label="逾期笔数" :value="ageing?.overdueCount" :format="formatNumber" suffix="笔" /></el-col>
+      <el-col :span="6"><StatCard label="本期回款·单据 (F-07)" :value="ar?.receiptPeriod" :format="formatMoney" accent="#67c23a" /></el-col>
+      <el-col :span="6"><StatCard label="本期应收发生 (F-03)" :value="ar?.receivablePeriod" :format="formatMoney" /></el-col>
+      <el-col :span="6"><StatCard label="回款率 (D-01)" :value="ar?.collectionRate" :format="formatPercent" accent="#67c23a" /></el-col>
+      <el-col :span="6"><StatCard label="本期核销额 (F-08)" :value="ar?.writeOffPeriod" :format="formatMoney" accent="#67c23a" /></el-col>
+      <el-col :span="6"><StatCard label="差异池 (F-09)" :value="ar?.diffPool" :format="formatMoney" :accent="(ar?.diffPool ?? 0) < 0 ? '#e6a23c' : '#909399'" /></el-col>
+      <el-col :span="6"><StatCard label="DSO 应收周转天数 (D-03)" :value="ageing?.dso" :format="formatNumber" suffix="天" accent="#409eff" /></el-col>
+      <el-col :span="6"><StatCard label="年化周转率 (D-04)" :value="ageing?.turnover" :format="formatNumber" suffix="次" accent="#409eff" /></el-col>
     </el-row>
 
     <el-card shadow="never" class="chart-card">

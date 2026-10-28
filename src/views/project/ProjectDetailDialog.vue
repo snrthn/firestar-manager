@@ -85,6 +85,29 @@ const overAmount = computed(() => {
   return Math.max(0, Number(d.collectedAmount) - Number(d.contractAmount))
 })
 
+// ===== 成熟业财口径：毛/净分离 + 红字行 + 钩稽链（2026-10-28 重构） =====
+// 净发货 = 累计发货(毛) - 累计退货；
+// 未开票余额 = 净发货 - 累计开票(净额)；
+// 未收余额 = 有效应收(净额) - 累计已收(净额)。
+// 这些才是真正能和合同额对上账的钩稽数（原详情只挂孤立毛/净，对不上合同额）。
+const netShipment = computed(() => {
+  const d = detail.value
+  if (!d) return 0
+  return (Number(d.shippedAmount) || 0) - (Number(d.returnedAmount) || 0)
+})
+const uninvoicedBalance = computed(() => {
+  const d = detail.value
+  if (!d) return 0
+  return netShipment.value - (Number(d.invoicedAmount) || 0)
+})
+const unreceivedBalance = computed(() => {
+  const d = detail.value
+  if (!d) return 0
+  return (Number(d.receivableAmount) || 0) - (Number(d.collectedAmount) || 0)
+})
+// 红字行的「未收余额为负」即超收（已收 > 有效应收），与上方合同额超收标记同源互补
+const isUnreceivedNegative = computed(() => unreceivedBalance.value < 0)
+
 const { label: statusLabel, style: statusStyle } = useDictLabels('approval_status')
 const { label: contractStatusLabel } = useDictLabels('project_contract_status')
 
@@ -161,6 +184,7 @@ const itemsTotal = computed(() =>
     <div v-loading="loading" class="detail-scroll">
       <el-empty v-if="!detail" description="暂无数据" :image-size="60" />
       <template v-else>
+        <!-- 基本信息（不含金额，金额统一收进下方「业财口径」分区，毛/净分离 + 红字行） -->
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
           <el-descriptions-item label="项目名称">{{ detail.projectName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="项目编号">{{ detail.projectNo || '—' }}</el-descriptions-item>
@@ -174,19 +198,6 @@ const itemsTotal = computed(() =>
           <el-descriptions-item label="签约状态">
             {{ contractStatusLabel(detail.contractStatus) || '—' }}
           </el-descriptions-item>
-          <el-descriptions-item label="合同金额">{{ formatAmount(detail.contractAmount) }}</el-descriptions-item>
-          <el-descriptions-item label="累计发货">{{ formatAmount(detail.shippedAmount) }}</el-descriptions-item>
-          <el-descriptions-item label="累计已收">
-            <span :style="isOverCollected ? 'color:#f56c6c;font-weight:600' : ''">{{ formatAmount(detail.collectedAmount) }}</span>
-            <el-tooltip v-if="isOverCollected" :content="`⚠ 超收 ${formatAmount(overAmount)}，累计已收已超过合同金额`" placement="top">
-              <span style="color:#e6a23c;margin-left:6px;font-size:13px;line-height:1;cursor:pointer">⚠</span>
-            </el-tooltip>
-          </el-descriptions-item>
-          <el-descriptions-item label="累计开票">{{ formatAmount(detail.invoicedAmount) }}</el-descriptions-item>
-          <el-descriptions-item label="回款前开票">
-            {{ detail.allowInvoiceBeforeReceipt === false ? '不允许（强制票款勾稽）' : '允许' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="应收合计">{{ formatAmount(detail.receivableAmount) }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.contractSignedAt" label="签约时间">
             {{ formatDateTime(detail.contractSignedAt) }}
           </el-descriptions-item>
@@ -198,6 +209,56 @@ const itemsTotal = computed(() =>
           </el-descriptions-item>
         </el-descriptions>
 
+        <!-- 业财口径（2026-10-28 重构）：成熟 ERP 的毛/净分离 + 红字行 + 钩稽链。
+             红字行（退货/红冲）用红字独立展示，钩稽行让金额能对到合同额上。
+             布局用固定列宽网格 132px 1fr 132px 1fr：因每个区块等宽，中间标签列(L2)
+             左边缘恒定 = 面板宽度/2（即面板中线），三个区块严格对齐
+             （之前的 el-descriptions 自动列宽会因数值内容不同错位，已弃用）。 -->
+        <h4 class="block-title">合同与发货</h4>
+        <div class="fin-grid">
+          <div class="fin-cell label">合同金额（签约）</div>
+          <div class="fin-cell value">{{ formatAmount(detail.contractAmount) }}</div>
+          <div class="fin-cell label">累计发货（毛）</div>
+          <div class="fin-cell value">{{ formatAmount(detail.shippedAmount) }}</div>
+          <div class="fin-cell label">累计退货</div>
+          <div class="fin-cell value"><span class="red-amount">{{ formatAmount(detail.returnedAmount) }}</span></div>
+          <div class="fin-cell label">净发货（钩稽）</div>
+          <div class="fin-cell value"><strong>{{ formatAmount(netShipment) }}</strong></div>
+        </div>
+
+        <h4 class="block-title">应收与回款</h4>
+        <div class="fin-grid">
+          <div class="fin-cell label">有效应收（净额）</div>
+          <div class="fin-cell value">{{ formatAmount(detail.receivableAmount) }}</div>
+          <div class="fin-cell label">红冲应收</div>
+          <div class="fin-cell value"><span class="red-amount">{{ formatAmount(detail.redReceivableAmount) }}</span></div>
+          <div class="fin-cell label">累计已收（净额）</div>
+          <div class="fin-cell value">
+            <span :class="isOverCollected ? 'over-amount' : ''">{{ formatAmount(detail.collectedAmount) }}</span>
+            <el-tooltip v-if="isOverCollected" :content="`⚠ 超收 ${formatAmount(overAmount)}，累计已收已超过合同金额`" placement="top">
+              <span style="color:#e6a23c;margin-left:6px;font-size:13px;line-height:1;cursor:pointer">⚠</span>
+            </el-tooltip>
+          </div>
+          <div class="fin-cell label">红冲回款</div>
+          <div class="fin-cell value"><span class="red-amount">{{ formatAmount(detail.redReceivedAmount) }}</span></div>
+          <div class="fin-cell label">未收余额（钩稽）</div>
+          <div class="fin-cell value"><strong :style="isUnreceivedNegative ? 'color:#f56c6c' : ''">{{ formatAmount(unreceivedBalance) }}</strong></div>
+          <div class="fin-cell label">回款前开票</div>
+          <div class="fin-cell value">{{ detail.allowInvoiceBeforeReceipt === false ? '不允许（强制票款勾稽）' : '允许' }}</div>
+        </div>
+
+        <h4 class="block-title">开票</h4>
+        <div class="fin-grid">
+          <div class="fin-cell label">累计开票（净额）</div>
+          <div class="fin-cell value">{{ formatAmount(detail.invoicedAmount) }}</div>
+          <div class="fin-cell label">红字发票</div>
+          <div class="fin-cell value"><span class="red-amount">{{ formatAmount(detail.redInvoicedAmount) }}</span></div>
+          <div class="fin-cell label">未开票余额（钩稽）</div>
+          <div class="fin-cell value"><strong :style="uninvoicedBalance < 0 ? 'color:#e6a23c' : ''">{{ formatAmount(uninvoicedBalance) }}</strong></div>
+          <div class="fin-cell label">—</div>
+          <div class="fin-cell value">—</div>
+        </div>
+
         <!-- 货物明细（分区标题与发货详情 .block-title 同款，2026-10-24 统一布局口径）。
              合计放标题行右对齐（虎哥 2026-10-24）：原来挂在表格下方单独占一行，视觉上和明细脱节 -->
         <h4 class="block-title">
@@ -208,12 +269,12 @@ const itemsTotal = computed(() =>
           <el-table-column prop="itemName" label="货物" min-width="150" show-overflow-tooltip />
           <el-table-column prop="specModel" label="规格" min-width="120" show-overflow-tooltip />
           <el-table-column prop="unit" label="单位" width="70" align="center" />
-          <el-table-column prop="quantity" label="合同量" width="90" align="right" />
-          <el-table-column prop="shippedQty" label="已发量" width="90" align="right" />
-          <el-table-column prop="unitPrice" label="单价" width="110" align="right">
+          <el-table-column prop="quantity" label="合同量" width="90" align="right" header-align="center" />
+          <el-table-column prop="shippedQty" label="已发量" width="90" align="right" header-align="center" />
+          <el-table-column prop="unitPrice" label="单价" width="110" align="right" header-align="center">
             <template #default="{ row }">{{ formatAmount(row.unitPrice) }}</template>
           </el-table-column>
-          <el-table-column prop="totalAmount" label="行金额" width="120" align="right">
+          <el-table-column prop="totalAmount" label="行金额" width="120" align="right" header-align="center">
             <template #default="{ row }">{{ formatAmount(row.totalAmount) }}</template>
           </el-table-column>
           <template #empty>
@@ -302,5 +363,45 @@ const itemsTotal = computed(() =>
   max-height: calc(100vh - 280px);
   overflow-y: auto;
   padding-right: 4px;
+}
+/* 业财口径：红字行（退货/红冲）走红字 */
+.red-amount {
+  color: #f56c6c;
+  font-weight: 600;
+}
+.over-amount {
+  color: #f56c6c;
+  font-weight: 600;
+}
+/* 业财口径：固定列宽网格（132px 1fr 132px 1fr）。
+   关键：每个区块等宽 → 中间标签列(L2)左边缘恒定 = 面板宽度/2（即面板中线），
+   三个区块严格对齐，不再因数值内容不同错位。
+   金额按自然左对齐（虎哥 2026-10-28：不要右对齐）。 */
+.fin-grid {
+  display: grid;
+  grid-template-columns: 132px 1fr 132px 1fr;
+  border: 1px solid var(--el-border-color-lighter);
+  border-bottom: none;
+  margin-bottom: 8px;
+}
+.fin-grid > .fin-cell {
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  border-right: 1px solid var(--el-border-color-lighter);
+  padding: 7px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  min-width: 0;
+}
+.fin-grid > .fin-cell:nth-child(4n) {
+  border-right: none;
+}
+.fin-grid > .fin-cell.label {
+  background: var(--el-fill-color-light);
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+}
+.fin-grid > .fin-cell.value {
+  text-align: left;
+  overflow-wrap: break-word;
 }
 </style>

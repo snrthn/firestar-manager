@@ -52,11 +52,11 @@ const option = computed<Record<string, unknown>>(() => {
 <template>
   <div v-loading="loading">
     <el-row :gutter="12" class="kpi-grid">
-      <el-col :span="6"><StatCard label="退货率 (D-09)" :value="formatPercent(data?.returnRate)" accent="#f56c6c" /></el-col>
-      <el-col :span="6"><StatCard label="累计退货额" :value="formatMoney(data?.returnAmountTotal)" accent="#f56c6c" /></el-col>
-      <el-col :span="6"><StatCard label="已发货额" :value="formatMoney(data?.shipmentAmountTotal)" /></el-col>
-      <el-col :span="6"><StatCard label="在途超期批次 (E-04)" :value="formatNumber(data?.inTransitOverdueCount)" suffix="批" accent="#e6a23c" /></el-col>
-      <el-col :span="6"><StatCard label="红冲率 (D-10)" :value="formatPercent(data?.redRate)" accent="#f56c6c" /></el-col>
+      <el-col :span="6"><StatCard label="退货率 (D-09)" :value="data?.returnRate" :format="formatPercent" accent="#f56c6c" /></el-col>
+      <el-col :span="6"><StatCard label="累计退货额" :value="data?.returnAmountTotal" :format="formatMoney" accent="#f56c6c" /></el-col>
+      <el-col :span="6"><StatCard label="已发货额" :value="data?.shipmentAmountTotal" :format="formatMoney" /></el-col>
+      <el-col :span="6"><StatCard label="在途超期批次 (E-04)" :value="data?.inTransitOverdueCount" :format="formatNumber" suffix="批" accent="#e6a23c" /></el-col>
+      <el-col :span="6"><StatCard label="红冲率 (D-10)" :value="data?.redRate" :format="formatPercent" accent="#f56c6c" /></el-col>
     </el-row>
 
     <el-card shadow="never" class="chart-card">

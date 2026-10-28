@@ -28,14 +28,19 @@ watch(
   { deep: true, immediate: true },
 )
 
-// 三个完成率展示为迷你进度条（百分比封顶 100，避免超额回款撑爆组件）
+// 三个完成率展示为迷你进度条 + 显式百分比文字（百分比封顶 100，避免超额回款撑爆组件）。
+// 进度条在 0% 时视觉上近乎空白，故额外用文字标出数值，避免「看不到率」的误判。
 const pct = (v: number | null | undefined) => Math.min(100, Math.round((Number(v) || 0) * 100))
+const pctText = (v: number | null | undefined) => {
+  const r = (Number(v) || 0) * 100
+  return `${r.toFixed(2)}%`
+}
 </script>
 
 <template>
   <div v-loading="loading">
     <el-alert type="info" :closable="false" show-icon class="rank-tip">
-      <template #title>仅统计「已签合同」（approval_status = APPROVED）项目，合同额与 F-01 口径对齐</template>
+      <template #title>仅统计「已签合同」</template>
     </el-alert>
 
     <el-table :data="data?.rows || []" border stripe :max-height="520" class="rank-table">
@@ -62,19 +67,28 @@ const pct = (v: number | null | undefined) => Math.min(100, Math.round((Number(v
       <el-table-column label="回款额" min-width="130" align="right">
         <template #default="{ row }">{{ formatMoney(row.receiptAmount) }}</template>
       </el-table-column>
-      <el-table-column label="发货率" min-width="160">
+      <el-table-column label="发货率" min-width="170">
         <template #default="{ row }">
-          <el-progress :percentage="pct(row.shipRate)" :stroke-width="14" />
+          <div class="rate-cell">
+            <el-progress :percentage="pct(row.shipRate)" :stroke-width="14" :show-text="false" />
+            <span class="rate-num">{{ pctText(row.shipRate) }}</span>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column label="开票率" min-width="160">
+      <el-table-column label="开票率" min-width="170">
         <template #default="{ row }">
-          <el-progress :percentage="pct(row.invoiceRate)" :stroke-width="14" color="#e6a23c" />
+          <div class="rate-cell">
+            <el-progress :percentage="pct(row.invoiceRate)" :stroke-width="14" :show-text="false" color="#e6a23c" />
+            <span class="rate-num">{{ pctText(row.invoiceRate) }}</span>
+          </div>
         </template>
       </el-table-column>
-      <el-table-column label="回款率" min-width="160">
+      <el-table-column label="回款率" min-width="170">
         <template #default="{ row }">
-          <el-progress :percentage="pct(row.receiptRate)" :stroke-width="14" color="#67c23a" />
+          <div class="rate-cell">
+            <el-progress :percentage="pct(row.receiptRate)" :stroke-width="14" :show-text="false" color="#67c23a" />
+            <span class="rate-num">{{ pctText(row.receiptRate) }}</span>
+          </div>
         </template>
       </el-table-column>
     <template #empty>
@@ -98,5 +112,16 @@ const pct = (v: number | null | undefined) => Math.min(100, Math.round((Number(v
   font-size: 13px;
   color: var(--el-text-color-secondary);
   text-align: right;
+}
+.rate-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rate-num {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 </style>
