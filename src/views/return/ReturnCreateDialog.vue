@@ -5,8 +5,10 @@ import EmptyState from '@/components/EmptyState.vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { createReturn } from '@/api/return'
 import { shipmentDetail, shipmentPage } from '@/api/shipment'
+import { projectOptions as fetchProjectOptions } from '@/api/project'
 import type { ReturnCreateForm, ReturnLineForm } from '@/types/return'
 import type { ShipmentLineVO, ShipmentVO } from '@/types/shipment'
+import type { ProjectOptionVO } from '@/types/project'
 
 // 发起退货弹窗（V67）：选已审批发货单 → 带出明细行 → 逐行填退货数量 → 原因 → 提交即三级审批。
 //
@@ -25,15 +27,35 @@ const form = reactive<{ projectId: number | null; shipmentId: number | null; ret
   returnReason: '',
 })
 
-/** 项目下拉：从已加载的「已审批发货单」反推（保证下拉项都有可退发货单，符合退货惯性） */
-const projectOptions = computed(() => {
-  const map = new Map<number, string>()
-  for (const s of shipmentOptions.value) {
-    if (s.projectId != null && !map.has(s.projectId)) {
-      map.set(s.projectId, s.projectName || `项目#${s.projectId}`)
-    }
+/** 全量项目（带 projectNo，来自 /project/options），用于项目下拉拼接编号 */
+const allProjects = ref<ProjectOptionVO[]>([])
+
+/** 拉取项目下拉选项（失败不阻断主流程，降级为仅按发货单反推） */
+const loadProjects = async () => {
+  try {
+    allProjects.value = await fetchProjectOptions()
+  } catch {
+    allProjects.value = []
   }
-  return Array.from(map, ([id, name]) => ({ id, name }))
+}
+
+/** 项目下拉：取已加载发货单涉及的项目，编号+名称拼接（与收款/开票弹窗一致）；
+ *  接口未加载时降级为按发货单反推（无编号） */
+const projectOptions = computed(() => {
+  const shipProjs = shipmentOptions.value
+    .map((s) => ({ id: s.projectId, name: s.projectName }))
+    .filter((x) => x.id != null) as { id: number; name: string | null }[]
+  const ids = new Set(shipProjs.map((x) => x.id))
+  if (allProjects.value.length) {
+    return allProjects.value
+      .filter((p) => ids.has(p.id))
+      .map((p) => ({ id: p.id, label: `${p.projectNo || '—'} ${p.projectName}` }))
+  }
+  const map = new Map<number, string>()
+  for (const s of shipProjs) {
+    if (!map.has(s.id)) map.set(s.id, s.name || `项目#${s.id}`)
+  }
+  return Array.from(map, ([id, name]) => ({ id, label: name }))
 })
 
 /** 发货单下拉：按所选项目在客户端过滤 */
@@ -42,6 +64,11 @@ const shipmentFiltered = computed(() =>
     ? []
     : shipmentOptions.value.filter((s) => s.projectId === form.projectId),
 )
+
+/** 是否已全退完（列表级口径：已退金额 >= 发货金额；无金额或退货额不足则不算「已退完」）
+ *  ⚠️ 行级精确判断需拉详情；下拉场景用金额口径足够（全退=退货额追平发货额）。 */
+const isFullyReturned = (s: ShipmentVO): boolean =>
+  (s.shipmentAmount ?? 0) > 0 && (s.returnedAmount ?? 0) >= (s.shipmentAmount ?? 0)
 
 /** 切换项目 → 清空已选发货单与明细行（级联重置） */
 const onProjectChange = () => {
@@ -160,6 +187,7 @@ watch(
     form.returnReason = ''
     resetLines()
     loadShipments()
+    loadProjects()
   },
 )
 </script>
@@ -181,7 +209,7 @@ watch(
             <el-option
               v-for="p in projectOptions"
               :key="p.id"
-              :label="p.name"
+              :label="p.label"
               :value="p.id"
             />
           </el-select>
@@ -200,11 +228,12 @@ watch(
             <el-option
               v-for="s in shipmentFiltered"
               :key="s.id"
-              :label="`${s.batchNo || '—'} · ${s.projectName || ''}`"
+              :label="`${s.batchNo || '—'} · ${s.projectName || ''}${isFullyReturned(s) ? ' · 已退完' : ''}`"
               :value="s.id"
+              :disabled="isFullyReturned(s)"
             />
           </el-select>
-          <div class="muted">仅列出审批通过的发货单；退货针对「已收货」数量，未收货的行不展示</div>
+          <div class="muted">仅列出审批通过的发货单；已全退完的发货单置灰不可选；退货针对「已收货」数量，未收货的行不展示</div>
         </el-form-item>
         <el-form-item label="退货原因" required>
           <el-input
