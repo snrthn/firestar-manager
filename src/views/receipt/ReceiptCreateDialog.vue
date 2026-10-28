@@ -156,12 +156,24 @@ const formatAmount = (v: number | null | undefined): string => {
   return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// ===== 核销分配交互增强（2026-10-27 Q1/Q2）=====
-// Q1：已选应收单禁止在其他分配行重复选择 —— 当前行已选的保留可见，其余行已选的剔除出候选。
-const allocOptionsFor = (idx: number) =>
-  receivableOptions.value.filter(
-    (rv) => !allocations.value.some((a, i) => i !== idx && a.receivableId === rv.id),
-  )
+// ===== 核销分配交互增强（2026-10-27 Q1/Q2；2026-10-28 禁用+标记改造）=====
+// 下拉不再「剔除」已选应收单（避免用户误以为数据丢失），改为：已选的禁用 + 标记，其余按结清态标记。
+// 红冲(RED)模式：已结清/已开票 的应收单仍可选（反向核销/退款要冲原单），仅防本单内重复选。
+const isRedMode = () => isRedFlush() || editDocDirection.value === 'RED'
+// 该应收单是否被「其他分配行」已选（防同一应收单在多个分配行重复选）
+const isChosenByOtherRow = (idx: number, rvId: number) =>
+  allocations.value.some((a, i) => i !== idx && a.receivableId === rvId)
+// 收款场景：未回款余额 ≤ 0 = 已结清
+const isReceiptCleared = (rv: ReceivableVO) => Number(rv.unreceivedAmount ?? 0) <= 0
+// 下拉项是否禁用：其他行已选（禁止重复）→ 禁用；非红冲且已结清 → 禁用
+const isOptionDisabled = (idx: number, rv: ReceivableVO) =>
+  isChosenByOtherRow(idx, rv.id) || (!isRedMode() && isReceiptCleared(rv))
+// 下拉项后缀标签：其他行已选 → 「已选」；已结清 → 「已结清」（红冲态标注「可红冲」）；否则空
+const optionTag = (idx: number, rv: ReceivableVO): string => {
+  if (isChosenByOtherRow(idx, rv.id)) return '已选'
+  if (isReceiptCleared(rv)) return isRedMode() ? '已结清·可红冲' : '已结清'
+  return ''
+}
 // Q2：选中应收单后默认回填其「未回款余额」；已手填金额（>0）不覆盖。
 const onAllocationReceivableChange = (idx: number) => {
   const a = allocations.value[idx]
@@ -568,10 +580,11 @@ watch(
                 @change="onAllocationReceivableChange(idx)"
               >
                 <el-option
-                  v-for="rv in allocOptionsFor(idx)"
+                  v-for="rv in receivableOptions"
                   :key="rv.id"
-                  :label="`${rv.receivableNo}（未回款 ${formatAmount(rv.unreceivedAmount)}）`"
+                  :label="`${rv.receivableNo}（未回款 ${formatAmount(rv.unreceivedAmount)}）${optionTag(idx, rv) ? ' · ' + optionTag(idx, rv) : ''}`"
                   :value="rv.id"
+                  :disabled="isOptionDisabled(idx, rv)"
                 />
               </el-select>
               <el-input-number

@@ -90,6 +90,17 @@ const formatAmount = (v: number | null | undefined): string => {
   return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// 红冲应收单（docDirection=RED，退供生成）：整行标红 + 金额取负展示，
+// 与立项/汇总侧「红字取负」口径一致（否则列表正值会让用户误以为还有应收款）。
+const isRed = (row: ReceivableVO) => row.docDirection === 'RED'
+const dispAmt = (row: ReceivableVO, v: number | null | undefined): string => {
+  if (isRed(row) && v != null && !Number.isNaN(Number(v))) {
+    return '-' + formatAmount(v)
+  }
+  return formatAmount(v)
+}
+const redRowClass = ({ row }: { row: ReceivableVO }): string => (isRed(row) ? 'row-red' : '')
+
 const { label: statusLabel, style: statusStyle } = useDictLabels('receivable_status')
 const { label: sourceTypeLabel, style: sourceTypeStyle } = useDictLabels('receivable_source')
 
@@ -168,7 +179,7 @@ onMounted(() => {
       <span class="muted">应收单由发货「客户已收货」自动生成，不支持手工新增</span>
     </div>
 
-    <el-table v-loading="loading" :data="list" border>
+    <el-table v-loading="loading" :data="list" border :row-class-name="redRowClass">
       <el-table-column label="应收单号" min-width="170" show-overflow-tooltip>
         <template #default="{ row }">{{ row.receivableNo || '—' }}</template>
       </el-table-column>
@@ -186,25 +197,25 @@ onMounted(() => {
         </template>
       </el-table-column>
       <el-table-column label="应收金额" width="140" align="right">
-        <template #default="{ row }">{{ formatAmount(row.receivableAmount) }}</template>
+        <template #default="{ row }">{{ dispAmt(row, row.receivableAmount) }}</template>
       </el-table-column>
       <el-table-column label="已核销" width="130" align="right">
-        <template #default="{ row }">{{ formatAmount(row.writtenOffAmount) }}</template>
+        <template #default="{ row }">{{ dispAmt(row, row.writtenOffAmount) }}</template>
       </el-table-column>
       <el-table-column label="未核销" width="130" align="right">
-        <template #default="{ row }"><b>{{ formatAmount(row.unwrittenOffAmount) }}</b></template>
+        <template #default="{ row }"><b>{{ dispAmt(row, row.unwrittenOffAmount) }}</b></template>
       </el-table-column>
       <el-table-column label="已开票" width="130" align="right">
-        <template #default="{ row }">{{ formatAmount(row.invoicedAmount) }}</template>
+        <template #default="{ row }">{{ dispAmt(row, row.invoicedAmount) }}</template>
       </el-table-column>
       <el-table-column label="未开票" width="130" align="right">
-        <template #default="{ row }"><b>{{ formatAmount(row.uninvoicedAmount) }}</b></template>
+        <template #default="{ row }"><b>{{ dispAmt(row, row.uninvoicedAmount) }}</b></template>
       </el-table-column>
       <el-table-column label="已回款" width="130" align="right">
-        <template #default="{ row }">{{ formatAmount(row.receivedAmount) }}</template>
+        <template #default="{ row }">{{ dispAmt(row, row.receivedAmount) }}</template>
       </el-table-column>
       <el-table-column label="未回款" width="130" align="right">
-        <template #default="{ row }"><b>{{ formatAmount(row.unreceivedAmount) }}</b></template>
+        <template #default="{ row }"><b>{{ dispAmt(row, row.unreceivedAmount) }}</b></template>
       </el-table-column>
       <el-table-column label="应收日期" width="120" align="center">
         <template #default="{ row }">{{ formatDate(row.receivableDate) }}</template>
@@ -258,4 +269,8 @@ onMounted(() => {
   font-size: 12px;
 }
 /* .pagination-bar 已上提到 styles/pages.css 全局（2026-10-26），本文件不再留本地副本 */
+/* 红冲应收单整行标红（D5：与立项/汇总侧「红字取负」口径一致，避免列表正值误导） */
+:deep(tr.row-red td) {
+  color: #f56c6c;
+}
 </style>

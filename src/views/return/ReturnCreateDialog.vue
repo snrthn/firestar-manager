@@ -19,10 +19,35 @@ const emit = defineEmits<{ saved: [] }>()
 
 const shipmentOptions = ref<ShipmentVO[]>([])
 const lineRows = ref<ShipmentLineVO[]>([])
-const form = reactive<{ shipmentId: number | null; returnReason: string }>({
+const form = reactive<{ projectId: number | null; shipmentId: number | null; returnReason: string }>({
+  projectId: null,
   shipmentId: null,
   returnReason: '',
 })
+
+/** 项目下拉：从已加载的「已审批发货单」反推（保证下拉项都有可退发货单，符合退货惯性） */
+const projectOptions = computed(() => {
+  const map = new Map<number, string>()
+  for (const s of shipmentOptions.value) {
+    if (s.projectId != null && !map.has(s.projectId)) {
+      map.set(s.projectId, s.projectName || `项目#${s.projectId}`)
+    }
+  }
+  return Array.from(map, ([id, name]) => ({ id, name }))
+})
+
+/** 发货单下拉：按所选项目在客户端过滤 */
+const shipmentFiltered = computed(() =>
+  form.projectId == null
+    ? []
+    : shipmentOptions.value.filter((s) => s.projectId === form.projectId),
+)
+
+/** 切换项目 → 清空已选发货单与明细行（级联重置） */
+const onProjectChange = () => {
+  form.shipmentId = null
+  resetLines()
+}
 /** shipmentLineId → 本次退货数量（仅 >0 的行参与提交） */
 const qty = reactive<Record<number, number>>({})
 const loadingShipments = ref(false)
@@ -79,6 +104,10 @@ const formatAmount = (v: number | null | undefined): string => {
 }
 
 const handleSubmit = async () => {
+  if (!form.projectId) {
+    ElMessage.warning('请选择项目')
+    return
+  }
   if (!form.shipmentId) {
     ElMessage.warning('请选择发货单')
     return
@@ -126,6 +155,7 @@ watch(
   () => visible.value,
   (v) => {
     if (!v) return
+    form.projectId = null
     form.shipmentId = null
     form.returnReason = ''
     resetLines()
@@ -139,17 +169,36 @@ watch(
   <el-dialog v-model="visible" title="发起退货申请" width="1000px" top="7vh">
     <div class="dialog-scroll">
       <el-form label-width="90px" @submit.prevent>
+        <el-form-item label="项目" required>
+          <el-select
+            v-model="form.projectId"
+            filterable
+            placeholder="选择项目"
+            style="width: 100%"
+            :loading="loadingShipments"
+            @change="onProjectChange"
+          >
+            <el-option
+              v-for="p in projectOptions"
+              :key="p.id"
+              :label="p.name"
+              :value="p.id"
+            />
+          </el-select>
+          <div class="muted">先选择项目，再选择该项目的已审批发货单</div>
+        </el-form-item>
         <el-form-item label="发货单" required>
           <el-select
             v-model="form.shipmentId"
             filterable
-            placeholder="选择已审批的发货单"
+            :disabled="!form.projectId"
+            :placeholder="form.projectId ? '选择已审批的发货单' : '请先选择项目'"
             style="width: 100%"
             :loading="loadingShipments"
             @change="onShipmentChange"
           >
             <el-option
-              v-for="s in shipmentOptions"
+              v-for="s in shipmentFiltered"
               :key="s.id"
               :label="`${s.batchNo || '—'} · ${s.projectName || ''}`"
               :value="s.id"
@@ -170,13 +219,15 @@ watch(
       </el-form>
 
       <div v-loading="loadingLines" class="lines-wrap">
-        <el-empty
-          v-if="!lineRows.length && !loadingLines"
-          :description="
-            form.shipmentId ? '该发货单暂无已收货明细，无可退货物' : '请先选择发货单'
-          "
-          :image-size="60"
-        />
+          <el-empty
+            v-if="!lineRows.length && !loadingLines"
+            :description="
+              form.projectId
+                ? (form.shipmentId ? '该发货单暂无已收货明细，无可退货物' : '请选择该项目的发货单')
+                : '请先选择项目'
+            "
+            :image-size="60"
+          />
         <template v-else>
           <el-table :data="lineRows" border size="small">
             <el-table-column prop="itemName" label="货物名称" min-width="160" fixed="left" show-overflow-tooltip />
