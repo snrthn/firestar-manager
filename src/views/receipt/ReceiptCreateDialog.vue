@@ -6,6 +6,7 @@ import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { createReceipt, receiptDetail, updateReceipt } from '@/api/receipt'
 import { projectPage } from '@/api/project'
 import { receivablePage } from '@/api/receivable'
+import { loadDictOptions, type DictOption } from '@/composables/useDict'
 import { listFiles, uploadFile } from '@/api/file'
 import type { AllocationItem, ReceiptRequest, ReceiptVO } from '@/types/receipt'
 import type { ProjectVO } from '@/types/project'
@@ -149,6 +150,32 @@ const loadProjects = async () => {
   }
 }
 
+// 款项类型合并下拉（2026-10-28 虎哥要求：正常新建单也能选「红冲」）：
+// receipt_type（蓝字 NORMAL/PREPAY）+ receipt_red_type（红字 REFUND/RED）合并，
+// 选中红字类即进入红冲态。DictSelect 仅支持单 typeCode，故此处自定义合并 el-select，
+// 复用 useDict.loadDictOptions 取同口径 ENABLED 选项。
+type ReceiptTypeOpt = DictOption & { grp: 'blue' | 'red' }
+const receiptTypeOptions = ref<ReceiptTypeOpt[]>([])
+const loadReceiptTypeOptions = async () => {
+  try {
+    const [blue, red] = await Promise.all([
+      loadDictOptions('receipt_type'),
+      loadDictOptions('receipt_red_type'),
+    ])
+    receiptTypeOptions.value = [
+      ...blue.map((o) => ({ ...o, grp: 'blue' as const })),
+      ...red.map((o) => ({ ...o, grp: 'red' as const })),
+    ]
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  }
+}
+// 蓝字 / 红字两组拆开，供模板按「分组标题 + 红字项打标签」渲染（2026-10-28 虎哥：
+// 仅靠颜色区分太眼花，要明确文字标签）。`:label` 仍用字典原名 → 折叠态显示干净；
+// 展开态红字项额外加「红冲」标签，区分落到文字而非颜色。
+const blueTypeOpts = computed(() => receiptTypeOptions.value.filter((o) => o.grp === 'blue'))
+const redTypeOpts = computed(() => receiptTypeOptions.value.filter((o) => o.grp === 'red'))
+
 const selectedProject = () => projectOptions.value.find((p) => p.id === form.projectId) ?? null
 
 const formatAmount = (v: number | null | undefined): string => {
@@ -159,7 +186,17 @@ const formatAmount = (v: number | null | undefined): string => {
 // ===== 核销分配交互增强（2026-10-27 Q1/Q2；2026-10-28 禁用+标记改造）=====
 // 下拉不再「剔除」已选应收单（避免用户误以为数据丢失），改为：已选的禁用 + 标记，其余按结清态标记。
 // 红冲(RED)模式：已结清/已开票 的应收单仍可选（反向核销/退款要冲原单），仅防本单内重复选。
-const isRedMode = () => isRedFlush() || editDocDirection.value === 'RED'
+// 手动选「红冲」款项类型（REFUND/RED）→ 进入红冲态（与详情红冲按钮、编辑红字单同口径）
+const isRedType = () =>
+  form.receiptType === 'REFUND' || form.receiptType === 'RED'
+// 红冲态：① 详情红冲按钮（originalReceiptId 非空，冲原蓝字应收、镜像锁定）；
+//         ② 手动选红冲款项类型（originalReceiptId 空，冲红字应收、消耗贷项）；
+//         ③ 编辑既有红字单。三种皆 docDirection=RED，下拉走红冲口径。
+const isRedMode = () => isRedFlush() || editDocDirection.value === 'RED' || isRedType()
+// 红字应收是否已冲销（消耗贷项完成）：writtenOffAmount ≥ receivableAmount 即视为已结清，
+// 用于手动红冲下拉排除（防双冲）。零字典/零迁移，纯数值判定（2026-10-28 虎哥拍板）。
+const isReceivableConsumed = (rv: ReceivableVO): boolean =>
+  Number(rv.writtenOffAmount ?? 0) >= Number(rv.receivableAmount ?? 0)
 // 该应收单是否被「其他分配行」已选（防同一应收单在多个分配行重复选）
 const isChosenByOtherRow = (idx: number, rvId: number) =>
   allocations.value.some((a, i) => i !== idx && a.receivableId === rvId)
@@ -174,6 +211,21 @@ const optionTag = (idx: number, rv: ReceivableVO): string => {
   if (isReceiptCleared(rv)) return isRedMode() ? '已结清·可红冲' : '已结清'
   return ''
 }
+// 下拉可见应收单：按模式过滤（2026-10-28 红冲改造）
+// - 正常收款态：剔除红字应收（docDirection=RED），避免误选退货贷项；
+// - 手动红冲态（选红冲款项类型、非详情红冲）：只留红字应收且排除已冲销（防双冲）；
+// - 详情红冲态（冲原蓝字应收）：显示全部（下拉只读锁定，无需过滤方向）。
+const visibleReceivableOptions = computed<ReceivableVO[]>(() => {
+  if (isRedType() && !isRedFlush()) {
+    return receivableOptions.value.filter(
+      (rv) => rv.docDirection === 'RED' && !isReceivableConsumed(rv),
+    )
+  }
+  if (!isRedMode()) {
+    return receivableOptions.value.filter((rv) => rv.docDirection !== 'RED')
+  }
+  return receivableOptions.value
+})
 // Q2：选中应收单后默认回填其「未回款余额」；已手填金额（>0）不覆盖。
 const onAllocationReceivableChange = (idx: number) => {
   const a = allocations.value[idx]
@@ -319,6 +371,11 @@ const handleSubmit = async () => {
     ElMessage.warning('正常收款必须至少选择一条应收单进行核销分配')
     return
   }
+  // 红冲态（详情红冲 / 手动红冲款项类型 / 编辑红字单）必须至少一条冲销目标
+  if (isRedMode() && allocations.value.length === 0) {
+    ElMessage.warning('红冲单必须至少选择一条应收单（红字应收或原单应收）进行冲销')
+    return
+  }
   if (!form.receiptDate) {
     ElMessage.warning('请选择收款日期')
     return
@@ -335,9 +392,10 @@ const handleSubmit = async () => {
       return
     }
   }
-  // 超收拦截（双保险·前端关口）：蓝字收款不得使累计已收超过合同金额；后端 create/审批回写亦会拦截
-  // 编辑对象本身是红冲单（RED）时放行：红冲审批通过后做减法，只会让累计已收回落（2026-10-27 误拦实锤）
-  if (!isRedFlush() && editDocDirection.value !== 'RED') {
+  // 超收拦截（双保险·前端关口）：仅「蓝字收款」不得使累计已收超过合同金额；
+  // 红冲态一律放行——详情红冲(isRedFlush) / 编辑红字单(editDocDirection=RED) / 手动选红冲款项类型(isRedType)
+  // 审批通过都是做减法，只会让累计已收回落（2026-10-27 误拦实锤；2026-10-28 补上手动红冲类型，否则②路径建不出单）
+  if (!isRedMode()) {
     const p = selectedProject()
     if (p && p.contractAmount != null && p.collectedAmount != null) {
       const c = Number(p.contractAmount)
@@ -357,7 +415,7 @@ const handleSubmit = async () => {
     .map((a) => ({ receivableId: a.receivableId, amount: Number(a.amount) }))
   // 单行分配不得超出该应收单未回款余额（双保险·前端关口，后端 saveAllocations 强制）：
   // 红冲单（RED）审批通过是做减法，放行；编辑中的红冲草稿同放行。
-  if (!(isRedFlush() || editDocDirection.value === 'RED')) {
+  if (!isRedMode()) {
     const bad = allocs.find((a) => {
       const rv = receivableOptions.value.find((r) => r.id === a.receivableId)
       return rv?.unreceivedAmount != null && a.amount > Number(rv.unreceivedAmount)
@@ -377,8 +435,10 @@ const handleSubmit = async () => {
     receiptDate: form.receiptDate || null,
     attachmentFileIds: attachments.value.map((f) => f.id),
     allocations: allocs,
-    // 红冲单（2026-10-25）：方向 RED + 原单 ID；审批通过后对应收单/项目汇总做减法
-    docDirection: isRedFlush() ? 'RED' : undefined,
+    // 红冲单（2026-10-25 / 2026-10-28 改造）：详情红冲或为「红冲」款项类型 → 方向 RED
+    // + 原单 ID（仅详情红冲带 originalReceiptId，手动红冲单 originalReceiptId 留空）；
+    // 审批通过后对应收单/项目汇总做减法（红字应收走消耗贷项语义）
+    docDirection: isRedMode() ? 'RED' : undefined,
     originalReceiptId: isRedFlush() ? props.originalReceiptId! : undefined,
   }
   saving.value = true
@@ -454,6 +514,7 @@ watch(
   (v) => {
     if (!v) return
     loadProjects()
+    loadReceiptTypeOptions()
     if (isEdit()) {
       loadForEdit(props.receiptId!)
     } else if (isRedFlush()) {
@@ -555,7 +616,38 @@ watch(
         <!-- 款项类型放在项目下方（2026-10-28 交互优化）：它决定下方「核销分配」的显隐，
              位置靠上可避免切换时下方整块跳动把上方字段顶走，阅读顺序也符合「先定性质再分钱」 -->
         <el-form-item label="款项类型" required>
+          <!-- 新建蓝字单（非编辑、非详情红冲）：合并下拉，蓝字/红字同屏，选中红字类即进入红冲态 -->
+          <el-select
+            v-if="!isEdit() && !isRedFlush()"
+            v-model="form.receiptType"
+            class="w-full"
+            placeholder="选择款项类型（含红冲）"
+          >
+            <el-option-group label="蓝字收款（正常 / 预收）">
+              <el-option
+                v-for="o in blueTypeOpts"
+                :key="o.value"
+                :label="o.label"
+                :value="o.value"
+              />
+            </el-option-group>
+            <el-option-group label="红字 / 退款（红冲 · 减项）">
+              <el-option
+                v-for="o in redTypeOpts"
+                :key="o.value"
+                :label="o.label"
+                :value="o.value"
+              >
+                <span class="type-opt">
+                  <el-tag size="small" type="danger" effect="plain">红冲</el-tag>
+                  <span>{{ o.label }}</span>
+                </span>
+              </el-option>
+            </el-option-group>
+          </el-select>
+          <!-- 编辑态 / 详情红冲：沿用原字典下拉（receipt_red_type），行为不变 -->
           <DictSelect
+            v-else
             v-model="form.receiptType"
             :type-code="isRedFlush() || editDocDirection === 'RED' ? 'receipt_red_type' : 'receipt_type'"
             :placeholder="isRedFlush() || editDocDirection === 'RED' ? '选择红冲款项类型' : '选择款项类型'"
@@ -568,7 +660,9 @@ watch(
         <el-form-item label="核销分配" v-if="!isPrepay()">
           <div class="alloc-box">
             <div class="alloc-hint muted">
-              正常收款需将金额分配到应收单（可拆多张）；同一应收单不可重复选；选完自动回填未回款余额，金额不得超出该余额。切到「预收款」将隐藏本区。
+              <template v-if="isRedFlush()">本单为红冲（冲销原单），以下为原单核销明细镜像：应收单不可更改、金额只能调减（≤原值），减至 0 即该行不参与冲销。</template>
+              <template v-else-if="isRedType()">红冲收款单：请选择「红字应收单」（退货生成的贷项）进行冲销，金额即冲销额；已冲销的红字应收单不在下拉中（防双冲）。</template>
+              <template v-else>正常收款需将金额分配到应收单（可拆多张）；同一应收单不可重复选；选完自动回填未回款余额，金额不得超出该余额。切到「预收款」将隐藏本区。</template>
             </div>
             <div v-for="(a, idx) in allocations" :key="idx" class="alloc-row">
               <el-select
@@ -577,10 +671,11 @@ watch(
                 placeholder="选择应收单"
                 style="flex: 1 1 0; min-width: 0"
                 :loading="loadingReceivables"
+                :disabled="isRedFlush()"
                 @change="onAllocationReceivableChange(idx)"
               >
                 <el-option
-                  v-for="rv in receivableOptions"
+                  v-for="rv in visibleReceivableOptions"
                   :key="rv.id"
                   :label="`${rv.receivableNo}（未回款 ${formatAmount(rv.unreceivedAmount)}）${optionTag(idx, rv) ? ' · ' + optionTag(idx, rv) : ''}`"
                   :value="rv.id"
@@ -590,19 +685,20 @@ watch(
               <el-input-number
                 v-model="a.amount"
                 :min="0"
-                :max="allocMaxAmount(idx)"
+                :max="isRedFlush() ? (a.amount ?? 0) : (isRedType() ? undefined : allocMaxAmount(idx))"
                 :precision="2"
                 controls-position="right"
                 placeholder="金额"
                 style="width: 150px"
+                :disabled="isRedFlush() && (a.amount ?? 0) <= 0"
                 @change="onAllocationAmountChange(idx)"
               />
-              <el-button link type="danger" size="small" @click="removeAllocation(idx)">
+              <el-button v-if="!isRedFlush()" link type="danger" size="small" @click="removeAllocation(idx)">
                 删除
               </el-button>
             </div>
             <div class="alloc-foot">
-              <el-button size="small" :disabled="!form.projectId" @click="addAllocation">
+              <el-button size="small" :disabled="!form.projectId || isRedFlush()" @click="addAllocation">
                 + 添加分配行
               </el-button>
               <span v-if="allocations.length" class="alloc-sum">
@@ -620,7 +716,7 @@ watch(
         <el-form-item label="收款金额" required>
           <el-input-number
             v-model="form.receiptAmount"
-            :disabled="form.receiptType === 'NORMAL'"
+            :disabled="!isPrepay()"
             :min="0"
             :precision="2"
             controls-position="right"
@@ -628,7 +724,7 @@ watch(
             style="width: 100%"
           />
           <div class="muted" style="margin-top: 4px">
-            正常收款：金额按应收单分配自动合计（只读）；切到「预收款」：隐藏分配、可手动填写金额。
+            正常收款 / 红冲：金额按应收单分配自动合计（只读，改动请在上方分配行内调整）；仅「预收款」：隐藏分配、可手动填写金额。
           </div>
         </el-form-item>
 
@@ -735,6 +831,12 @@ watch(
   color: #909399;
   font-size: 12px;
   margin-left: 4px;
+}
+/* 款项类型红字项：标签 + 文字同行对齐（2026-10-28 红冲标签改造） */
+.type-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .detail-scroll {
   max-height: calc(100vh - 280px);
