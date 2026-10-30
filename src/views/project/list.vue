@@ -11,6 +11,8 @@ import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import { projectPage, createProject, submitProject, projectDetail, updateProject, signProject } from '@/api/project'
 import type { ProjectFormData, ProjectItemForm, ProjectSignFormData, ProjectVO } from '@/types/project'
 import ProjectDetailDialog from './ProjectDetailDialog.vue'
+// 合同附件点击预览：与详情弹窗/发票详情同套，复用文件管理模块的预览弹窗
+import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
 import { formatDateTime } from '@/utils/datetime'
 import { listUserOptions } from '@/api/user'
 import type { UserOptionVO } from '@/types/user'
@@ -370,6 +372,16 @@ const removeContractFile = (idx: number) => {
   contractFiles.value.splice(idx, 1)
 }
 
+// ===== 合同附件就地预览 =====
+// 上传成功即返回 FileVO（已有 id、字节已入库），preview 接口开箱可用；
+// 不支持预览的格式（docx 等）由 FilePreviewDialog 给「请下载后查看」引导，本窗不做格式判定。
+const previewVisible = ref(false)
+const previewRow = ref<FileVO | null>(null)
+const handlePreview = (f: FileVO) => {
+  previewRow.value = f
+  previewVisible.value = true
+}
+
 // 签约入口判定 APPROVED + UNSIGNED 已迁至 ProjectDetailDialog（详情弹窗底部动作区）；
 // 列表侧不再需要，避免同一判定在两处漂移。
 const openSign = (row: ProjectVO) => {
@@ -640,7 +652,18 @@ onMounted(() => {
         </div>
         <ul v-if="contractFiles.length" class="attach-list">
           <li v-for="(f, idx) in contractFiles" :key="f.id" class="attach-item">
-            <span class="attach-name-text">{{ f.originalName || f.fileName || `文件#${f.id}` }}</span>
+            <!-- 文件名=预览入口（与详情弹窗/发票详情同款「el-button link primary small」），
+                 移除仍归独立按钮，避免「点名字是预览还是移除」的歧义 -->
+            <el-button
+              link
+              type="primary"
+              size="small"
+              class="attach-name"
+              :title="f.originalName || f.fileName || `文件#${f.id}`"
+              @click="handlePreview(f)"
+            >
+              <span class="attach-name-text">{{ f.originalName || f.fileName || `文件#${f.id}` }}</span>
+            </el-button>
             <el-button link type="danger" size="small" @click="removeContractFile(idx)">移除</el-button>
           </li>
         </ul>
@@ -656,6 +679,9 @@ onMounted(() => {
       <el-button type="primary" :loading="signSaving" v-has-perm="'project:sign'" @click="handleSign">确认签约</el-button>
     </template>
   </el-dialog>
+
+  <!-- 合同附件预览：刚上传的文件已入库有 id，直接复用文件管理模块的预览弹窗 -->
+  <FilePreviewDialog v-model="previewVisible" :file="previewRow" />
 
   <!-- 新建立项弹窗：top+内层限高与详情弹窗同口径（2026-10-24 虎哥），
        明细表长时不至于把 footer 顶出屏幕 -->
@@ -905,12 +931,24 @@ onMounted(() => {
   line-height: 22px;
   max-width: 100%;
 }
-.attach-name-text {
-  display: inline-block;
+/* 文件名按钮 = 预览入口，样式口径与发票详情/回款创建弹窗同款（2026-10-25 虎哥定稿）：
+   ⚠️ 溢出省略必须在按钮内再包一层真实子节点 <span>：`.el-button` 实测是 display:inline-flex，
+      裸文本会被包成**匿名 flex item**，text-overflow 对它无效——写在根按钮上的 ellipsis 根本
+      不出省略号。正解：span 作为真实 flex item，display:block + min-width:0，才能收缩到
+      max-width 以内再由 ellipsis 收尾。
+   ⚠️ line-height 必须显式写：`.el-button{line-height:1}` 是 EP 自带、**直接命中 button 元素**，
+      「直接指定赢过继承」，父 li 的 22px 传不进按钮 → 12px 文字落进 12px 行盒，
+      g/j/p/q/y 下半截被 overflow:hidden 切掉。给 1.5（12px×1.5=18px，装 12px 字体有余）。 */
+.attach-name {
   max-width: 340px;
+  line-height: 1.5;
+}
+.attach-name-text {
+  display: block;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: bottom;
+  line-height: 1.5;
 }
 </style>
