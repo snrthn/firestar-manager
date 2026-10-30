@@ -284,17 +284,20 @@ const onMenuCheck = (data: MenuVO) => {
     else menuCheckedSet.add(data.id)
     reconcilePageNodes()
   } else if (data.menuType === 'MENU' && btnKids.length > 0) {
+    // 页面节点（可能同时挂有子页面，如 字典管理(17)→字典数据(22)）：用整段后代 leafIds
+    // 做三态，避免只动直接按钮而漏控子页面子树。
+    //   EMPTY（页面未在集）→ 只加自身：半选（页面可见、按钮/子页空）
+    //   HALF（页面在集但后代未全）→ leafIds 整段全加：全选
+    //   FULL（页面+后代全在集）→ leafIds 整段全删：空选
     const inSet = menuCheckedSet.has(data.id)
     const allBtns = btnKids.every((c) => menuCheckedSet.has(c.id))
     const state: 'EMPTY' | 'HALF' | 'FULL' = !inSet ? 'EMPTY' : allBtns ? 'FULL' : 'HALF'
+    const leafIds = menuDescLeafMap.get(data.id) ?? []
     if (state === 'EMPTY') {
       menuCheckedSet.add(data.id) // → 半选（页面可见，按钮保持当前/空）
-    } else if (state === 'HALF') {
-      menuCheckedSet.add(data.id)
-      btnKids.forEach((c) => menuCheckedSet.add(c.id)) // → 全选
     } else {
-      menuCheckedSet.delete(data.id)
-      btnKids.forEach((c) => menuCheckedSet.delete(c.id)) // → 空选
+      // HALF → 全选（整段后代全加）；FULL → 清空（整段后代全删）
+      leafIds.forEach((id) => (state === 'FULL' ? menuCheckedSet.delete(id) : menuCheckedSet.add(id)))
     }
   } else {
     // 目录 / 外链 / 无按钮纯页面：整段两态
@@ -407,7 +410,10 @@ const collectAuthorizableIds = (nodes: MenuVO[]): number[] => {
       return [n.id]
     }
     if (n.menuType === 'MENU' && btnKids.length > 0) {
-      return [n.id, ...btnKids.map((c) => c.id)]
+      // 自身 + 全部后代可授权 id（按钮孩子 + 其他页面/子页面孩子都要递归）。
+      // 旧逻辑只递归按钮孩子，会漏掉「既挂按钮又挂子页面」的混合节点（见字典管理(17)→字典数据(22)），
+      // 导致子页面子树既不进全选集合、也不进 menuDescLeafMap → 全选勾不上、点击也空操作。
+      return [n.id, ...kids.flatMap((c) => walk(c))]
     }
     // CATALOG / 纯页面 MENU / LINK / 含子菜单的 MENU：递归后代
     const desc = kids.flatMap((c) => walk(c))
@@ -434,7 +440,8 @@ const buildMenuDescLeafMap = (nodes: MenuVO[]) => {
     if (n.menuType === 'BUTTON') {
       ids = [n.id]
     } else if (n.menuType === 'MENU' && btnKids.length > 0) {
-      ids = [n.id, ...btnKids.flatMap((c) => walk(c))]
+      // 同 collectAuthorizableIds：递归全部孩子而非仅按钮孩子，保证子页面子树不漏
+      ids = [n.id, ...kids.flatMap((c) => walk(c))]
     } else {
       const desc = kids.flatMap((c) => walk(c))
       if (desc.length === 0 && (n.menuType === 'MENU' || n.menuType === 'LINK')) {
