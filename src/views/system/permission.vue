@@ -197,7 +197,7 @@ onMounted(() => {
     </el-form>
 
     <div class="toolbar">
-      <el-button type="primary" :icon="Plus" @click="openCreate">新增权限</el-button>
+      <el-button type="primary" :icon="Plus" v-has-perm="'permission:create'" @click="openCreate">新增权限</el-button>
       <el-button :icon="Refresh" @click="loadPermissions">刷新</el-button>
     </div>
 
@@ -226,8 +226,8 @@ onMounted(() => {
       </el-table-column>
       <el-table-column label="操作" width="180" fixed="right" align="center">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openEdit(row)">修改</el-button>
-          <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+          <el-button link type="primary" size="small" v-has-perm="'permission:edit'" @click="openEdit(row)">修改</el-button>
+          <el-button link type="danger" size="small" v-has-perm="'permission:delete'" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     <template #empty>
@@ -282,7 +282,7 @@ onMounted(() => {
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSubmit">保存</el-button>
+      <el-button type="primary" :loading="saving" v-has-perm="'permission:create'" @click="handleSubmit">保存</el-button>
     </template>
   </el-dialog>
 </template>

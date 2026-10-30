@@ -30,7 +30,7 @@
               />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" :loading="savingBasic" @click="saveBasic">保存</el-button>
+              <el-button type="primary" :loading="savingBasic" v-has-perm="'config:create'" @click="saveBasic">保存</el-button>
             </el-form-item>
           </el-form>
         </el-card>
@@ -54,7 +54,7 @@
             placeholder="支持富文本（标题 / 列表 / 链接 / 图片）"
           />
           <div class="pt-card-actions">
-            <el-button type="primary" :loading="savingAbout" @click="saveAbout">保存</el-button>
+            <el-button type="primary" :loading="savingAbout" v-has-perm="'config:create'" @click="saveAbout">保存</el-button>
           </div>
         </el-card>
       </el-tab-pane>
@@ -90,7 +90,7 @@
             <el-button @click="onResetQuery">重置</el-button>
           </el-form-item>
           <el-form-item class="pt-adv-query-new">
-            <el-button type="primary" @click="openCreateDialog">新建键值</el-button>
+            <el-button type="primary" v-has-perm="'config:create'" @click="openCreateDialog">新建键值</el-button>
           </el-form-item>
         </el-form>
 
@@ -105,7 +105,7 @@
           </el-table-column>
           <el-table-column label="操作" width="90" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="openEditDialog(row)">编辑</el-button>
+              <el-button link type="primary" size="small" v-has-perm="'config:create'" @click="openEditDialog(row)">编辑</el-button>
             </template>
           </el-table-column>
         <template #empty>
@@ -157,7 +157,7 @@
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="dialogSubmitting" @click="submitDialog">确定</el-button>
+        <el-button type="primary" :loading="dialogSubmitting" v-has-perm="'config:create'" @click="submitDialog">确定</el-button>
       </template>
     </el-dialog>
   </div>

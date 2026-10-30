@@ -313,7 +313,7 @@ watch(
 
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSubmit">提交退货申请</el-button>
+      <el-button type="primary" :loading="saving" v-has-perm="'return:create'" @click="handleSubmit">提交退货申请</el-button>
     </template>
   </el-dialog>
 </template>

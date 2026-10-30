@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { MagicStick, Refresh, Search } from '@element-plus/icons-vue'
+import { MagicStick, Refresh, Search, Download } from '@element-plus/icons-vue'
+import { downloadViaBackend } from '@/utils/fileDownload'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -86,6 +87,17 @@ const resetQuery = () => {
   pageNum.value = 1
   loadLedger()
 }
+const onExport = () => {
+  const qs = new URLSearchParams()
+  if (query.projectId != null) qs.append('projectId', String(query.projectId))
+  if (query.ledgerType) qs.append('ledgerType', query.ledgerType)
+  if (query.status) qs.append('status', query.status)
+  if (query.keyword.trim()) qs.append('keyword', query.keyword.trim())
+  if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
+  if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
+  downloadViaBackend('/writeoff/export?' + qs.toString(), 'writeoff_export.xlsx')
+}
+
 const handleSizeChange = () => {
   pageNum.value = 1
   loadLedger()
@@ -239,6 +251,7 @@ onMounted(() => {
         <div class="toolbar">
           <span class="toolbar-tip">所有核销动作（手工 / 自动 / 反核销）按时间序一屏可查</span>
           <el-button :icon="Refresh" @click="loadLedger">刷新</el-button>
+          <el-button v-has-perm="'writeoff:export'" :icon="Download" @click="onExport">导出</el-button>
         </div>
 
         <el-table v-loading="loading" :data="list" border>
@@ -291,6 +304,7 @@ onMounted(() => {
               <!-- 反核销：仅 NORMAL 行可操作（REVERSED 已是终态；红冲单的核销行反核销=加回，后端处理方向） -->
               <el-button
                 v-if="row.status === 'NORMAL'"
+                v-has-perm="'writeoff:reverse'"
                 link
                 type="danger"
                 size="small"
@@ -384,6 +398,7 @@ onMounted(() => {
                 link
                 type="primary"
                 size="small"
+                v-has-perm="'writeoff:writeoff'"
                 :disabled="!row.receipts.length || !row.receivables.length"
                 :loading="matchSubmittingId === row.projectId"
                 @click="runAutoMatch(row)"
@@ -419,7 +434,7 @@ onMounted(() => {
     </el-form>
     <template #footer>
       <el-button @click="reverseVisible = false">取消</el-button>
-      <el-button type="danger" :loading="reverseSubmitting" @click="submitReverse">确认反核销</el-button>
+      <el-button type="danger" :loading="reverseSubmitting" v-has-perm="'writeoff:reverse'" @click="submitReverse">确认反核销</el-button>
     </template>
   </el-dialog>
 

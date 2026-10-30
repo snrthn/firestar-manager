@@ -177,6 +177,8 @@ import '@/styles/theme.css'
 import '@/styles/pages.css'
 import App from './App.vue'
 import router from './router'
+// 按钮级权限指令（任务3：v-has-perm）
+import { registerHasPermDirective } from '@/directives/hasPerm'
 
 const app = createApp(App)
 app.use(createPinia())
@@ -241,4 +243,6 @@ app.use(ElDatePicker)
 app.use(ElImageViewer)
 // 图片缩略图 + 点击预览（发货详情签收证据，2026-10-23）
 app.use(ElImage)
+// 按钮级权限指令：v-has-perm="'project:create'"（任务3）
+registerHasPermDirective(app)
 app.mount('#app')

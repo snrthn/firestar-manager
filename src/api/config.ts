@@ -30,3 +30,10 @@ export function updateConfigItem(data: ConfigCreateRequest) {
 export function getAbout() {
   return request.get('/system/config/about').then((r) => r.data.data as AboutVO)
 }
+
+/** 特性开关（登录即可访问）：返回白名单内的布尔型功能开关，缺省 "false" */
+export function getFlags() {
+  return request
+    .get('/system/config/flags')
+    .then((r) => (r.data.data ?? {}) as Record<string, string>)
+}

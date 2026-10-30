@@ -2,7 +2,8 @@
 import { onMounted, reactive, ref } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
 import type { FormInstance } from 'element-plus'
-import { Delete, Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Delete, Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
+import { downloadViaBackend } from '@/utils/fileDownload'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -83,6 +84,19 @@ const reloadAfterMutation = async () => {
     pageNum.value -= 1
     await loadList()
   }
+}
+
+const onExport = () => {
+  const qs = new URLSearchParams()
+  if (query.projectNo.trim()) qs.append('projectNo', query.projectNo.trim())
+  if (query.projectName.trim()) qs.append('projectName', query.projectName.trim())
+  if (query.customerName.trim()) qs.append('customerName', query.customerName.trim())
+  if (query.approvalStatus) qs.append('approvalStatus', query.approvalStatus)
+  if (query.contractStatus) qs.append('contractStatus', query.contractStatus)
+  if (query.salesManagerId != null) qs.append('salesManagerId', String(query.salesManagerId))
+  if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
+  if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
+  downloadViaBackend('/project/export?' + qs.toString(), 'project_export.xlsx')
 }
 
 const handleSizeChange = () => {
@@ -443,8 +457,9 @@ onMounted(() => {
     </el-form>
 
     <div class="toolbar">
-      <el-button type="primary" :icon="Plus" @click="openCreate">新建立项</el-button>
+      <el-button type="primary" :icon="Plus" v-has-perm="'project:create'" @click="openCreate">新建立项</el-button>
       <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+      <el-button v-has-perm="'project:export'" :icon="Download" @click="onExport">导出</el-button>
     </div>
 
     <el-table v-loading="loading" :data="list" border>
@@ -502,6 +517,7 @@ onMounted(() => {
         <template #default="{ row }">
           <el-button
             v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
+            v-has-perm="'project:edit'"
             link type="primary" size="small"
             @click="openEdit(row)"
           >编辑</el-button>
@@ -554,7 +570,7 @@ onMounted(() => {
     </el-form>
     <template #footer>
       <el-button @click="signVisible = false">取消</el-button>
-      <el-button type="primary" :loading="signSaving" @click="handleSign">确认签约</el-button>
+      <el-button type="primary" :loading="signSaving" v-has-perm="'project:sign'" @click="handleSign">确认签约</el-button>
     </template>
   </el-dialog>
 
@@ -689,7 +705,7 @@ onMounted(() => {
     </div>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSubmit">保存</el-button>
+      <el-button type="primary" :loading="saving" v-has-perm="'project:create'" @click="handleSubmit">保存</el-button>
     </template>
   </el-dialog>
 </template>

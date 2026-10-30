@@ -8,6 +8,7 @@ import type {
   ProjectRankingVO,
   FulfillmentVO,
   AgeingVO,
+  PlatformStatsVO,
 } from '@/types/stats'
 
 // 数据看板（L1/L2）接口层
@@ -44,4 +45,9 @@ export function statsFulfillment(q: StatsQuery = {}) {
 /** Tab② L2 账龄与周转（FIFO 法） */
 export function statsAgeing(q: StatsQuery = {}) {
   return request.post<ApiResult<AgeingVO>>(`${base}/ageing`, q).then((r) => r.data.data!)
+}
+
+/** 工作台平台指标：活跃用户总数 + 今日登录次数 */
+export function statsPlatform() {
+  return request.post<ApiResult<PlatformStatsVO>>(`${base}/platform`).then((r) => r.data.data!)
 }

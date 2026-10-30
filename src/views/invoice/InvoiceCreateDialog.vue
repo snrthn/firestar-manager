@@ -687,6 +687,7 @@ watch(
         <el-form-item label="发票文件" required>
           <div class="attach-box">
             <el-upload
+              v-has-perm="'invoice:upload'"
               :show-file-list="false"
               :http-request="customUpload"
               :before-upload="beforeUpload"
@@ -721,7 +722,7 @@ watch(
 
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSubmit">
+      <el-button type="primary" :loading="saving" v-has-perm="'invoice:create'" @click="handleSubmit">
         {{ isEdit() ? '保存修改' : isRedFlush() ? '创建红冲单' : '创建发票单' }}
       </el-button>
     </template>

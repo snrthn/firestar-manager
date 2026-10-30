@@ -194,7 +194,7 @@ onMounted(loadTypes)
     </el-form>
 
     <div class="toolbar">
-      <el-button type="primary" :icon="Plus" @click="openCreate">新增字典类型</el-button>
+      <el-button type="primary" :icon="Plus" v-has-perm="'dict:create'" @click="openCreate">新增字典类型</el-button>
       <el-button :icon="Refresh" @click="loadTypes">刷新</el-button>
     </div>
 
@@ -216,8 +216,8 @@ onMounted(loadTypes)
           <el-button link type="primary" size="small" :icon="Search" @click="openDictData(row)">
             字典数据
           </el-button>
-          <el-button link type="primary" size="small" @click="openEdit(row)">修改</el-button>
-          <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+          <el-button link type="primary" size="small" v-has-perm="'dict:edit'" @click="openEdit(row)">修改</el-button>
+          <el-button link type="danger" size="small" v-has-perm="'dict:delete'" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     <template #empty>
@@ -267,7 +267,7 @@ onMounted(loadTypes)
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSubmit">保存</el-button>
+      <el-button type="primary" :loading="saving" v-has-perm="'dict:create'" @click="handleSubmit">保存</el-button>
     </template>
   </el-dialog>
 </template>

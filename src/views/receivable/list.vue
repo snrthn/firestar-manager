@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
-import { Refresh, Search } from '@element-plus/icons-vue'
+import { Refresh, Search, Download } from '@element-plus/icons-vue'
+import { downloadViaBackend } from '@/utils/fileDownload'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { receivablePage } from '@/api/receivable'
@@ -68,6 +69,18 @@ const loadList = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const onExport = () => {
+  const qs = new URLSearchParams()
+  if (query.projectId != null) qs.append('projectId', String(query.projectId))
+  if (query.receivableNo.trim()) qs.append('receivableNo', query.receivableNo.trim())
+  if (query.projectName.trim()) qs.append('projectName', query.projectName.trim())
+  if (query.sourceType) qs.append('sourceType', query.sourceType)
+  if (query.status) qs.append('status', query.status)
+  if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
+  if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
+  downloadViaBackend('/receivable/export?' + qs.toString(), 'receivable_export.xlsx')
 }
 
 const handleSizeChange = () => {
@@ -176,6 +189,7 @@ onMounted(() => {
 
     <div class="toolbar">
       <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+      <el-button v-has-perm="'receivable:export'" :icon="Download" @click="onExport">导出</el-button>
       <span class="muted">应收单由发货「客户已收货」自动生成，不支持手工新增</span>
     </div>
 

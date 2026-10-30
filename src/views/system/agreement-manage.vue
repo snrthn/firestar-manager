@@ -10,6 +10,7 @@
               size="small"
               type="primary"
               class="agr-publish-btn"
+              v-has-perm="'agreement:publish'"
               @click="openPublish"
             >发布新版本</el-button>
           </template>
@@ -28,7 +29,11 @@
           <el-table :data="versions" size="default" stripe height="100%">
             <el-table-column prop="ver" label="版本" width="70" />
             <el-table-column prop="changeSummary" label="变更摘要" show-overflow-tooltip />
-            <el-table-column prop="effectiveAt" label="生效时间" width="160" />
+            <el-table-column prop="effectiveAt" label="生效时间" width="160">
+              <template #default="{ row }">
+                {{ formatDateTime(row.effectiveAt) }}
+              </template>
+            </el-table-column>
             <el-table-column label="重同意" width="70" align="center">
               <template #default="{ row }">
                 <el-tag v-if="row.needReconsent" type="warning" size="small">需重同意</el-tag>
@@ -59,7 +64,7 @@
       </el-form>
       <template #footer>
         <el-button @click="publishVisible = false">取消</el-button>
-        <el-button type="primary" :loading="publishing" @click="doPublish">发布</el-button>
+        <el-button type="primary" :loading="publishing" v-has-perm="'agreement:publish'" @click="doPublish">发布</el-button>
       </template>
     </el-dialog>
   </div>
@@ -68,6 +73,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
+import { formatDateTime } from '@/utils/datetime'
 import { ElMessage } from 'element-plus'
 import RichView from '@/components/RichView.vue'
 import RichEditor from '@/components/RichEditor.vue'

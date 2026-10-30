@@ -2,7 +2,8 @@
 import { onMounted, reactive, ref } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useRoute } from 'vue-router'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
+import { downloadViaBackend } from '@/utils/fileDownload'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { shipmentPage } from '@/api/shipment'
@@ -75,6 +76,18 @@ const reloadAfterMutation = async () => {
     pageNum.value -= 1
     await loadList()
   }
+}
+
+const onExport = () => {
+  const qs = new URLSearchParams()
+  if (query.batchNo.trim()) qs.append('batchNo', query.batchNo.trim())
+  if (query.projectNo.trim()) qs.append('projectNo', query.projectNo.trim())
+  if (query.projectName.trim()) qs.append('projectName', query.projectName.trim())
+  if (query.status) qs.append('status', query.status)
+  if (query.approvalStatus) qs.append('approvalStatus', query.approvalStatus)
+  if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
+  if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
+  downloadViaBackend('/shipment/export?' + qs.toString(), 'shipment_export.xlsx')
 }
 
 const handleSizeChange = () => {
@@ -162,8 +175,9 @@ onMounted(() => {
     </el-form>
 
     <div class="toolbar">
-      <el-button type="primary" :icon="Plus" @click="openCreate">新建发货</el-button>
+      <el-button type="primary" :icon="Plus" v-has-perm="'shipment:create'" @click="openCreate">新建发货</el-button>
       <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+      <el-button v-has-perm="'shipment:export'" :icon="Download" @click="onExport">导出</el-button>
     </div>
 
     <el-table v-loading="loading" :data="list" border>
@@ -215,6 +229,7 @@ onMounted(() => {
                提交审批后隐藏编辑入口，避免「有编辑入口的同时审批流已发出」不合规） -->
           <el-button
             v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
+            v-has-perm="'shipment:edit'"
             link type="primary" size="small"
             @click="openEdit(row)"
           >编辑</el-button>

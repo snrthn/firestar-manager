@@ -221,6 +221,37 @@ const LINK_URL_PATTERN = /^https?:\/\/\S+$/i
 
 const rules = {
   menuName: [{ required: true, message: '请输入菜单名称', trigger: 'blur' }],
+  // 上级菜单：后端无强约束，前端按逐级下挂规则兜底拦截（防越级/逆向反挂）
+  parentId: [
+    {
+      validator: (_rule: unknown, value: number, callback: (err?: Error) => void) => {
+        if (value == null) {
+          callback(new Error('请选择上级菜单'))
+          return
+        }
+        if (value === 0) {
+          if (form.menuType === 'BUTTON') {
+            callback(new Error('按钮不可置于顶级，必须挂在菜单下'))
+            return
+          }
+          callback()
+          return
+        }
+        const p = findNode(menuTree.value, value)
+        const allowed = allowedParentTypes(form.menuType)
+        if (!p || !p.menuType || !allowed.includes(p.menuType)) {
+          callback(
+            new Error(
+              `${menuTypeLabel(form.menuType)}只能挂在 ${allowed.map(menuTypeLabel).join('/')} 下`,
+            ),
+          )
+          return
+        }
+        callback()
+      },
+      trigger: 'change',
+    },
+  ],
   // 路由地址：仅「菜单」型必填（其它类型走 validator 动态判断；目录允许为空）
   routePath: [
     {
@@ -274,14 +305,111 @@ const rules = {
 interface ParentNode {
   id: number
   menuName: string
+  menuType?: string
+  disabled?: boolean
   children?: ParentNode[]
 }
 
-const toParentNodes = (nodes: MenuVO[]): ParentNode[] =>
+// 逐级下挂规则：当前菜单类型允许挂在哪些父类型下（不可越级、不可逆向反挂）。
+// 目录/菜单/外链 → 目录 / 顶级 / 菜单（菜单可挂菜单：放开「主菜单页的二级页」，
+//   种子里「字典数据」(MENU) 即挂在「字典管理」(MENU) 下，属合法的多级菜单形态；
+//   若不放开，该存量数据在编辑器里父级被灰掉、保存还会被 parentId 校验器驳回）；
+// 按钮 → 菜单（按钮必须挂在菜单下，二级页同样可挂按钮）。
+const allowedParentTypes = (type: string): string[] => {
+  switch (type) {
+    case 'CATALOG':
+    case 'MENU':
+    case 'LINK':
+      return ['CATALOG', 'ROOT', 'MENU']
+    case 'BUTTON':
+      return ['MENU']
+    default:
+      return []
+  }
+}
+
+const findNode = (nodes: MenuVO[], id: number): MenuVO | null => {
+  for (const n of nodes) {
+    if (n.id === id) return n
+    if (n.children?.length) {
+      const f = findNode(n.children, id)
+      if (f) return f
+    }
+  }
+  return null
+}
+
+// ===== 正向下挂规则（父级类型 → 允许的子类型）：驱动「菜单类型」单选随已选父级冻结 =====
+// 这是用户 2026-10-30 明确的交互方向：先选父级，再据此冻结非法的子类型选项。
+// 与 allowedParentTypes（子→父，反向约束，父级下拉兜底）互为镜像：
+//   父=主类目(ROOT) → 子可为 目录/菜单/外链（按钮必须挂菜单下，故按钮禁）
+//   父=目录(CATALOG) → 子可为 目录/菜单/外链（目录允许嵌套目录，是合法形态；按钮禁）
+//   父=菜单(MENU)    → 子可为 菜单(主菜单的二级页)/按钮（即用户举例「父级是菜单，目录冻结不能选」；
+//                       并放开「页面下也能挂页面」，二级页视觉归属更干净）
+//   父=外链(LINK)/按钮(BUTTON) → 叶子，不可再下挂（列表上其「新增」按钮已隐藏）
+// 注意：目录套目录、菜单套菜单 均放行（与反向 allowedParentTypes 保持一致），否则 watch
+//       会把这些合法嵌套的类型自动改回，等于变相堵死。
+const allowedChildTypes = (parentType: string): string[] => {
+  switch (parentType) {
+    case 'ROOT':
+      return ['CATALOG', 'MENU', 'LINK']
+    case 'CATALOG':
+      return ['CATALOG', 'MENU', 'LINK']
+    case 'MENU':
+      return ['MENU', 'BUTTON']
+    case 'LINK':
+    case 'BUTTON':
+      return []
+    default:
+      return ['CATALOG', 'MENU', 'LINK', 'BUTTON']
+  }
+}
+
+// 已选父级的类型（主类目视为 ROOT）；用于驱动「菜单类型」单选的可选项冻结
+const selectedParentType = computed<string>(() => {
+  if (form.parentId === 0) return 'ROOT'
+  const p = findNode(menuTree.value, form.parentId)
+  return (p?.menuType as string) ?? ''
+})
+
+// 某菜单类型在「当前已选父级」下是否非法（应在单选里冻结）
+const isTypeDisabled = (type: string): boolean =>
+  !allowedChildTypes(selectedParentType.value).includes(type)
+
+// 父级类型 → 默认子类型（保证起点即合法，与 openCreate 推导一致）
+const defaultTypeForParent = (parentType: string): MenuFormData['menuType'] | '' => {
+  switch (parentType) {
+    case 'ROOT':
+      return 'CATALOG'
+    case 'CATALOG':
+    case 'MENU':
+      return 'MENU'
+    default:
+      return ''
+  }
+}
+
+// 切换父级时：若当前菜单类型在新父级下非法，自动回落到该父级下的默认类型，
+// 避免表单停在「类型被冻结却已选中」的非法态（如父级从主类目切到某菜单，目录即被冻结）
+watch(
+  () => form.parentId,
+  () => {
+    const allowed = allowedChildTypes(selectedParentType.value)
+    if (allowed.length && !allowed.includes(form.menuType)) {
+      const d = defaultTypeForParent(selectedParentType.value)
+      if (d) form.menuType = d
+    }
+  },
+)
+
+// 按当前 form.menuType 给每个候选父节点打 disabled：非法的父类型一律禁用
+const buildParentTree = (nodes: MenuVO[]): ParentNode[] =>
   nodes.map((n) => ({
     id: n.id,
     menuName: n.menuName,
-    children: n.children?.length ? toParentNodes(n.children) : undefined,
+    menuType: n.menuType,
+    disabled: !allowedParentTypes(form.menuType).includes(n.menuType ?? ''),
+    children: n.children?.length ? buildParentTree(n.children) : undefined,
   }))
 
 // 编辑时把「自己及子孙」从父菜单树里摘掉，防止把父菜单设成自己的后代造成死循环
@@ -293,7 +421,20 @@ const excludeById = (nodes: MenuVO[], excludeId: number): MenuVO[] =>
       children: n.children?.length ? excludeById(n.children, excludeId) : undefined,
     }))
 
-const parentTreeData = ref<ParentNode[]>([{ id: 0, menuName: '主类目' }])
+// 父级下拉：编辑态排除自身子树（防逆向反挂成环）；按当前类型禁用非法父选项（逐级下挂）。
+// 改为 computed：随 form.id / form.menuType / menuTree 自动重算，无需 dialogVisible watch。
+const parentTreeData = computed<ParentNode[]>(() => {
+  const src = form.id ? excludeById(menuTree.value, form.id) : menuTree.value
+  return [
+    {
+      id: 0,
+      menuName: '主类目',
+      menuType: 'ROOT',
+      disabled: !allowedParentTypes(form.menuType).includes('ROOT'),
+      children: buildParentTree(src),
+    },
+  ]
+})
 
 const openCreate = (parentId: number) => {
   Object.assign(form, emptyForm())
@@ -301,6 +442,13 @@ const openCreate = (parentId: number) => {
   // 不清掉的话，「新增」会带着旧 id 走 update 分支，把那条菜单改成新表单内容。
   form.id = undefined
   form.parentId = parentId
+  // 默认类型按父级推导，保证「新增」起点即合法：顶级→目录；其余（目录/菜单/外链父级）→菜单。
+  // 父级是菜单时即「主菜单的二级页」，与放开页面下挂页面的约定一致（仍可在弹窗里改成按钮）。
+  if (parentId === 0) {
+    form.menuType = 'CATALOG'
+  } else {
+    form.menuType = 'MENU'
+  }
   dialogTitle.value = parentId ? '新增子菜单' : '新增顶级菜单'
   dialogVisible.value = true
   nextTick(() => formRef.value?.clearValidate())
@@ -324,16 +472,6 @@ const openEdit = (row: MenuVO) => {
   dialogVisible.value = true
   nextTick(() => formRef.value?.clearValidate())
 }
-
-// dialog 打开瞬间用最新菜单树重建父级下拉（编辑态排除自身子树）
-watch(
-  dialogVisible,
-  (visible) => {
-    if (!visible) return
-    const tree = form.id ? excludeById(menuTree.value, form.id) : menuTree.value
-    parentTreeData.value = [{ id: 0, menuName: '主类目', children: toParentNodes(tree) }]
-  },
-)
 
 const handleSubmit = async () => {
   if (!formRef.value) return
@@ -438,7 +576,7 @@ onMounted(() => {
     </el-form>
 
     <div class="toolbar">
-      <el-button type="primary" :icon="Plus" @click="openCreate(0)">新增顶级菜单</el-button>
+      <el-button type="primary" :icon="Plus" v-has-perm="'menu:create'" @click="openCreate(0)">新增顶级菜单</el-button>
       <el-button :icon="allExpanded ? Fold : Expand" @click="toggleExpandAll">
         {{ allExpanded ? '折叠全部' : '展开全部' }}
       </el-button>
@@ -523,9 +661,16 @@ onMounted(() => {
       </el-table-column>
       <el-table-column label="操作" width="180" fixed="right" align="center">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openCreate(row.id)">新增</el-button>
-          <el-button link type="primary" size="small" @click="openEdit(row)">修改</el-button>
-          <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+          <el-button
+            link
+            type="primary"
+            size="small"
+            v-has-perm="'menu:create'"
+            v-if="row.menuType === 'CATALOG' || row.menuType === 'MENU'"
+            @click="openCreate(row.id)"
+          >新增</el-button>
+          <el-button link type="primary" size="small" v-has-perm="'menu:edit'" @click="openEdit(row)">修改</el-button>
+          <el-button link type="danger" size="small" v-has-perm="'menu:delete'" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     <template #empty>
@@ -541,7 +686,7 @@ onMounted(() => {
         <!-- 选项来自字典 menu_type（启用中、按 sort_no 升序）：
              停用「外链」后这里只剩三个选项，字典维护即业务生效 -->
         <el-radio-group v-model="form.menuType">
-          <el-radio v-for="opt in menuTypeOptions" :key="opt.value" :label="opt.value">
+          <el-radio v-for="opt in menuTypeOptions" :key="opt.value" :label="opt.value" :disabled="isTypeDisabled(opt.value)">
             {{ opt.label }}
           </el-radio>
         </el-radio-group>
@@ -550,7 +695,7 @@ onMounted(() => {
         <el-tree-select
           v-model="form.parentId"
           :data="parentTreeData"
-          :props="{ label: 'menuName', value: 'id', children: 'children' }"
+          :props="{ label: 'menuName', value: 'id', children: 'children', disabled: 'disabled' }"
           node-key="id"
           check-strictly
           default-expand-all
@@ -633,7 +778,7 @@ onMounted(() => {
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSubmit">保存</el-button>
+      <el-button type="primary" :loading="saving" v-has-perm="'menu:create'" @click="handleSubmit">保存</el-button>
     </template>
   </el-dialog>
 </template>

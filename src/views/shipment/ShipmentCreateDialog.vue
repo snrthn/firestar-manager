@@ -280,7 +280,7 @@ watch(
 
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" :icon="Plus" @click="handleSubmit">
+      <el-button type="primary" :loading="saving" :icon="Plus" v-has-perm="'shipment:create'" @click="handleSubmit">
         {{ isEdit() ? '保存修改' : '保存草稿' }}
       </el-button>
     </template>

@@ -231,8 +231,17 @@ const openAssignPerms = async (row: RoleManageVO) => {
     // setChecked(true, false)，父组由 Node.setChecked → reInitChecked(parent) 自动半选/全选。
     // 之后用户操作只靠 @check 回写本地 ref（提交用），不再喂给树的任何 prop。
     await nextTick()
+    // 右侧操作权限树：保持原非严格 + filterLeafIds 回显（分组父节点靠 reInitChecked 半选，无 bug）
     permTreeRef.value?.setCheckedKeys(filterLeafIds(permTree.value, pids), true)
-    menuTreeRef.value?.setCheckedKeys(filterLeafIds(menuTree.value, mids), true)
+    // 左侧菜单树：用完整 mids（不过滤父节点）初始化真相集，再手动投射 checked/indeterminate。
+    // 修旧 bug：filterLeafIds 把「挂了按钮后变父节点」的页面误剥 → 侧栏丢页面。
+    const allIds = collectAllIds(menuTree.value)
+    menuCheckedSet = new Set(mids.filter((id) => allIds.has(id)))
+    checkedMenuIds.value = [...menuCheckedSet]
+    buildMenuDescLeafMap(menuTree.value)
+    buildPageAuthBase(menuTree.value)
+    reconcilePageNodes()
+    applyMenuTreeState()
   } catch (e) {
     ElMessage.error((e as Error).message)
   }
@@ -263,12 +272,39 @@ const onPermCheck = (_data: unknown, payload: { checkedKeys: (string | number)[]
   checkedPermIds.value = payload.checkedKeys.map(Number)
 }
 
-// 父子联动（未开 check-strictly）下，取消个别子项会让父组呈半选态，
-// halfCheckedKeys 里的父组 id 必须一并提交：
-// 否则 sys_role_menu 缺父组，后端 menus() 父链剪枝会把整组子项误剪
-// （虎哥 2026-10-15 实测：只移除菜单组中的一项，整个组都不返回）
-const onMenuCheck = (_data: unknown, payload: { checkedKeys: (string | number)[]; halfCheckedKeys: (string | number)[] }) => {
-  checkedMenuIds.value = [...payload.checkedKeys, ...payload.halfCheckedKeys].map(Number)
+// 菜单树勾选：check-strictly 下完全手控。三态循环（页面有按钮子集时）：
+// 空 → 半（页面可见、按钮保持当前/空）→ 全（连带全部按钮）→ 空。
+// 渲染出来若是半选→再点全选；全选→再点空选；空选→再点半选（状态驱动，与到达方式无关）。
+// 无按钮的纯页面 / 目录 / 外链：整段两态（全选/清空），不出现半选。
+const onMenuCheck = (data: MenuVO) => {
+  const btnKids = (data.children ?? []).filter((c) => c.menuType === 'BUTTON')
+  if (data.menuType === 'BUTTON') {
+    // 按钮独立 toggle，随后对账所属页面节点的 pageId 进/出集（页面可见性随按钮联动）
+    if (menuCheckedSet.has(data.id)) menuCheckedSet.delete(data.id)
+    else menuCheckedSet.add(data.id)
+    reconcilePageNodes()
+  } else if (data.menuType === 'MENU' && btnKids.length > 0) {
+    const inSet = menuCheckedSet.has(data.id)
+    const allBtns = btnKids.every((c) => menuCheckedSet.has(c.id))
+    const state: 'EMPTY' | 'HALF' | 'FULL' = !inSet ? 'EMPTY' : allBtns ? 'FULL' : 'HALF'
+    if (state === 'EMPTY') {
+      menuCheckedSet.add(data.id) // → 半选（页面可见，按钮保持当前/空）
+    } else if (state === 'HALF') {
+      menuCheckedSet.add(data.id)
+      btnKids.forEach((c) => menuCheckedSet.add(c.id)) // → 全选
+    } else {
+      menuCheckedSet.delete(data.id)
+      btnKids.forEach((c) => menuCheckedSet.delete(c.id)) // → 空选
+    }
+  } else {
+    // 目录 / 外链 / 无按钮纯页面：整段两态
+    const leafIds = menuDescLeafMap.get(data.id) ?? []
+    const allOn = leafIds.length > 0 && leafIds.every((id) => menuCheckedSet.has(id))
+    if (allOn) leafIds.forEach((id) => menuCheckedSet.delete(id))
+    else leafIds.forEach((id) => menuCheckedSet.add(id))
+  }
+  checkedMenuIds.value = [...menuCheckedSet]
+  applyMenuTreeState()
 }
 
 // ===== 全选 / 清空（菜单树与权限树各自独立）=====
@@ -312,14 +348,14 @@ const filterLeafIds = (
 }
 
 const checkAllMenu = () => {
-  const ids = collectTreeIds(menuTree.value)
-  menuTreeRef.value?.setCheckedKeys(ids)
-  // 显式回写：setCheckedKeys 是编程式设置，不能依赖 @check 事件时序（同上 default-checked-keys 教训）
-  checkedMenuIds.value = ids
+  collectAuthorizableIds(menuTree.value).forEach((id) => menuCheckedSet.add(id))
+  checkedMenuIds.value = [...menuCheckedSet]
+  applyMenuTreeState()
 }
 const clearMenu = () => {
-  menuTreeRef.value?.setCheckedKeys([])
+  menuCheckedSet.clear()
   checkedMenuIds.value = []
+  applyMenuTreeState()
 }
 const checkAllPerm = () => {
   const ids = collectTreeIds(permTree.value)
@@ -329,6 +365,152 @@ const checkAllPerm = () => {
 const clearPerm = () => {
   permTreeRef.value?.setCheckedKeys([])
   checkedPermIds.value = []
+}
+
+// ===== 菜单树三态（check-strictly 手动状态机，2026-10-30 改造）=====
+// 单一真相集：所有「在集」id 即最终写回 sys_role_menu 的集合，含页面 id（半选/全选态）
+// 与按钮 id（已勾选）。后端 menus() 无叶子剪枝——页面 id 在集即返回该页 → 侧栏可见，
+// 与按钮子集是否为空无关（满足「页面已选、按钮一个不选也要看到页面」）。
+let menuCheckedSet = new Set<number>()
+// 每个节点的「可授权叶子」集合（含自身可授权 id + 全部后代可授权 id），用于推导半选/全选
+const menuDescLeafMap = new Map<number, number[]>()
+// 「带按钮的 MENU 页」原始授权态：openAssignPerms 初始化时记录每个页面节点的 pageId
+// 是否已在 mids 中（=该页原本就被授权）。用于 reconcilePageNodes 的「全取消→回原始态」
+// 判定：原始已授权页即便按钮全清，页面仍可见（半选）；原始未授权页按钮全清则整页不可见。
+const pageAuthBase = new Map<number, boolean>()
+
+const collectAllIds = (nodes: MenuVO[]): Set<number> => {
+  const s = new Set<number>()
+  const walk = (list: MenuVO[]) => {
+    for (const n of list) {
+      s.add(n.id)
+      if (n.children?.length) walk(n.children)
+    }
+  }
+  walk(nodes)
+  return s
+}
+
+// 可授权单元：
+//  - BUTTON：自身即一个可授权单元；
+//  - MENU 且下挂按钮：视为「页面节点」，可授权集合 = 自身 + 全部 BUTTON 子节点；
+//  - 纯页面 MENU / LINK（无按钮子集、且无任何可授权后代）：自身即为可授权单元
+//    （修复：旧逻辑对「无按钮子节点的 MENU」走入 kids.forEach(walk) 透传，叶子页无子节点
+//     导致既不被收集、menuDescLeafMap 又为空 → 全选勾不上、鼠标也勾不上）；
+//  - CATALOG / 含子菜单的 MENU：递归收集后代可授权 id（容器本身不直接授权）。
+const collectAuthorizableIds = (nodes: MenuVO[]): number[] => {
+  const out: number[] = []
+  const walk = (n: MenuVO): number[] => {
+    const kids = n.children ?? []
+    const btnKids = kids.filter((c) => c.menuType === 'BUTTON')
+    if (n.menuType === 'BUTTON') {
+      return [n.id]
+    }
+    if (n.menuType === 'MENU' && btnKids.length > 0) {
+      return [n.id, ...btnKids.map((c) => c.id)]
+    }
+    // CATALOG / 纯页面 MENU / LINK / 含子菜单的 MENU：递归后代
+    const desc = kids.flatMap((c) => walk(c))
+    if (desc.length === 0 && (n.menuType === 'MENU' || n.menuType === 'LINK')) {
+      // 无后代可授权 id：自身是页面/外链 → 自身即授权单元；CATALOG 纯容器则忽略
+      return [n.id]
+    }
+    return desc
+  }
+  nodes.forEach((n) => out.push(...walk(n)))
+  return out
+}
+
+// 与 collectAuthorizableIds 同口径：为每个节点算出「其子树内的可授权 id 集合」，
+// 用于 applyMenuTreeState 推导 全选/半选 与 onMenuCheck 的整段 toggle。
+// 关键修复：纯页面 MENU / LINK（无按钮、无后代可授权 id）自身也要进集合，
+// 否则该节点 leafIds 为空 → 全选勾不上、点击 toggle 空操作。
+const buildMenuDescLeafMap = (nodes: MenuVO[]) => {
+  menuDescLeafMap.clear()
+  const walk = (n: MenuVO): number[] => {
+    const kids = n.children ?? []
+    const btnKids = kids.filter((c) => c.menuType === 'BUTTON')
+    let ids: number[]
+    if (n.menuType === 'BUTTON') {
+      ids = [n.id]
+    } else if (n.menuType === 'MENU' && btnKids.length > 0) {
+      ids = [n.id, ...btnKids.flatMap((c) => walk(c))]
+    } else {
+      const desc = kids.flatMap((c) => walk(c))
+      if (desc.length === 0 && (n.menuType === 'MENU' || n.menuType === 'LINK')) {
+        ids = [n.id]
+      } else {
+        ids = desc
+      }
+    }
+    menuDescLeafMap.set(n.id, ids)
+    return ids
+  }
+  nodes.forEach(walk)
+}
+
+// 记录每个「带按钮的 MENU 页」的原始授权态（pageId 是否在初始化 mids 中）
+const buildPageAuthBase = (nodes: MenuVO[]) => {
+  pageAuthBase.clear()
+  const walk = (n: MenuVO) => {
+    const kids = n.children ?? []
+    const btnKids = kids.filter((c) => c.menuType === 'BUTTON')
+    if (n.menuType === 'MENU' && btnKids.length > 0) {
+      pageAuthBase.set(n.id, menuCheckedSet.has(n.id))
+    }
+    kids.forEach(walk)
+  }
+  nodes.forEach(walk)
+}
+
+// 页面节点一致性对账：带按钮的 MENU 页，只要「全部按钮勾选 / 部分按钮勾选 / 原始即授权」
+// 任一成立即视为页面可见，pageId 必须进集（否则后端 menus() 不返回该页 → 侧栏看不见、
+// 其上按钮也就无从使用）；三者皆否则从集移除（页面不可见）。
+// 这是修复「勾完按钮父页面仍半选、到不了已选」的关键：按钮勾选态必须同步反映到页面节点。
+const reconcilePageNodes = () => {
+  const walk = (n: MenuVO) => {
+    const kids = n.children ?? []
+    const btnKids = kids.filter((c) => c.menuType === 'BUTTON')
+    if (n.menuType === 'MENU' && btnKids.length > 0) {
+      const allBtns = btnKids.every((c) => menuCheckedSet.has(c.id))
+      const someBtns = btnKids.some((c) => menuCheckedSet.has(c.id))
+      const base = pageAuthBase.get(n.id) ?? false
+      const visible = allBtns || someBtns || base
+      if (visible) menuCheckedSet.add(n.id)
+      else menuCheckedSet.delete(n.id)
+    }
+    kids.forEach(walk)
+  }
+  menuTree.value.forEach(walk)
+}
+const applyMenuTreeState = () => {
+  const tree = menuTreeRef.value as unknown as {
+    store: { nodesMap: Record<string, { data: MenuVO; key: number; indeterminate: boolean }> }
+    setChecked: (key: number, checked: boolean, deep?: boolean) => void
+  } | null
+  if (!tree) return
+  for (const node of Object.values(tree.store.nodesMap)) {
+    const data = node.data
+    const leafIds = menuDescLeafMap.get(data.id) ?? []
+    const anyOn = leafIds.some((id) => menuCheckedSet.has(id))
+    const allOn = leafIds.length > 0 && leafIds.every((id) => menuCheckedSet.has(id))
+    const btnKids = (data.children ?? []).filter((c) => c.menuType === 'BUTTON')
+    const isPageWithBtns = data.menuType === 'MENU' && btnKids.length > 0
+    let checked: boolean
+    let indeterminate: boolean
+    if (isPageWithBtns) {
+      const on = menuCheckedSet.has(data.id)
+      checked = on
+      // 半选 = 页面在集但按钮未全选；防御：页面不在集但存在已勾按钮也呈半选
+      indeterminate = on ? !allOn : anyOn
+    } else {
+      checked = allOn
+      indeterminate = anyOn && !allOn
+    }
+    tree.setChecked(node.key, checked, false)
+    // setChecked 会复位 indeterminate，故其后显式写回（严格模式手动控制）
+    node.indeterminate = indeterminate
+  }
 }
 
 onMounted(loadRoles)
@@ -352,7 +534,7 @@ onMounted(loadRoles)
     </el-form>
 
     <div class="toolbar">
-      <el-button type="primary" :icon="Plus" @click="openCreate">新增角色</el-button>
+      <el-button type="primary" :icon="Plus" v-has-perm="'role:create'" @click="openCreate">新增角色</el-button>
       <el-button :icon="Refresh" @click="loadRoles">刷新</el-button>
     </div>
 
@@ -376,9 +558,9 @@ onMounted(loadRoles)
       </el-table-column>
       <el-table-column label="操作" width="220" fixed="right" align="center">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openEdit(row)">修改</el-button>
-          <el-button link type="primary" size="small" @click="openAssignPerms(row)">分配权限</el-button>
-          <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+          <el-button link type="primary" size="small" v-has-perm="'role:edit'" @click="openEdit(row)">修改</el-button>
+          <el-button link type="primary" size="small" v-has-perm="'role:assign'" @click="openAssignPerms(row)">分配权限</el-button>
+          <el-button link type="danger" size="small" v-has-perm="'role:delete'" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     <template #empty>
@@ -432,7 +614,7 @@ onMounted(loadRoles)
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSubmit">保存</el-button>
+      <el-button type="primary" :loading="saving" v-has-perm="'role:create'" @click="handleSubmit">保存</el-button>
     </template>
   </el-dialog>
 
@@ -465,6 +647,7 @@ onMounted(loadRoles)
             :props="{ label: 'menuName', children: 'children' }"
             node-key="id"
             show-checkbox
+            check-strictly
             check-on-click-node
             default-expand-all
             :expand-on-click-node="false"
@@ -510,7 +693,7 @@ onMounted(loadRoles)
     </div>
     <template #footer>
       <el-button @click="permDialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="permSaving" @click="handleAssignSubmit">保存</el-button>
+      <el-button type="primary" :loading="permSaving" v-has-perm="'role:assign'" @click="handleAssignSubmit">保存</el-button>
     </template>
   </el-dialog>
 </template>

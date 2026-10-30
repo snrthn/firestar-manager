@@ -241,7 +241,7 @@ onMounted(loadFiles)
     </el-form>
 
     <div class="toolbar">
-      <el-button type="primary" :icon="Upload" @click="openUpload">上传文件</el-button>
+      <el-button type="primary" :icon="Upload" v-has-perm="'file:upload'" @click="openUpload">上传文件</el-button>
       <el-button :icon="Refresh" @click="loadFiles">刷新</el-button>
     </div>
 
@@ -278,9 +278,9 @@ onMounted(loadFiles)
       <el-table-column label="操作" width="260" fixed="right" align="center">
         <template #default="{ row }">
           <el-button link type="primary" size="small" :icon="View" @click="handlePreview(row)">预览</el-button>
-          <el-button link type="primary" size="small" :icon="Download" @click="handleDownload(row)">下载</el-button>
-          <el-button link type="primary" size="small" :icon="Edit" @click="openAliasEditor(row)">别名</el-button>
-          <el-button link type="danger" size="small" :icon="Delete" @click="handleDelete(row)">删除</el-button>
+          <el-button link type="primary" size="small" :icon="Download" v-has-perm="'file:download'" @click="handleDownload(row)">下载</el-button>
+          <el-button link type="primary" size="small" :icon="Edit" v-has-perm="'file:alias'" @click="openAliasEditor(row)">别名</el-button>
+          <el-button link type="danger" size="small" :icon="Delete" v-has-perm="'file:delete'" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     <template #empty>
@@ -337,7 +337,7 @@ onMounted(loadFiles)
     </el-form>
     <template #footer>
       <el-button @click="uploadVisible = false">取消</el-button>
-      <el-button type="primary" :loading="uploading" :disabled="uploadFileList.length === 0" @click="submitUpload">
+      <el-button type="primary" :loading="uploading" :disabled="uploadFileList.length === 0" v-has-perm="'file:upload'" @click="submitUpload">
         确认上传
       </el-button>
     </template>
@@ -357,7 +357,7 @@ onMounted(loadFiles)
     </el-form>
     <template #footer>
       <el-button @click="aliasVisible = false">取消</el-button>
-      <el-button type="primary" :loading="aliasSaving" @click="saveAlias">保存</el-button>
+      <el-button type="primary" :loading="aliasSaving" v-has-perm="'file:alias'" @click="saveAlias">保存</el-button>
     </template>
   </el-dialog>
 

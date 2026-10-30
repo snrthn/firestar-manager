@@ -741,6 +741,7 @@ watch(
         <el-form-item label="银行回单" required>
           <div class="attach-box">
             <el-upload
+              v-has-perm="'receipt:upload'"
               :show-file-list="false"
               :http-request="customUpload"
               :before-upload="beforeUpload"
@@ -775,7 +776,7 @@ watch(
 
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSubmit">
+      <el-button type="primary" :loading="saving" v-has-perm="'receipt:create'" @click="handleSubmit">
         {{ isEdit() ? '保存修改' : '创建回款单' }}
       </el-button>
     </template>

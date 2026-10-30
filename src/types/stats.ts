@@ -111,3 +111,10 @@ export interface AgeingVO {
   add: number
   overdueCount: number
 }
+
+/** 工作台平台指标（/stats/platform）：活跃用户总数 + 今日登录次数 + 历史访问总数 */
+export interface PlatformStatsVO {
+  userCount: number
+  todayLoginCount: number
+  historyVisitCount: number
+}

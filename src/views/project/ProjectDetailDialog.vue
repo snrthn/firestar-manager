@@ -328,6 +328,7 @@ const itemsTotal = computed(() =>
           >提交审批</el-button>
           <el-button
             v-if="canSign()"
+            v-has-perm="'project:sign'"
             type="primary"
             @click="emit('sign', detail)"
           >签约</el-button>

@@ -207,7 +207,7 @@ async function submitPublish() {
       </div>
       <div class="head-actions">
         <el-button @click="router.push('/system/notify-template')">通知模板</el-button>
-        <el-button type="primary" @click="openPublish">发布通知</el-button>
+        <el-button type="primary" v-has-perm="'notify:publish'" @click="openPublish">发布通知</el-button>
       </div>
     </div>
 
@@ -348,7 +348,7 @@ async function submitPublish() {
       </el-form>
       <template #footer>
         <el-button @click="pubDialog = false">取消</el-button>
-        <el-button type="primary" :loading="publishing" @click="submitPublish">发布</el-button>
+        <el-button type="primary" :loading="publishing" v-has-perm="'notify:publish'" @click="submitPublish">发布</el-button>
       </template>
     </el-dialog>
   </div>

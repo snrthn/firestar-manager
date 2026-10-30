@@ -195,7 +195,7 @@ async function remove(row: HelpArticle) {
     </el-form>
 
     <div class="toolbar">
-      <el-button type="primary" @click="openCreate">新建条目</el-button>
+      <el-button type="primary" v-has-perm="'help:create'" @click="openCreate">新建条目</el-button>
     </div>
 
     <el-table v-loading="loading" :data="rows" border stripe>
@@ -216,11 +216,11 @@ async function remove(row: HelpArticle) {
       </el-table-column>
       <el-table-column label="操作" width="180" align="center">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-          <el-button link :type="row.status === 'ENABLED' ? 'warning' : 'success'" @click="toggleStatus(row)">
+          <el-button link type="primary" v-has-perm="'help:edit'" @click="openEdit(row)">编辑</el-button>
+          <el-button link :type="row.status === 'ENABLED' ? 'warning' : 'success'" v-has-perm="'help:toggle'" @click="toggleStatus(row)">
             {{ row.status === 'ENABLED' ? '停用' : '启用' }}
           </el-button>
-          <el-button link type="danger" @click="remove(row)">删除</el-button>
+          <el-button link type="danger" v-has-perm="'help:delete'" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     <template #empty>
@@ -278,7 +278,7 @@ async function remove(row: HelpArticle) {
       </el-form>
       <template #footer>
         <el-button @click="dialog = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
+        <el-button type="primary" :loading="saving" v-has-perm="'help:create'" @click="save">保存</el-button>
       </template>
     </el-dialog>
   </div>

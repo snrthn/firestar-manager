@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
+import { downloadViaBackend } from '@/utils/fileDownload'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -72,6 +73,18 @@ const handleReset = () => {
   query.executeStatus = ''
   query.dateRange = null
   handleQuery()
+}
+
+const onExport = () => {
+  const qs = new URLSearchParams()
+  if (query.projectNo.trim()) qs.append('projectNo', query.projectNo.trim())
+  if (query.projectName.trim()) qs.append('projectName', query.projectName.trim())
+  if (query.returnNo.trim()) qs.append('returnNo', query.returnNo.trim())
+  if (query.status) qs.append('status', query.status)
+  if (query.executeStatus) qs.append('executeStatus', query.executeStatus)
+  if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
+  if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
+  downloadViaBackend('/return/export?' + qs.toString(), 'return_export.xlsx')
 }
 
 const openDetail = (row: ReturnVO) => {
@@ -161,8 +174,9 @@ onMounted(load)
 
     <!-- 工具条：主动作 + 刷新（与 shipment/invoice/receipt 列表同款两件套），样式吃全局 .toolbar -->
     <div class="toolbar">
-      <el-button type="primary" :icon="Plus" @click="createVisible = true">发起退货</el-button>
+      <el-button type="primary" :icon="Plus" v-has-perm="'return:create'" @click="createVisible = true">发起退货</el-button>
       <el-button :icon="Refresh" @click="load">刷新</el-button>
+      <el-button v-has-perm="'return:export'" :icon="Download" @click="onExport">导出</el-button>
     </div>
 
     <!-- 列表：主列表表格走默认 size（同 receipt/shipment/invoice），不缩到 small -->
@@ -205,7 +219,7 @@ onMounted(load)
         <template #default="{ row }">
           <!-- 操作按钮一律 size="small"，同 receipt 列表口径 -->
           <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
-          <el-button v-if="row.canCancel" link type="danger" size="small" @click="onCancel(row)">撤销</el-button>
+          <el-button v-if="row.canCancel" link type="danger" size="small" v-has-perm="'return:cancel'" @click="onCancel(row)">撤销</el-button>
         </template>
       </el-table-column>
       <template #empty>

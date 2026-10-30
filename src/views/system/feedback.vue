@@ -260,7 +260,7 @@ async function submitCreate() {
           class="filter-select"
           @change="((query.pageNum = 1), load())"
         />
-        <el-button type="primary" @click="openCreate">新建反馈</el-button>
+        <el-button type="primary" v-has-perm="'feedback:create'" @click="openCreate">新建反馈</el-button>
       </div>
     </div>
 
@@ -401,8 +401,8 @@ async function submitCreate() {
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
-        <el-button type="primary" :loading="creating" @click="submitCreate">提交</el-button>
+      <el-button @click="createVisible = false">取消</el-button>
+      <el-button type="primary" :loading="creating" v-has-perm="'feedback:create'" @click="submitCreate">提交</el-button>
       </template>
     </el-dialog>
   </div>

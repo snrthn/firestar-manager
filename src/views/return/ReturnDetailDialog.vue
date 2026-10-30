@@ -223,8 +223,8 @@ watch(
     <template #footer>
       <el-button @click="visible = false">关闭</el-button>
       <template v-if="detail?.myPendingTaskId">
-        <el-button type="danger" :icon="Close" :loading="acting" @click="onReject">驳回</el-button>
-        <el-button type="primary" :icon="Check" :loading="acting" @click="onApprove">通过</el-button>
+        <el-button type="danger" :icon="Close" :loading="acting" v-has-perm="'return:reject'" @click="onReject">驳回</el-button>
+        <el-button type="primary" :icon="Check" :loading="acting" v-has-perm="'return:approve'" @click="onApprove">通过</el-button>
       </template>
     </template>
   </el-dialog>

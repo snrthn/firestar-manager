@@ -2,7 +2,8 @@
 import { onMounted, reactive, ref } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useRoute } from 'vue-router'
-import { Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
+import { downloadViaBackend } from '@/utils/fileDownload'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { invoicePage } from '@/api/invoice'
@@ -79,6 +80,19 @@ const reloadAfterMutation = async () => {
     pageNum.value -= 1
     await loadList()
   }
+}
+
+const onExport = () => {
+  const qs = new URLSearchParams()
+  if (query.projectId != null) qs.append('projectId', String(query.projectId))
+  if (query.invoiceNo.trim()) qs.append('invoiceNo', query.invoiceNo.trim())
+  if (query.projectName.trim()) qs.append('projectName', query.projectName.trim())
+  if (query.invoiceType) qs.append('invoiceType', query.invoiceType)
+  if (query.docDirection) qs.append('docDirection', query.docDirection)
+  if (query.status) qs.append('status', query.status)
+  if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
+  if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
+  downloadViaBackend('/invoice/export?' + qs.toString(), 'invoice_export.xlsx')
 }
 
 const handleSizeChange = () => {
@@ -211,8 +225,9 @@ onMounted(() => {
     </el-form>
 
     <div class="toolbar">
-      <el-button type="primary" :icon="Plus" @click="openCreate">新建发票</el-button>
+      <el-button type="primary" :icon="Plus" v-has-perm="'invoice:create'" @click="openCreate">新建发票</el-button>
       <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+      <el-button v-has-perm="'invoice:export'" :icon="Download" @click="onExport">导出</el-button>
     </div>
 
     <el-table v-loading="loading" :data="list" border>
@@ -268,6 +283,7 @@ onMounted(() => {
           <!-- 草稿态 + 已驳回态可编辑（驳回=回到编写中，用友范式，可改后重提） -->
           <el-button
             v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
+            v-has-perm="'invoice:edit'"
             link
             type="primary"
             size="small"

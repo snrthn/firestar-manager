@@ -49,12 +49,14 @@
           type="warning"
           :disabled="!canResetHere"
           :title="resetDisabledTip"
+          v-has-perm="'system:reset'"
           @click="openReset('light')"
         >轻度重置</el-button>
         <el-button
           type="danger"
           :disabled="!canResetHere"
           :title="resetDisabledTip"
+          v-has-perm="'system:reset'"
           @click="openReset('full')"
         >完整重置（恢复出厂）</el-button>
       </div>
@@ -77,7 +79,7 @@
           <div class="ir-hint">请输入大写 RESET 以确认你要执行的危险操作。</div>
         </el-form-item>
         <el-form-item>
-          <el-button :disabled="confirmText !== 'RESET'" :loading="resetLoading" @click="requestVerifyCode">
+          <el-button :disabled="confirmText !== 'RESET'" :loading="resetLoading" v-has-perm="'system:reset'" @click="requestVerifyCode">
             获取验证码
           </el-button>
         </el-form-item>
@@ -89,7 +91,7 @@
             <el-input v-model="verifyCode" placeholder="请输入上方验证码" />
           </el-form-item>
           <el-form-item>
-            <el-button type="danger" :loading="resetLoading" @click="executeReset">确认执行重置</el-button>
+            <el-button type="danger" :loading="resetLoading" v-has-perm="'system:reset'" @click="executeReset">确认执行重置</el-button>
           </el-form-item>
         </template>
       </el-form>

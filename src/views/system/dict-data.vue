@@ -211,7 +211,7 @@ onMounted(reloadAll)
     />
 
     <div class="toolbar">
-      <el-button type="primary" :icon="Plus" :disabled="!typeCode" @click="openCreate">新增字典数据</el-button>
+      <el-button type="primary" :icon="Plus" :disabled="!typeCode" v-has-perm="'dict:data:create'" @click="openCreate">新增字典数据</el-button>
       <el-button :icon="Refresh" :disabled="!typeCode" @click="reloadAll">刷新</el-button>
     </div>
 
@@ -243,8 +243,8 @@ onMounted(reloadAll)
       </el-table-column>
       <el-table-column label="操作" width="140" fixed="right" align="center">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openEdit(row)">修改</el-button>
-          <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+          <el-button link type="primary" size="small" v-has-perm="'dict:data:edit'" @click="openEdit(row)">修改</el-button>
+          <el-button link type="danger" size="small" v-has-perm="'dict:data:delete'" @click="handleDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     <template #empty>
@@ -305,7 +305,7 @@ onMounted(reloadAll)
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="handleSubmit">保存</el-button>
+      <el-button type="primary" :loading="saving" v-has-perm="'dict:data:create'" @click="handleSubmit">保存</el-button>
     </template>
   </el-dialog>
 </template>

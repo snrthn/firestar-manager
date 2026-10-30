@@ -108,7 +108,7 @@ async function submit() {
       </el-table-column>
       <el-table-column label="操作" width="90" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+          <el-button link type="primary" v-has-perm="'notify:template:edit'" @click="openEdit(row)">编辑</el-button>
         </template>
       </el-table-column>
     <template #empty>
@@ -140,7 +140,7 @@ async function submit() {
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
+        <el-button type="primary" :loading="saving" v-has-perm="'notify:template:edit'" @click="submit">保存</el-button>
       </template>
     </el-dialog>
   </div>

@@ -548,6 +548,7 @@ const handleWithdraw = async () => {
           >标记已发货</el-button>
           <el-button
             v-if="canReceive()"
+            v-has-perm="'shipment:receive'"
             type="warning"
             :loading="acting"
             @click="openReceive"
@@ -584,7 +585,7 @@ const handleWithdraw = async () => {
               :http-request="customUpload"
               :disabled="uploading"
             >
-              <el-button :icon="UploadFilled" :loading="uploading">上传签收证据</el-button>
+              <el-button :icon="UploadFilled" :loading="uploading" v-has-perm="'shipment:upload'">上传签收证据</el-button>
             </el-upload>
           </div>
         </template>
@@ -648,7 +649,7 @@ const handleWithdraw = async () => {
 
       <template #footer>
         <el-button @click="recvVisible = false">取消</el-button>
-        <el-button type="primary" :loading="recvSaving" @click="handleConfirmReceive">确认收货</el-button>
+        <el-button type="primary" :loading="recvSaving" v-has-perm="'shipment:receive'" @click="handleConfirmReceive">确认收货</el-button>
       </template>
     </el-dialog>
   </el-dialog>
