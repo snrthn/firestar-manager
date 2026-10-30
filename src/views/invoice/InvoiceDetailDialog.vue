@@ -148,8 +148,11 @@ const reload = async () => {
 // 注意：状态字段真名是 approvalStatus（V75 由 InvoiceVO.invoiceStatus 改名，非 status）
 // 草稿态 + 已驳回态可提交（2026-10-25 用友范式：驳回=回到编写中，改完可重提）
 const canSubmit = () => detail.value?.approvalStatus === 'DRAFT' || detail.value?.approvalStatus === 'REJECTED'
-const canWithdraw = () =>
-  detail.value?.approvalStatus === 'DRAFT' || detail.value?.approvalStatus === 'APPROVING'
+/**
+ * 撤回 = 申请已发出（审批中）才有的动作（2026-10-30 虎哥：草稿态不给撤回入口）。
+ * 草稿单据压根没进流程，撤回无从谈起（后端 engine.withdraw 也只认运行中的流程实例）。
+ */
+const canWithdraw = () => detail.value?.approvalStatus === 'APPROVING'
 // 红冲入口（2026-10-25）：仅审批通过（已开票）的单据可冲；红冲单本身不再套娃
 const canRedFlush = () =>
   detail.value?.approvalStatus === 'APPROVED' && detail.value?.docDirection !== 'RED'

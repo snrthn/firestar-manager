@@ -125,7 +125,6 @@ const openDetail = (row: ShipmentVO) => {
   detailId.value = row.id
   detailVisible.value = true
 }
-
 const route = useRoute()
 
 onMounted(() => {
@@ -262,7 +261,11 @@ onMounted(() => {
     :shipment-id="editId"
     @saved="reloadAfterMutation"
   />
-  <ShipmentDetailDialog v-model:visible="detailVisible" :shipment-id="detailId" @updated="reloadAfterMutation" />
+  <ShipmentDetailDialog
+    v-model:visible="detailVisible"
+    :shipment-id="detailId"
+    @updated="reloadAfterMutation"
+  />
 </template>
 
 <style scoped>

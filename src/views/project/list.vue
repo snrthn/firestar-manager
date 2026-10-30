@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import EmptyState from '@/components/EmptyState.vue'
 import type { FormInstance } from 'element-plus'
-import { Delete, Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
+import { Delete, Plus, Refresh, Search, Download, Upload } from '@element-plus/icons-vue'
 import { downloadViaBackend } from '@/utils/fileDownload'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
@@ -19,6 +20,8 @@ import { goodsOptions } from '@/api/goods'
 import type { CustomerOptionVO } from '@/types/customer'
 import type { GoodsOptionVO } from '@/types/goods'
 import { useDictLabels } from '@/composables/useDict'
+import { uploadFile } from '@/api/file'
+import type { FileVO } from '@/types/file'
 
 // ===== 查询条件（2026-10-28 补齐，口径对齐核销台账） =====
 // 项目编号 / 项目名称 / 客户名称 模糊；审批状态 / 合同状态 / 销售经理 精确；创建时间闭区间
@@ -325,12 +328,55 @@ const signSaving = ref(false)
 const signForm = ref<ProjectSignFormData>({ contractAmount: undefined, contractDesc: '' })
 const signRow = ref<ProjectVO | null>(null)
 
+// ===== 合同附件（V84：签约必传，至少 1 个） =====
+// 存储口径与发票附件（V62）同构：先调 /files/upload 拿到 fileId，随签约请求提交，
+// 由后端统一改写 bizType/bizId 挂载到本项目；不走「业务表存路径」的老路
+// （fin_invoice.invoice_file_path 已被证明是死输入位）。
+/** 三方一致的字面量：后端 ProjectServiceImpl.CONTRACT_ATTACH_BIZ_TYPE / file_biz_type 字典（V84 种入）/ 本常量 */
+const CONTRACT_BIZ_TYPE = 'contract'
+const MAX_CONTRACT_MB = 20
+/** 本次签约选中的合同文件（上传成功即入列） */
+const contractFiles = ref<FileVO[]>([])
+const contractUploading = ref(false)
+
+const beforeContractUpload = (file: File) => {
+  if (file.size > MAX_CONTRACT_MB * 1024 * 1024) {
+    ElMessage.warning(`单个合同文件不能超过 ${MAX_CONTRACT_MB}MB`)
+    return false
+  }
+  return true
+}
+
+/** 项目在签约时早已存在（审批通过后才签约），故上传即可带 bizId，不用后端事后补挂 */
+const handleContractUpload = async (options: { file: File }) => {
+  if (!signRow.value) return
+  contractUploading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', options.file)
+    fd.append('bizType', CONTRACT_BIZ_TYPE)
+    fd.append('bizId', String(signRow.value.id))
+    const vo = await uploadFile(fd)
+    contractFiles.value.push(vo)
+  } catch (e) {
+    ElMessage.error('合同上传失败：' + (e as Error).message)
+  } finally {
+    contractUploading.value = false
+  }
+}
+
+/** 移除只是从本次提交列表里摘掉（文件本身保留在库，未挂 bizType 前等同未提交） */
+const removeContractFile = (idx: number) => {
+  contractFiles.value.splice(idx, 1)
+}
+
 // 签约入口判定 APPROVED + UNSIGNED 已迁至 ProjectDetailDialog（详情弹窗底部动作区）；
 // 列表侧不再需要，避免同一判定在两处漂移。
 const openSign = (row: ProjectVO) => {
   signRow.value = row
   // 金额初始带现值（预估额），允许修正为最终合同额（b 拍板）
   signForm.value = { contractAmount: row.contractAmount ?? undefined, contractDesc: '' }
+  contractFiles.value = []
   signVisible.value = true
 }
 
@@ -340,11 +386,18 @@ const handleSign = async () => {
     ElMessage.warning('合同金额不能为负')
     return
   }
+  // 合同必传（2026-10-30 虎哥）：项目得有合同支撑，没合同不许签约。
+  // 前端只做提示，后端 ProjectServiceImpl.sign 同样硬卡，绕过前端也签不成。
+  if (contractFiles.value.length === 0) {
+    ElMessage.warning('请上传合同附件后再签约')
+    return
+  }
   signSaving.value = true
   try {
     await signProject(signRow.value.id, {
       contractAmount: signForm.value.contractAmount,
       contractDesc: signForm.value.contractDesc?.trim() || undefined,
+      contractFileIds: contractFiles.value.map((f) => f.id),
     })
     ElMessage.success('已签约')
     signVisible.value = false
@@ -400,9 +453,17 @@ const { label: contractStatusLabel, style: contractStatusStyle } = useDictLabels
 
 // 查询区「销售经理」下拉需要用户选项，进页面就拉一次（开窗时的懒加载 ensureUserOptions
 // 只服务表单，查询区不等开窗）；列表与下拉并行加载，不串行阻塞。
+const route = useRoute()
+
 onMounted(() => {
   ensureUserOptions()
   loadList()
+  // 审批中心「我发起的」行内「编辑」跳 /project?edit={id}（2026-10-30）：
+  // 直接按 id 打开编辑弹窗（openEdit 内部会拉详情回填，不依赖列表是否加载完）
+  const editId = route.query.edit
+  if (editId && !Number.isNaN(Number(editId))) {
+    openEdit({ id: Number(editId) } as ProjectVO)
+  }
 })
 </script>
 
@@ -557,11 +618,33 @@ onMounted(() => {
        组件本体保留给审批中心「我发起的」使用（views/approval/list.vue）。 -->
 
   <!-- 签约弹窗（2026-10-22 虎哥拍板：审批通过后的独立动作；金额可修正为最终合同额，描述非必填） -->
-  <el-dialog v-model="signVisible" :title="`签约 - ${signRow?.projectName ?? ''}`" width="480px">
+  <el-dialog v-model="signVisible" :title="`签约 - ${signRow?.projectName ?? ''}`" width="560px">
     <el-form label-width="90px" @submit.prevent>
       <el-form-item label="合同金额">
         <el-input-number v-model="signForm.contractAmount" :min="0" :precision="2" :step="1000"
                          class="amount-left" controls-position="right" style="width: 100%" placeholder="最终合同金额" />
+      </el-form-item>
+      <!-- 合同附件（V84）：必传，至少 1 个。签约即终态、不可撤销，故放在提交前一步收口 -->
+      <el-form-item label="合同附件" required>
+        <div class="contract-upload">
+          <el-upload
+            :http-request="handleContractUpload"
+            :before-upload="beforeContractUpload"
+            :show-file-list="false"
+            :multiple="true"
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+          >
+            <el-button :icon="Upload" :loading="contractUploading">上传合同</el-button>
+          </el-upload>
+          <span class="contract-tip">支持 PDF / 图片 / Word，单个不超过 {{ MAX_CONTRACT_MB }}MB，可多份</span>
+        </div>
+        <ul v-if="contractFiles.length" class="attach-list">
+          <li v-for="(f, idx) in contractFiles" :key="f.id" class="attach-item">
+            <span class="attach-name-text">{{ f.originalName || f.fileName || `文件#${f.id}` }}</span>
+            <el-button link type="danger" size="small" @click="removeContractFile(idx)">移除</el-button>
+          </li>
+        </ul>
+        <div v-else class="contract-empty">尚未上传合同文件</div>
       </el-form-item>
       <el-form-item label="签约描述">
         <el-input v-model="signForm.contractDesc" type="textarea" :rows="3" maxlength="500"
@@ -787,5 +870,47 @@ onMounted(() => {
   margin-left: 8px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+/* ===== 签约弹窗合同附件（V84） =====
+   附件行样式与发票详情弹窗 .attach-list / .attach-item 同款（同文件命名，便于跨页对齐），
+   长文件名走 attach-name-text 的省略号（文件管理页同款口径） */
+.contract-upload {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.contract-tip {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.contract-empty {
+  font-size: 13px;
+  color: #909399;
+  line-height: 22px;
+}
+.attach-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.attach-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  line-height: 22px;
+  max-width: 100%;
+}
+.attach-name-text {
+  display: inline-block;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 </style>

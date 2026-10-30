@@ -349,9 +349,15 @@ const canMarkShipped = () =>
 // 部分收货（PARTIAL_RECEIVED）也可续收剩余量（2026-10-24 虎哥：玻璃水收 0 后剩余的还要再收）
 const canReceive = () =>
   detail.value?.shipmentStatus === 'SHIPPED' || detail.value?.shipmentStatus === 'PARTIAL_RECEIVED'
-// 撤回（方案 B）：待发货且流程仍未走完。真正的「发起人身份 + 流程运行中」两道闸在后端引擎，
-// 这里只做前端可见性，越权/已审完由后端报错兜底
-const canWithdraw = () => detail.value?.shipmentStatus === 'PENDING'
+/**
+ * 撤回（方案 B）：待发货且流程仍在运行。真正的「发起人身份 + 流程运行中」两道闸在后端引擎，
+ * 这里只做前端可见性，越权/已审完由后端报错兜底。
+ *
+ * 2026-10-30 虎哥：草稿态（已建单未提交审批）不给撤回入口 —— 申请发出去才有撤回可言，
+ * 故必须同时满足 approvalStatus = APPROVING（此前只判 shipmentStatus=PENDING，草稿单也亮按钮）。
+ */
+const canWithdraw = () =>
+  detail.value?.shipmentStatus === 'PENDING' && detail.value?.approvalStatus === 'APPROVING'
 // 提交审批（2026-10-26 虎哥）：仅草稿/驳回可提；提交后审批态转 APPROVING，编辑入口随之隐藏
 const canSubmit = () =>
   detail.value?.approvalStatus === 'DRAFT' || detail.value?.approvalStatus === 'REJECTED'

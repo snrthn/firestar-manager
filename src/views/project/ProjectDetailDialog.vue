@@ -4,12 +4,18 @@ import { computed, ref, watch } from 'vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import { projectDetail, projectTimeline, withdrawProject } from '@/api/project'
+import { getFileDetail, downloadFileUrl } from '@/api/file'
 import type { ProjectVO } from '@/types/project'
 import type { TimelineNodeVO } from '@/types/project'
 import type { TaskInfoVO } from '@/types/approval'
+import type { FileVO } from '@/types/file'
 import ApprovalTimeline from '@/components/ApprovalTimeline.vue'
 import ApprovalActionForm from '@/components/ApprovalActionForm.vue'
 import EmptyState from '@/components/EmptyState.vue'
+// 合同附件预览复用文件管理模块的预览弹窗（与发票详情同口径，2026-10-25 虎哥要求）：
+// 图片/PDF/音视频判定、blob 取字节与 objectURL 回收全在组件内，本窗不自己拼 URL
+import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
+import { downloadViaBackend } from '@/utils/fileDownload'
 import { useTaskApproval } from '@/composables/useTaskApproval'
 import { useDictLabels } from '@/composables/useDict'
 import { formatDateTime } from '@/utils/datetime'
@@ -117,11 +123,51 @@ const load = async (id: number) => {
     const [d, tl] = await Promise.all([projectDetail(id), projectTimeline(id)])
     detail.value = d
     timeline.value = tl
+    await loadContractFiles(d)
   } catch (e) {
     ElMessage.error((e as Error).message)
     detail.value = null
   } finally {
     loading.value = false
+  }
+}
+
+// ===== 合同附件（V84：签约必传，详情只读展示 + 预览/下载） =====
+const contractFiles = ref<FileVO[]>([])
+
+/**
+ * 合同附件只走详情返回的 contractFileIds 逐个取文件元信息（列表接口不返回该字段，避 N+1）。
+ * 合同文件通常 1~3 份，逐个取比「拉一整页文件再筛 bizId」更省也更准（后者依赖分页上限）。
+ */
+const loadContractFiles = async (d: ProjectVO) => {
+  const ids = d.contractFileIds || []
+  if (ids.length === 0) {
+    contractFiles.value = []
+    return
+  }
+  try {
+    const files = await Promise.all(ids.map((fid) => getFileDetail(fid)))
+    contractFiles.value = files.filter((f): f is FileVO => !!f)
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+    contractFiles.value = []
+  }
+}
+
+const previewVisible = ref(false)
+const previewRow = ref<FileVO | null>(null)
+const handlePreview = (f: FileVO) => {
+  previewRow.value = f
+  previewVisible.value = true
+}
+
+/** 下载走 downloadViaBackend（OSS 直连 / 本地带 token 取 blob 落地，不起新页签） */
+const handleDownload = async (f: FileVO) => {
+  try {
+    const url = await downloadFileUrl(f.id)
+    await downloadViaBackend(url, f.originalName || f.fileName || `文件#${f.id}`)
+  } catch (e) {
+    ElMessage.error((e as Error).message)
   }
 }
 
@@ -142,10 +188,15 @@ const canSubmit = () =>
   detail.value?.approvalStatus === 'DRAFT' || detail.value?.approvalStatus === 'REJECTED'
 const canSign = () =>
   detail.value?.approvalStatus === 'APPROVED' && detail.value?.contractStatus === 'UNSIGNED'
-// 撤回：审批流程仍在运行（方案 B）。后端引擎再做「发起人身份 + 流程运行中」两道闸，
-// 这里只做前端可见性判断，越权/已结束由后端兜底报错
-const canWithdraw = () =>
-  detail.value?.approvalStatus === 'APPROVING' || detail.value?.approvalStatus === 'PENDING_APPROVAL'
+/**
+ * 撤回：仅审批已发出（APPROVING）才有意义 —— 2026-10-30 虎哥：草稿态不给撤回入口。
+ *
+ * 原判定额外放行 PENDING_APPROVAL（立项旧版「待审批」字面量），实测是坑：库里 144 条
+ * PENDING_APPROVAL 的 process_instance_id 全为空（压根没提交过审批 = 纯草稿），
+ * 撤回必然撞 engine.withdraw(null) 报错。故只认 APPROVING（其 3 条均有流程实例）。
+ * 后端引擎仍有「发起人身份 + 流程运行中」两道闸，这里只做前端可见性。
+ */
+const canWithdraw = () => detail.value?.approvalStatus === 'APPROVING'
 
 const handleWithdraw = async () => {
   if (!detail.value) return
@@ -206,6 +257,25 @@ const itemsTotal = computed(() =>
           </el-descriptions-item>
           <el-descriptions-item v-if="detail.contractDesc" label="签约描述" :span="3">
             {{ detail.contractDesc }}
+          </el-descriptions-item>
+          <!-- 合同附件（V84）：签约必传，故签约后必有；未签约时整行不显示（没东西可看） -->
+          <el-descriptions-item v-if="detail.contractStatus === 'SIGNED'" label="合同附件" :span="3">
+            <span v-if="!contractFiles.length" class="muted">—</span>
+            <div v-else class="attach-list">
+              <div v-for="f in contractFiles" :key="f.id" class="attach-item">
+                <el-button
+                  link
+                  type="primary"
+                  size="small"
+                  class="attach-name"
+                  :title="f.originalName || f.fileName || `文件#${f.id}`"
+                  @click="handlePreview(f)"
+                >
+                  <span class="attach-name-text">{{ f.originalName || f.fileName || `文件#${f.id}` }}</span>
+                </el-button>
+                <el-button link type="primary" size="small" @click="handleDownload(f)">下载</el-button>
+              </div>
+            </div>
           </el-descriptions-item>
         </el-descriptions>
 
@@ -337,6 +407,9 @@ const itemsTotal = computed(() =>
       </template>
     </template>
   </el-dialog>
+
+  <!-- 合同附件预览：复用文件管理模块的预览弹窗（与发票详情同款） -->
+  <FilePreviewDialog v-model="previewVisible" :file="previewRow" />
 </template>
 
 <style scoped>
@@ -404,5 +477,34 @@ const itemsTotal = computed(() =>
 .fin-grid > .fin-cell.value {
   text-align: left;
   overflow-wrap: break-word;
+}
+
+/* ===== 合同附件（V84）：与发票详情弹窗 .attach-list/.attach-item 同款命名与样式 ===== */
+.attach-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.attach-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  line-height: 22px;
+}
+.attach-name {
+  line-height: 1;
+}
+.attach-name-text {
+  display: inline-block;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.muted {
+  color: #909399;
+  font-size: 13px;
 }
 </style>

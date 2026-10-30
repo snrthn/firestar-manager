@@ -149,7 +149,6 @@ const openRedFlush = (invoiceId: number) => {
   redFlushOriginalId.value = invoiceId
   redFlushVisible.value = true
 }
-
 const route = useRoute()
 
 onMounted(() => {

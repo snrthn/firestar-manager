@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import EmptyState from '@/components/EmptyState.vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
@@ -14,6 +15,8 @@ import { formatDateTime } from '@/utils/datetime'
 import type { ApprovalHistoryVO, TaskInfoVO } from '@/types/approval'
 import type { ProjectVO } from '@/types/project'
 import { approvalModuleOf, isShipmentTask, isReceiptTask, isInvoiceTask } from '@/composables/useTaskApproval'
+
+const router = useRouter()
 
 /** 发货审批任务标识（2026-10-23 通用化：待办 enrich 按流程 key 分发，前端审批动作同样按 key 路由） */
 
@@ -163,6 +166,15 @@ const openProject = (id: number | null) => {
   approvalTask.value = null
   projectId.value = id
   projectVisible.value = true
+}
+
+/**
+ * 「我发起的」行内「编辑」（2026-10-30）：跳立项管理页并带 ?edit={id}，
+ * 由立项页 onMounted 读取参数自动打开编辑弹窗（与 /invoice?detail= 同款参数契约）。
+ * 走路由而不是在本页塞一个编辑弹窗：编辑表单 + 校验逻辑已在立项页，复制一份必然漂移。
+ */
+const editProject = (id: number) => {
+  router.push({ path: '/project', query: { edit: String(id) } })
 }
 
 // 发货详情：三个 Tab 里的发货单都是别人的（我是审批人视角），一律 readonly
@@ -345,8 +357,19 @@ onMounted(loadApprovals)
           <el-table-column label="创建时间" min-width="170">
             <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right" align="center">
+          <el-table-column label="操作" width="160" fixed="right" align="center">
             <template #default="{ row }">
+              <!-- 编辑（2026-10-30 虎哥：驳回后要能直接改单）：跳立项管理页打开编辑弹窗。
+                   为什么不在本页就地编辑 —— 审批中心是「审批视角」，单据写动作与弹窗/校验
+                   都归业务页（立项管理），在两处各放一份必然漂移（见本文件详情弹窗 readonly 注释）。 -->
+              <el-button
+                v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
+                v-has-perm="'project:edit'"
+                link
+                type="primary"
+                size="small"
+                @click="editProject(row.id)"
+              >编辑</el-button>
               <el-button link type="primary" size="small" @click="openProject(row.id)">详情</el-button>
             </template>
           </el-table-column>

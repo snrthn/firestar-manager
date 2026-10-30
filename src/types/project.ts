@@ -79,6 +79,12 @@ export interface ProjectVO {
   contractSignedBy: number | null
   /** 签约人展示名（后端批量翻译，V46） */
   contractSignedByName: string | null
+  /**
+   * 合同附件文件 ID 列表（V84 软关联：sys_file_storage.bizType='contract' + bizId=项目 id）。
+   * 与发票 attachmentFileIds 同口径：仅详情返回（列表不填充以避 N+1），
+   * 前端按 id 调 /files/{id} 取文件名与下载/预览链接。
+   */
+  contractFileIds?: number[] | null
   /** 审批状态（字典 approval_status：DRAFT/APPROVING/APPROVED/REJECTED/CANCELLED） */
   approvalStatus: string
   /** 审批状态中文名（字典翻译，后端回填） */
@@ -125,10 +131,18 @@ export interface ProjectItemForm {
   unitPrice?: number
 }
 
-/** 签约表单（审批通过后的独立动作；金额可修正为最终合同额，描述非必填） */
+/**
+ * 签约表单（审批通过后的独立动作；金额可修正为最终合同额，描述非必填）。
+ *
+ * V84（2026-10-30 虎哥拍板）：合同附件必传（至少 1 个）——「项目毕竟还是需要有合同支撑的」。
+ * 前端先调 POST /files/upload（bizType='contract'，项目已存在故直接带 bizId=项目 id）拿 fileId，
+ * 随本表单提交；后端 ProjectServiceImpl.sign 校验非空并统一挂载，缺失直接 400。
+ */
 export interface ProjectSignFormData {
   contractAmount?: number
   contractDesc?: string
+  /** 合同附件文件 ID（必传，至少 1 个） */
+  contractFileIds?: number[]
 }
 
 /** 审批时间线节点（与后端 TimelineNodeVO 对齐） */
