@@ -365,10 +365,7 @@ const handleSubmit = async () => {
     return
   }
   // 总额=Σ分配（只读自动算），Σ=金额的一致性由前端分配与后端 saveAllocations 双重保证，无需再校验
-  if (attachments.value.length === 0) {
-    ElMessage.warning('请上传发票文件')
-    return
-  }
+  // 发票文件改为选填（2026-10-31）：申请阶段常未取得票面扫描件，允许先建单后补传
   const payload: InvoiceRequest = {
     projectId,
     receivableId: mainReceivableId,
@@ -684,7 +681,7 @@ watch(
           />
         </el-form-item>
 
-        <el-form-item label="发票文件" required>
+        <el-form-item label="发票文件">
           <div class="attach-box">
             <el-upload
               v-has-perm="'file:upload'"
