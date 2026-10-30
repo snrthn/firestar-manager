@@ -591,7 +591,7 @@ const handleWithdraw = async () => {
               :http-request="customUpload"
               :disabled="uploading"
             >
-              <el-button :icon="UploadFilled" :loading="uploading" v-has-perm="'shipment:upload'">上传签收证据</el-button>
+              <el-button :icon="UploadFilled" :loading="uploading" v-has-perm="'file:upload'">上传签收证据</el-button>
             </el-upload>
           </div>
         </template>

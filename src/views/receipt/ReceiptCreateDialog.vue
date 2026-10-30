@@ -741,7 +741,7 @@ watch(
         <el-form-item label="银行回单" required>
           <div class="attach-box">
             <el-upload
-              v-has-perm="'receipt:upload'"
+              v-has-perm="'file:upload'"
               :show-file-list="false"
               :http-request="customUpload"
               :before-upload="beforeUpload"

@@ -687,7 +687,7 @@ watch(
         <el-form-item label="发票文件" required>
           <div class="attach-box">
             <el-upload
-              v-has-perm="'invoice:upload'"
+              v-has-perm="'file:upload'"
               :show-file-list="false"
               :http-request="customUpload"
               :before-upload="beforeUpload"

@@ -256,7 +256,7 @@ const handleWithdraw = async () => {
                 >
                   <span class="attach-name-text">{{ f.originalName || f.fileName || `文件#${f.id}` }}</span>
                 </el-button>
-                <el-button link type="primary" size="small" :icon="Download" v-has-perm="'invoice:download'" @click="handleDownload(f)">
+                <el-button link type="primary" size="small" :icon="Download" v-has-perm="'file:download'" @click="handleDownload(f)">
                   下载
                 </el-button>
               </div>

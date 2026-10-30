@@ -48,6 +48,11 @@ export function updateHelpArticle(
   return request.put(`/system/help/${id}`, payload).then((r) => r.data.data)
 }
 
+/** 启停切换（help:toggle）：翻转 ENABLED/DISABLED，不传其它字段 */
+export function toggleHelpArticle(id: number) {
+  return request.put(`/system/help/${id}/toggle`).then((r) => r.data.data)
+}
+
 export function deleteHelpArticle(id: number) {
   return request.delete(`/system/help/${id}`).then((r) => r.data.data)
 }

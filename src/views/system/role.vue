@@ -242,6 +242,14 @@ const openAssignPerms = async (row: RoleManageVO) => {
     buildPageAuthBase(menuTree.value)
     reconcilePageNodes()
     applyMenuTreeState()
+    // 重开弹窗时把筛选关键字重新投射到树上：
+    // 每次 openAssignPerms 都会整体替换 menuTree/permTree 数据 → el-tree 收到新 data 后
+    // 重建节点树，内部筛选态（node.visible）随之丢失；而输入框是 v-model 绑在组件级 ref 上、
+    // 弹窗未设 destroy-on-close，文字仍留在框里。结果就是「框里还有关键字、树却显示全量」。
+    // 故这里在树数据/勾选态就绪后，按输入框当前值再调一次 filter，兑现「关闭再打开仍保持过滤」。
+    // 关键字为空字符串时 filter('') 会走 filterNodeMethod 的 !value 短路 → 恢复全量，无副作用。
+    menuTreeRef.value?.filter(menuFilter.value)
+    permTreeRef.value?.filter(permFilter.value)
   } catch (e) {
     ElMessage.error((e as Error).message)
   }

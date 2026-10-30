@@ -8,6 +8,7 @@ import {
   pageHelpArticles,
   createHelpArticle,
   updateHelpArticle,
+  toggleHelpArticle,
   deleteHelpArticle,
 } from '@/api/help'
 import type { HelpArticle } from '@/types/feedback'
@@ -141,13 +142,7 @@ async function toggleStatus(row: HelpArticle) {
     return
   }
   try {
-    await updateHelpArticle(row.id, {
-      title: row.title,
-      content: row.content,
-      category: row.category,
-      sortNo: row.sortNo,
-      status: next,
-    })
+    await toggleHelpArticle(row.id)
     ElMessage.success(`已${actionText}`)
     load()
   } catch {

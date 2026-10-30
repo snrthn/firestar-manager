@@ -39,7 +39,7 @@
       <el-table-column label="操作" width="300" fixed="right" align="center">
         <template #default="{ row }">
           <el-button link type="primary" size="small" v-has-perm="'process:edit'" @click="openEdit(row)">编辑</el-button>
-          <el-button link type="warning" size="small" v-has-perm="'process:config'" @click="openNodes(row)">配置节点</el-button>
+          <el-button link type="warning" size="small" v-has-perm="'process:edit'" @click="openNodes(row)">配置节点</el-button>
           <el-button link type="success" size="small" v-has-perm="'process:deploy'" @click="onDeploy(row)">部署</el-button>
           <el-button link :type="row.status === 'ENABLED' ? 'danger' : 'success'" size="small" v-has-perm="'process:toggle'" @click="onToggle(row)">
             {{ row.status === 'ENABLED' ? '停用' : '启用' }}
@@ -112,8 +112,8 @@
           type="info" :closable="false" style="margin-bottom: 12px"
         />
         <div class="node-toolbar">
-          <el-button type="primary" size="small" v-has-perm="'process:config'" @click="addNode">+ 新增节点</el-button>
-          <el-button size="small" :loading="saving" v-has-perm="'process:config'" @click="onSaveNodes">保存节点</el-button>
+          <el-button type="primary" size="small" v-has-perm="'process:edit'" @click="addNode">+ 新增节点</el-button>
+          <el-button size="small" :loading="saving" v-has-perm="'process:edit'" @click="onSaveNodes">保存节点</el-button>
           <el-button type="success" size="small" :loading="deploying" v-has-perm="'process:deploy'" @click="onDeployFromDrawer">
             保存并部署
           </el-button>
@@ -168,9 +168,9 @@
           </el-table-column>
           <el-table-column label="操作" width="140" align="center">
             <template #default="{ $index }">
-              <el-button link type="primary" size="small" :disabled="$index === 0" v-has-perm="'process:config'" @click="move($index, -1)">上移</el-button>
-              <el-button link type="primary" size="small" :disabled="$index === editingNodes.length - 1" v-has-perm="'process:config'" @click="move($index, 1)">下移</el-button>
-              <el-button link type="danger" size="small" v-has-perm="'process:config'" @click="removeNode($index)">删除</el-button>
+              <el-button link type="primary" size="small" :disabled="$index === 0" v-has-perm="'process:edit'" @click="move($index, -1)">上移</el-button>
+              <el-button link type="primary" size="small" :disabled="$index === editingNodes.length - 1" v-has-perm="'process:edit'" @click="move($index, 1)">下移</el-button>
+              <el-button link type="danger" size="small" v-has-perm="'process:edit'" @click="removeNode($index)">删除</el-button>
             </template>
           </el-table-column>
           <template #empty>
