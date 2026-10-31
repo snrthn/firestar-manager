@@ -170,6 +170,9 @@ function onTabClick(fullPath: string) {
 let ro: ResizeObserver | null = null
 watch(() => tabsStore.tabs.length, () => nextTick(updateArrows), { flush: 'post' })
 onMounted(() => {
+  // 点击页面任意处关闭右键浮层（与 onBeforeUnmount 里的 removeEventListener 必须成对出现；
+  // 2026-11-01 本次结构改造时漏挂过一次，导致点击空白处菜单收不回去）
+  document.addEventListener('click', onDocClick)
   nextTick(updateArrows)
   window.addEventListener('resize', updateArrows)
   if (typeof ResizeObserver !== 'undefined' && scroller.value) {
