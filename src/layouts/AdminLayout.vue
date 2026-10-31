@@ -6,6 +6,7 @@ import { useTabsStore } from '@/stores/tabs'
 import { useUserStore } from '@/stores/user'
 import { useBreakpoint } from '@/composables/useBreakpoint'
 import { listPending, consent } from '@/api/agreement'
+import { ElMessage } from 'element-plus'
 import type { AgreementVO } from '@/types/agreement'
 import RichView from '@/components/RichView.vue'
 import AppHeader from '@/components/layout/AppHeader.vue'
@@ -89,8 +90,10 @@ async function agreeCurrent() {
   try {
     await consent(cur.agreementId, { versionId: cur.versionId, channel: 'LOGIN' })
     agreeIdx.value++
-  } catch {
-    // 同意失败则停留当前条，等待用户重试
+  } catch (e: any) {
+    // 原为静默吞掉：同意失败只是停在当前条、按钮恢复，用户以为没点到。
+    // 这是明确的写操作，失败必须让用户看见并可重试。
+    ElMessage.error(e?.message || '协议同意失败，请重试')
   } finally {
     agreeing.value = false
   }

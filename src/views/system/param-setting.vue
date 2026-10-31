@@ -280,6 +280,10 @@ async function saveBasic() {
     ElMessage.success('基本信息已保存')
     // 保存即生效：系统名 / Logo 变了，侧栏品牌标识立刻跟着变（force 重拉一次）
     appStore.loadBrand(true)
+  } catch (e: any) {
+    // 原写法只有 try/finally 没有 catch：403 等拒绝会变成 unhandledrejection，
+    // 界面上「点了没反应」（2026-11-01 虎哥实测）。缺权限/参数非法必须让用户看见。
+    ElMessage.error(e?.message || '保存失败')
   } finally {
     savingBasic.value = false
   }
@@ -290,6 +294,8 @@ async function saveAbout() {
   try {
     await updateValues({ about_us: aboutForm.about_us })
     ElMessage.success('关于我们已保存')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '保存失败')
   } finally {
     savingAbout.value = false
   }

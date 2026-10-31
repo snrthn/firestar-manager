@@ -135,6 +135,9 @@ async function doPublish() {
     ElMessage.success('新版本已发布')
     publishVisible.value = false
     await load()
+  } catch (e: any) {
+    // 同 param-setting：原为 try/finally 无 catch，发布被拒时界面毫无反馈
+    ElMessage.error(e?.message || '发布失败')
   } finally {
     publishing.value = false
   }

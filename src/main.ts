@@ -245,4 +245,62 @@ app.use(ElImageViewer)
 app.use(ElImage)
 // 按钮级权限指令：v-has-perm="'project:create'"（任务3）
 registerHasPermDirective(app)
+
+// ===== 全局异常兜底 =====
+// 起因（2026-11-01 虎哥实测）：关闭参数保存接口权限后后端已返回 403，
+// 前端却毫无提示——saveBasic 写的是 try{...}finally{...}，压根没有 catch，
+// Promise rejection 变成 "Uncaught (in promise)" 只在控制台飘一行，
+// 用户眼里就是「点了没反应」。本项目此前全站没有任何兜底
+// （app.config.errorHandler 与 unhandledrejection 均为空）。
+//
+// 两张网各管一段，缺一不可：
+//   ① app.config.errorHandler —— 模板渲染 / 生命周期 / 事件回调里的同步抛出
+//   ② unhandledrejection      —— async 函数里没接住的 await 失败（本案元凶）
+//
+// 刻意吞异常的地方不受影响：它们已被 try/catch settle 掉，不会冒到这儿，
+// 诸如 dashboard「网络失败不打断渲染」、登出容错、图片破图回落等降级逻辑照旧。
+// 401 亦然：sessionGuard 的 hangSilently 返回永不 settle 的 Promise，不会 reject。
+/** 框架/浏览器自身噪音，或用户主动中断，都不是故障 */
+const NOISE_RE = /ResizeObserver loop|Script error\.?/i
+const CANCEL_NAMES = new Set(['CanceledError', 'AbortError'])
+
+/** 同一文案的去重窗口：并发请求同时失败时只弹一次，避免 toast 刷屏 */
+const recentMsg = new Map<string, number>()
+
+function reportError(reason: unknown) {
+  if (reason == null) return
+  const name = (reason as { name?: string } | null)?.name
+  if (name && CANCEL_NAMES.has(name)) return // 请求取消 / 组件卸载导致的中止
+  // 表单校验失败必须在这里拦掉：Element Plus 的 formRef.validate() reject 的是形如
+  // { 字段名: [{ message, field }] } 的**纯对象**，没有 message 属性；此时表单项下方
+  // 已有红字提示，若继续往下取文本会得到 "[object Object]" 的荒唐 toast。
+  // 本项目有 10 处 await formRef.value.validate() 写在 try 之外，全靠这道闸。
+  // 因此：只认「带 message 的错误」（request.ts 已把后端响应体的中文挂到 error.message），
+  // 拿不到 message 的一律不打扰用户。
+  const msg =
+    typeof reason === 'string'
+      ? reason
+      : ((reason as { message?: string } | null)?.message ?? '')
+  if (!msg || NOISE_RE.test(msg)) return
+
+  const now = Date.now()
+  if (now - (recentMsg.get(msg) ?? 0) < 1500) return
+  if (recentMsg.size > 50) recentMsg.clear() // 长期运行防堆积
+  recentMsg.set(msg, now)
+  // request.ts 的响应拦截器已把后端响应体里的中文 message 挂到 error.message
+  ElMessage({ message: msg, type: 'error', duration: 4500, showClose: true })
+}
+
+app.config.errorHandler = (err) => {
+  console.error('[global] 组件内未捕获异常：', err)
+  reportError(err)
+}
+
+window.addEventListener('unhandledrejection', (e) => {
+  // 需要时用 preventDefault 抑制控制台的默认告警（已由上方 toast 接管）
+  e.preventDefault()
+  console.error('[global] 未处理的 Promise 拒绝：', e.reason)
+  reportError(e.reason)
+})
+
 app.mount('#app')
