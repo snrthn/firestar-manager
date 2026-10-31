@@ -206,7 +206,7 @@ async function submitPublish() {
         <h3 class="page-title">通知记录</h3>
       </div>
       <div class="head-actions">
-        <el-button @click="router.push('/system/notify-template')">通知模板</el-button>
+        <el-button v-has-perm="'notify:template'" @click="router.push('/system/notify-template')">通知模板</el-button>
         <el-button type="primary" v-has-perm="'notify:publish'" @click="openPublish">发布通知</el-button>
       </div>
     </div>

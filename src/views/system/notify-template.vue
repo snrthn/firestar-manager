@@ -1,14 +1,19 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { ElMessage } from 'element-plus'
 import { listTemplates, saveTemplate } from '@/api/notification'
+import { useUserStore } from '@/stores/user'
 import type { NotificationTemplate } from '@/types/notification'
 
 defineOptions({ name: 'notify-template' })
 
 const loading = ref(false)
 const templates = ref<NotificationTemplate[]>([])
+
+// 操作列隐藏：角色无 notify:template:edit 时整列收起（不再渲染空列/占位）
+const userStore = useUserStore()
+const hasNotifyTemplateEdit = computed(() => userStore.hasPermission('notify:template:edit'))
 
 async function load() {
   loading.value = true
@@ -106,7 +111,7 @@ async function submit() {
           {{ row.updatedAt ? row.updatedAt.replace('T', ' ') : '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="90" align="center" fixed="right">
+      <el-table-column v-if="hasNotifyTemplateEdit" label="操作" width="90" align="center" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" v-has-perm="'notify:template:edit'" @click="openEdit(row)">编辑</el-button>
         </template>
