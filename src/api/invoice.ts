@@ -1,6 +1,6 @@
 import request from './request'
 import type { ApiResult } from '@/types/auth'
-import type { InvoicePageVO, InvoiceVO, InvoiceRequest } from '@/types/invoice'
+import type { InvoicePageVO, InvoiceVO, InvoiceRequest, InvoiceIssueRequest } from '@/types/invoice'
 import type { TimelineNodeVO } from '@/types/project'
 
 // 发票（开票）管理接口（后端 /invoice/**；审批动作经 Flowable 任务端点）
@@ -76,4 +76,14 @@ export function rejectInvoiceTask(taskId: string, comment: string) {
   return request
     .post<ApiResult<null>>(`/invoice/task/${taskId}/reject?comment=${encodeURIComponent(comment)}`)
     .then((r) => r.data)
+}
+
+/**
+ * 开票（V95 发票流程重构）。
+ *
+ * 开票节点（ROLE_INVOICER，invoice:issue）在审批通过进入 SUBMITTED（待开票）后调用：
+ * 由开票员实际开具并回填票号/代码/日期 + 上传电子票。后端校验 SUBMITTED 态、必填项、发票号查重。
+ */
+export function issueInvoice(id: number, data: InvoiceIssueRequest) {
+  return request.post<ApiResult<null>>(`/invoice/${id}/issue`, data).then((r) => r.data)
 }

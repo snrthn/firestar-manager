@@ -35,6 +35,15 @@ export interface ProjectVO {
    * 看板「按客户」维度的聚合键 —— 统计别拿 customerName 做 GROUP BY，文本会重名分裂。
    */
   customerId: number | null
+  /**
+   * 客户购方六要素（V95 发票流程重构；只读快照，供发票申请弹窗「自动带出」预填）。
+   * 仅项目已关联客户时有值，未关联则为空。
+   */
+  customerTaxNo?: string | null
+  customerAddress?: string | null
+  customerBuyerPhone?: string | null
+  customerBankName?: string | null
+  customerBankAccount?: string | null
   /** 销售经理 ID → sys_user.id */
   salesManagerId: number | null
   /** 销售经理展示名（后端批量翻译：nickname 优先 username 兜底；空值前端回显 ID） */

@@ -1,46 +1,36 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import { UploadFilled } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { createInvoice, invoiceDetail, updateInvoice } from '@/api/invoice'
 import { projectPage } from '@/api/project'
 import { receivablePage } from '@/api/receivable'
-import { listFiles, uploadFile } from '@/api/file'
 import type { AllocationItem, InvoiceRequest, InvoiceVO } from '@/types/invoice'
 import type { ProjectVO } from '@/types/project'
 import type { ReceivableVO } from '@/types/receivable'
-import type { FileVO } from '@/types/file'
 import DictSelect from '@/components/DictSelect.vue'
-// 已选附件支持就地预览（2026-10-25 虎哥要求）：与详情弹窗同一套，复用文件管理模块的预览组件。
-// 预览走 preview 接口（inline、不计数），与 download 接口分家 —— 详见 FilePreviewDialog 注释。
-import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
+// 注：附件（电子发票）已移至「开票」节点（InvoiceIssueDialog），申请弹窗不再收集附件，
+// 故不再引入 FilePreviewDialog。
 
-// 发票单 新建 / 编辑弹窗。
+// 发票单 新建 / 编辑弹窗（V95 发票流程重构）。
 // 契约要点（对齐 InvoiceServiceImpl）：
-//  1) receivableId 必填且后端校验存在 —— 发票必须挂在应收单上，故项目由所选应收单带出，
-//     不让用户选两遍（InvoiceRequest.projectId 直接取 receivable.projectId）。
-//  2) 创建出来的是「草稿态 PENDING」，不拉审批流；必须回列表点「提交审批」才拉起
-//     invoice_approval。故按钮文案是「创建」不是「提交开票申请」。
+//  1) receivableId 必填且后端校验存在 —— 发票必须挂在应收单上；应收单下拉由所选项目过滤带出
+//     （InvoiceRequest.projectId 由表头项目决定，应收单关联统一由核销分配行表达，不重复选）。
+//  2) 创建出来的是「草稿态 DRAFT」，业务单号 apply_no 由后端创建即生成（FP-yyyyMMdd-NNN）；
+//     不拉审批流，必须回列表点「提交审批」才拉起 invoice_approval。故按钮文案是「创建」。
 //  3) fin_invoice 无 remark 列、后端未消费 → 本表单不提供备注输入位（避免「填了不存」）。
-//
-// 附件（2026-10-25 V62 真上传）：原 invoice_file_path「只存路径」是死输入位，改为走
-// sys_file_storage 软关联，与发货签收证据（V54 shipment_receive_proof）严格同构。
-// 新建时单据尚无 id → 上传不带 bizId，保存后由后端统一挂载。
+//  4) 购方六要素（发票抬头）：选完项目后由 project.customerId 反查客户主表「自动带出」预填，
+//     可编辑；提交时 upsert 回写客户表（新客户填一次、后续自动带出，见 q-0 分叉点决策）。
+//  5) 税务发票号/代码/开票日期/电子发票文件 属于「开票」节点（ROLE_INVOICER，invoice:issue），
+//     **不在本弹窗收集** —— 由独立的 InvoiceIssueDialog 在审批通过（SUBMITTED）后填写。
+//     V95 起申请阶段不再随本请求提交 attachmentFileIds（电子票在开票节点上传）。
 const visible = defineModel<boolean>('visible', { required: true })
 // originalInvoiceId：红冲模式入参（2026-10-25 红冲入口，虎哥拍板「正数+RED、走完整审批」）。
 // 从详情弹窗「红冲」按钮传入被冲销的蓝字发票 ID；非空 = 本弹窗以红冲单模式打开。
 const props = defineProps<{ invoiceId?: number | null; originalInvoiceId?: number | null }>()
 const emit = defineEmits<{ saved: [] }>()
 
-/**
- * 附件业务类型字面量。必须与下列三处严格一致，否则文件在文件管理页不可见、不可筛：
- *   ① 后端 InvoiceServiceImpl.INVOICE_ATTACH_BIZ_TYPE
- *   ② file_biz_type 字典的 dict_value（V20 已种 invoice）
- *   ③ 本常量
- */
-const ATTACH_BIZ_TYPE = 'invoice'
-const MAX_ATTACH_MB = 10
+// 附件（电子发票）已移至「开票」节点（InvoiceIssueDialog），申请弹窗不再使用附件常量。
 
 const isEdit = () => props.invoiceId != null
 /** 红冲模式：传了 originalInvoiceId 即红字单（与编辑态互斥，红冲永远新建） */
@@ -55,9 +45,6 @@ const loadingReceivables = ref(false)
 const projectOptions = ref<ProjectVO[]>([])
 const loadingProjects = ref(false)
 const saving = ref(false)
-/** 已选附件（编辑态从文件表按 bizType+bizId 回填） */
-const attachments = ref<FileVO[]>([])
-const uploading = ref(false)
 
 /**
  * 挂靠主体 = 项目（2026-10-28 交互优化）。
@@ -67,22 +54,38 @@ const uploading = ref(false)
  */
 const form = reactive<{
   projectId: number | null
-  invoiceNo: string
-  invoiceCode: string
   invoiceType: string
   invoiceAmount: number | null
   taxRate: number | null
   taxAmount: number | null
-  invoiceDate: string | null
 }>({
   projectId: null,
-  invoiceNo: '',
-  invoiceCode: '',
   invoiceType: 'NORMAL',
   invoiceAmount: null,
   taxRate: null,
   taxAmount: null,
-  invoiceDate: null,
+})
+
+/**
+ * 购方六要素（V95 发票流程重构；发票抬头）。
+ * 选完项目后由 project.customerId 反查客户主表「自动带出」预填（见 prefillBuyerFromProject），
+ * 可编辑；提交时随 InvoiceRequest.buyer* 一并提交，后端 upsert 回写客户表并快照到发票。
+ * 编辑 / 红冲态从发票自身快照（detail.buyer*）回填，不反查客户（避免客户改名污染历史单）。
+ */
+const buyer = reactive<{
+  name: string
+  taxNo: string
+  address: string
+  phone: string
+  bankName: string
+  bankAccount: string
+}>({
+  name: '',
+  taxNo: '',
+  address: '',
+  phone: '',
+  bankName: '',
+  bankAccount: '',
 })
 
 const loadProjects = async () => {
@@ -237,71 +240,20 @@ const balanceOfReceivable = (receivableId: number | null | undefined): number | 
   return rv?.uninvoicedAmount == null ? null : Number(Number(rv.uninvoicedAmount).toFixed(2))
 }
 
-// ===== 附件 =====
-
-const beforeUpload = (file: File) => {
-  if (file.size > MAX_ATTACH_MB * 1024 * 1024) {
-    ElMessage.warning(`单个附件不能超过 ${MAX_ATTACH_MB}MB`)
-    return false
-  }
-  return true
-}
-
-/** el-upload 自定义上传：复用 FileController.upload（file:manage，V62 已授给开票员） */
-const customUpload = async (options: { file: File }) => {
-  uploading.value = true
-  try {
-    const fd = new FormData()
-    fd.append('file', options.file)
-    fd.append('bizType', ATTACH_BIZ_TYPE)
-    // 新建时单据 id 尚未生成 → 不传 bizId，落库后由后端 bindAttachments 统一挂载
-    if (props.invoiceId != null) {
-      fd.append('bizId', String(props.invoiceId))
-    }
-    const vo = await uploadFile(fd)
-    attachments.value.push(vo)
-  } catch (e) {
-    ElMessage.error('附件上传失败：' + (e as Error).message)
-  } finally {
-    uploading.value = false
-  }
-}
-
-// 移除只是从表单列表里摘掉：文件本身保留，后端 rebindAttachments 做差分解绑（bizId 置 NULL）
-const removeAttachment = (idx: number) => {
-  attachments.value.splice(idx, 1)
-}
-
-const loadAttachments = async (id: number) => {
-  try {
-    const fp = await listFiles(1, 200, { bizType: ATTACH_BIZ_TYPE })
-    attachments.value = (fp.records || []).filter((f) => f.bizId === id)
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  }
-}
-
-// ===== 附件就地预览 =====
-// 刚上传成功的文件已有 id 且在库里，preview 接口开箱可用；不支持预览的格式
-// （xlsx/zip 等）由 FilePreviewDialog 给「请下载后查看」引导，本窗不做格式判定。
-const previewVisible = ref(false)
-const previewRow = ref<FileVO | null>(null)
-const handlePreview = (f: FileVO) => {
-  previewRow.value = f
-  previewVisible.value = true
-}
-
 const resetForm = () => {
   form.projectId = null
-  form.invoiceNo = ''
   editDocDirection.value = null
-  form.invoiceCode = ''
   form.invoiceType = 'NORMAL'
   form.invoiceAmount = null
   form.taxRate = null
   form.taxAmount = null
-  form.invoiceDate = null
-  attachments.value = []
+  // V95：购方六要素清空，待选完项目自动带出
+  buyer.name = ''
+  buyer.taxNo = ''
+  buyer.address = ''
+  buyer.phone = ''
+  buyer.bankName = ''
+  buyer.bankAccount = ''
   allocations.value = []
   allocLoadedEmpty.value = false
   redOriginal.value = null
@@ -326,11 +278,6 @@ const handleSubmit = async () => {
     return
   }
   const projectId = form.projectId
-  // 开票日期必填（财务凭证关键字段；2026-10-27 实锤空日期曾可提交）
-  if (!form.invoiceDate) {
-    ElMessage.warning('请选择开票日期')
-    return
-  }
   // 超开拦截（双保险·前端关口）：蓝字开票不得使应收单未开票余额转负；
   // 红冲单（RED）审批通过后是加回额度，不拦；编辑中的红冲草稿同放行。后端 saveAllocations/审批回写兜底。
   // 注：前端拿不到"在途占用"（审批中其他发票），此处是第一道粗滤，最终以审批时后端校验为准。
@@ -365,19 +312,23 @@ const handleSubmit = async () => {
     return
   }
   // 总额=Σ分配（只读自动算），Σ=金额的一致性由前端分配与后端 saveAllocations 双重保证，无需再校验
-  // 发票文件改为选填（2026-10-31）：申请阶段常未取得票面扫描件，允许先建单后补传
+  // V95：电子发票（attachmentFileIds）与税务发票号/代码/日期 属于「开票」节点，申请阶段不提交；
+  // 购方六要素（buyer*）+ 关联客户 customerId 随申请提交，后端 upsert 回写客户表并快照到发票。
   const payload: InvoiceRequest = {
     projectId,
     receivableId: mainReceivableId,
     invoiceAmount: allocatedTotal.value,
     taxRate: form.taxRate == null ? null : Number(form.taxRate),
     taxAmount: form.taxAmount == null ? null : Number(form.taxAmount),
-    invoiceNo: form.invoiceNo || null,
-    invoiceCode: form.invoiceCode || null,
     invoiceType: form.invoiceType || null,
-    // 日期控件返回 'YYYY-MM-DD'；清空时传 null（后端 LocalDate）
-    invoiceDate: form.invoiceDate || null,
-    attachmentFileIds: attachments.value.map((f) => f.id),
+    // V95：关联客户 ID（取所选项目的 customerId）；购方六要素取前端表单（自动带出后可编辑）
+    customerId: selectedProject()?.customerId ?? null,
+    buyerName: buyer.name || null,
+    buyerTaxNo: buyer.taxNo || null,
+    buyerAddress: buyer.address || null,
+    buyerPhone: buyer.phone || null,
+    buyerBankName: buyer.bankName || null,
+    buyerBankAccount: buyer.bankAccount || null,
     allocations: allocs,
     // 红冲单（2026-10-25）：方向 RED + 原单 ID；审批通过后对应收单/项目汇总做减法
     docDirection: isRedFlush() ? 'RED' : undefined,
@@ -417,17 +368,19 @@ const loadForEdit = async (id: number, asRedFlush = false) => {
     // 仅编辑态记录本单方向；红冲态 d 是原单（蓝字），不可拿来当"本单方向"用
     editDocDirection.value = asRedFlush ? null : (d.docDirection ?? null)
     form.projectId = d.projectId ?? null
-    form.invoiceNo = asRedFlush ? '' : (d.invoiceNo ?? '')
-    form.invoiceCode = asRedFlush ? '' : (d.invoiceCode ?? '')
     form.invoiceType = d.invoiceType ?? 'NORMAL'
     form.invoiceAmount = asRedFlush ? null : (d.invoiceAmount ?? null)
     form.taxRate = d.taxRate ?? null
     // 税额只读、由税率×金额自动算（2026-10-27）：编辑回填后以 amount×rate 重算，不沿用旧值
     form.taxAmount = (form.invoiceAmount != null && form.taxRate != null)
       ? Number((Number(form.invoiceAmount) * Number(form.taxRate)).toFixed(2)) : null
-    form.invoiceDate = d.invoiceDate ?? null
-    attachments.value = []
-    await loadAttachments(id)
+    // V95：购方六要素从发票自身快照回填（历史单头，不受客户改名影响）；红冲单同从原单带出
+    buyer.name = d.buyerName ?? ''
+    buyer.taxNo = d.buyerTaxNo ?? ''
+    buyer.address = d.buyerAddress ?? ''
+    buyer.phone = d.buyerPhone ?? ''
+    buyer.bankName = d.buyerBankName ?? ''
+    buyer.bankAccount = d.buyerBankAccount ?? ''
     // 分配明细回填（V65）：detail.allocations 为空 = V65 前的主应收单独享历史单
     // ⚠️ 2026-10-28 修复：projectId 的 watch 里 loadReceivables 是异步的，await nextTick()
     // 只等一个微任务、等不到 HTTP 返回 → 下拉此时还是空的，autoBal 算不出来（恒为 undefined），
@@ -467,6 +420,20 @@ watch(
   },
 )
 
+// 选完项目后按 project.customerId 反查客户主表「自动带出」购方六要素预填（q-0 分叉点决策）。
+// 仅新建态触发：编辑/红冲已从发票自身快照回填 buyer*，不反查客户（避免客户改名污染历史单头）。
+const prefillBuyerFromProject = () => {
+  if (isEdit() || isRedFlush()) return
+  const p = selectedProject()
+  if (!p) return
+  buyer.name = p.customerName ?? ''
+  buyer.taxNo = p.customerTaxNo ?? ''
+  buyer.address = p.customerAddress ?? ''
+  buyer.phone = p.customerBuyerPhone ?? ''
+  buyer.bankName = p.customerBankName ?? ''
+  buyer.bankAccount = p.customerBankAccount ?? ''
+}
+
 // 切换项目：分配明细作废（应收单属于项目维度），并按新项目重载应收单下拉
 watch(
   () => form.projectId,
@@ -474,6 +441,7 @@ watch(
     allocations.value = []
     if (pid != null) {
       loadReceivables(pid)
+      prefillBuyerFromProject()
     } else {
       receivableOptions.value = []
     }
@@ -637,12 +605,37 @@ watch(
           />
         </el-form-item>
 
-        <el-form-item label="发票号码">
-          <el-input v-model="form.invoiceNo" placeholder="留空自动生成单号；填纸质发票票号" style="width: 100%" />
-        </el-form-item>
-
-        <el-form-item label="发票代码">
-          <el-input v-model="form.invoiceCode" placeholder="选填" style="width: 100%" />
+        <!-- V95 发票流程重构：购方六要素（发票抬头）在申请阶段填写。
+             选完项目自动带出客户主表数据（prefillBuyerFromProject），可就地编辑，
+             提交随 InvoiceRequest.buyer* 一并提交，后端 upsert 回写客户表并快照到发票。 -->
+        <el-form-item label="购方信息" class="buyer-block">
+          <div class="buyer-grid">
+            <div class="buyer-cell">
+              <label>名称</label>
+              <el-input v-model="buyer.name" placeholder="购方名称（发票抬头）" style="width: 100%" />
+            </div>
+            <div class="buyer-cell">
+              <label>纳税人识别号</label>
+              <el-input v-model="buyer.taxNo" placeholder="税号" style="width: 100%" />
+            </div>
+            <div class="buyer-cell">
+              <label>地址</label>
+              <el-input v-model="buyer.address" placeholder="注册地址" style="width: 100%" />
+            </div>
+            <div class="buyer-cell">
+              <label>电话</label>
+              <el-input v-model="buyer.phone" placeholder="购方电话" style="width: 100%" />
+            </div>
+            <div class="buyer-cell">
+              <label>开户银行</label>
+              <el-input v-model="buyer.bankName" placeholder="开户行" style="width: 100%" />
+            </div>
+            <div class="buyer-cell">
+              <label>银行账号</label>
+              <el-input v-model="buyer.bankAccount" placeholder="账号" style="width: 100%" />
+            </div>
+          </div>
+          <div class="muted" style="margin-top: 6px">选完项目自动带出；提交即回写客户主表（如本次有变更）</div>
         </el-form-item>
 
         <el-form-item label="税率">
@@ -671,49 +664,6 @@ watch(
           />
         </el-form-item>
 
-        <el-form-item label="开票日期" required>
-          <el-date-picker
-            v-model="form.invoiceDate"
-            type="date"
-            value-format="YYYY-MM-DD"
-            placeholder="选择开票日期"
-            style="width: 100%"
-          />
-        </el-form-item>
-
-        <el-form-item label="发票文件">
-          <div class="attach-box">
-            <el-upload
-              v-has-perm="'file:upload'"
-              :show-file-list="false"
-              :http-request="customUpload"
-              :before-upload="beforeUpload"
-              :disabled="uploading"
-              accept="image/*,.pdf"
-              multiple
-            >
-              <el-button :icon="UploadFilled" :loading="uploading">上传发票</el-button>
-            </el-upload>
-            <span class="muted">支持图片/PDF，单个 ≤ {{ MAX_ATTACH_MB }}MB（选填）</span>
-          </div>
-          <ul v-if="attachments.length" class="attach-list">
-            <li v-for="(f, idx) in attachments" :key="f.id">
-              <el-button
-                link
-                type="primary"
-                size="small"
-                class="attach-name"
-                :title="f.originalName || f.fileName || `文件#${f.id}`"
-                @click="handlePreview(f)"
-              >
-                <span class="attach-name-text">{{ f.originalName || f.fileName || `文件#${f.id}` }}</span>
-              </el-button>
-              <el-button link type="danger" size="small" @click="removeAttachment(idx)">
-                移除
-              </el-button>
-            </li>
-          </ul>
-        </el-form-item>
       </el-form>
     </div>
 
@@ -724,9 +674,6 @@ watch(
       </el-button>
     </template>
   </el-dialog>
-
-  <!-- 附件预览：与详情弹窗同套，复用文件管理模块的预览组件 -->
-  <FilePreviewDialog v-model="previewVisible" :file="previewRow" />
 </template>
 
 <style scoped>
@@ -791,29 +738,6 @@ watch(
 .detail-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
-.attach-box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  width: 100%;
-}
-.attach-list {
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-  width: 100%;
-}
-.attach-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: #f5f7fa;
-  margin-bottom: 4px;
-}
 /* 文件名 = 列表操作列同款「el-button link primary small」（2026-10-25 虎哥定稿）：
    点文件名即预览，其余操作（移除）各归各按钮。
    ⚠️ 溢出省略为什么要在里面再包一层 <span>：`.el-button` 实测是 display:inline-flex
@@ -826,16 +750,20 @@ watch(
       于是 12px 文字落进 12px 行盒，下行字母被 overflow:hidden 切掉。
       修复：在 button 与内部 span 上都显式给 1.5 行高（12px×1.5=18px，装 12px 字体有余）。
    cursor 不必写：.el-button 原生就是 pointer（只有 .is-disabled 才是 not-allowed）。 */
-.attach-name {
-  max-width: 320px;
-  line-height: 1.5;
+/* V95 发票流程重构：购方六要素网格（申请弹窗） */
+.buyer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 16px;
+  width: 100%;
 }
-.attach-name-text {
-  display: block;
-  min-width: 0;
-  line-height: 1.5;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.buyer-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.buyer-cell label {
+  font-size: 12px;
+  color: #909399;
 }
 </style>

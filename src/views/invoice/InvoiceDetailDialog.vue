@@ -153,9 +153,9 @@ const canSubmit = () => detail.value?.approvalStatus === 'DRAFT' || detail.value
  * 草稿单据压根没进流程，撤回无从谈起（后端 engine.withdraw 也只认运行中的流程实例）。
  */
 const canWithdraw = () => detail.value?.approvalStatus === 'APPROVING'
-// 红冲入口（2026-10-25）：仅审批通过（已开票）的单据可冲；红冲单本身不再套娃
+// 红冲入口（V95 发票流程重构）：仅「已开票」ISSUED 的单据可冲（SUBMITTED 只是审批通过待开票，尚未产生票面，不可红冲）；红冲单本身不再套娃
 const canRedFlush = () =>
-  detail.value?.approvalStatus === 'APPROVED' && detail.value?.docDirection !== 'RED'
+  detail.value?.approvalStatus === 'ISSUED' && detail.value?.docDirection !== 'RED'
 
 const handleSubmit = async () => {
   if (!detail.value) return
@@ -202,6 +202,7 @@ const handleWithdraw = async () => {
       <el-empty v-if="!detail" description="暂无数据" :image-size="60" />
       <template v-else>
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
+          <el-descriptions-item label="业务单号">{{ detail.applyNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="发票号码">{{ detail.invoiceNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="发票类型">
             <el-tag :type="typeStyle(detail.invoiceType) || 'info'" size="small">
@@ -262,6 +263,16 @@ const handleWithdraw = async () => {
               </div>
             </div>
           </el-descriptions-item>
+        </el-descriptions>
+
+        <h4 class="block-title">购方信息（发票抬头）</h4>
+        <el-descriptions :column="3" border size="small" class="kv-desc">
+          <el-descriptions-item label="购方名称">{{ detail.buyerName || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="纳税人识别号">{{ detail.buyerTaxNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="购方电话">{{ detail.buyerPhone || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="购方地址" :span="3">{{ detail.buyerAddress || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="开户银行">{{ detail.buyerBankName || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="银行账号" :span="2">{{ detail.buyerBankAccount || '—' }}</el-descriptions-item>
         </el-descriptions>
 
         <h4 class="block-title">审批时间线</h4>

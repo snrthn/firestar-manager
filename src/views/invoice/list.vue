@@ -15,6 +15,7 @@ import { useDictLabels } from '@/composables/useDict'
 import { formatDate, formatDateTime } from '@/utils/datetime'
 import InvoiceCreateDialog from './InvoiceCreateDialog.vue'
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue'
+import InvoiceIssueDialog from './InvoiceIssueDialog.vue'
 
 // 查询条件（2026-10-28 补齐，口径对齐核销台账）：项目 / 发票号码 / 项目名称 /
 // 发票类型 / 单据方向 / 开票状态 / 开票日期区间。后端 InvoiceController.page 已声明
@@ -131,6 +132,18 @@ const editId = ref<number | null>(null)
 // 红冲模式（2026-10-25 红冲入口）：复用新建弹窗，靠 originalInvoiceId 切红冲模式
 const redFlushVisible = ref(false)
 const redFlushOriginalId = ref<number | null>(null)
+// 开票模式（V95 发票流程重构）：审批通过 SUBMITTED 的发票，由开票员在此回填票号并上传电子票
+const issueVisible = ref(false)
+const issueId = ref<number | null>(null)
+const issueApplyNo = ref<string | null>(null)
+const issueBuyerName = ref<string | null>(null)
+
+const openIssue = (row: InvoiceVO) => {
+  issueId.value = row.id
+  issueApplyNo.value = row.applyNo ?? null
+  issueBuyerName.value = row.buyerName ?? null
+  issueVisible.value = true
+}
 
 const openCreate = () => {
   createVisible.value = true
@@ -240,6 +253,9 @@ onMounted(() => {
       <el-table-column label="关联应收单" min-width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ row.receivableNo || '—' }}</template>
       </el-table-column>
+      <el-table-column label="业务单号" width="170" align="center">
+        <template #default="{ row }">{{ row.applyNo || '—' }}</template>
+      </el-table-column>
       <el-table-column label="发票类型" width="130" align="center">
         <template #default="{ row }">
           <el-tag :type="typeStyle(row.invoiceType) || 'info'" size="small">
@@ -289,6 +305,15 @@ onMounted(() => {
             @click="openEdit(row)"
           >编辑</el-button>
           <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
+          <!-- 开票（V95）：仅审批通过待开票（SUBMITTED）态显示，受 invoice:issue 权限门禁 -->
+          <el-button
+            v-if="row.approvalStatus === 'SUBMITTED'"
+            v-has-perm="'invoice:issue'"
+            link
+            type="success"
+            size="small"
+            @click="openIssue(row)"
+          >开票</el-button>
         </template>
       </el-table-column>
     <template #empty>
@@ -328,6 +353,14 @@ onMounted(() => {
     :invoice-id="detailId"
     @updated="reloadAfterMutation"
     @red-flush="openRedFlush"
+  />
+  <!-- 开票（V95）：审批通过 SUBMITTED 的发票，由开票员回填票号并上传电子票 -->
+  <InvoiceIssueDialog
+    v-model:visible="issueVisible"
+    :invoice-id="issueId"
+    :apply-no="issueApplyNo"
+    :buyer-name="issueBuyerName"
+    @issued="reloadAfterMutation"
   />
 </template>
 
