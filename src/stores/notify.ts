@@ -39,12 +39,25 @@ export const useNotifyStore = defineStore('notify', () => {
     }
   }
 
+  /**
+   * 打开面板。
+   *
+   * 【2026-11-01 虎哥实测修】原逻辑只在「items 为空」或「首条无正文」两种情况下才按事实表重拉：
+   *   const needReload = items.value.length === 0 || (items.value[0] && !items.value[0].content)
+   * 一旦 items 里已存在一条【带正文】的记录，该条件即永久失效，面板停留在那一瞬的快照。
+   * 而 unreadCount 始终以后端 COUNT 事实表为准（正确），两边就此脱节 —— 表现为
+   * 「小铃铛有数字、点开列表却没有新通知，F5 刷新才出来」。
+   *
+   * 为何「通知先发出、再登录系统」最容易触发：登录后 SSE 补推的插顶项 content/linkUrl
+   * 由后端 latestOf 带全（见 onPush），恰好命中「首条有正文」这一条件，把重拉挡掉了。
+   * SSE 重连同理 —— 原 init() 只 refreshUnread 不重载 items，同样是只校正角标不校正列表。
+   *
+   * 修法遵循本 store 顶部已确立的「事实表兜底」原则：每次打开都重拉首屏，与 unreadCount
+   * 保持同一数据源。代价仅是一次 10 条的分页请求，换取列表永不为陈旧快照。
+   */
   function openPanel() {
     panelOpen.value = true
-    // 首条 content 为空 = SSE latest 插顶的占位项（推送不塞全文，见 onPush），
-    // 打开面板时按事实表重拉，把正文补全
-    const needReload = items.value.length === 0 || (items.value[0] && !items.value[0].content)
-    if (needReload && !loading.value) {
+    if (!loading.value) {
       reload()
     }
   }
