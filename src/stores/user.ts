@@ -96,6 +96,11 @@ export const useUserStore = defineStore('user', () => {
     return permissions.value.includes(perm)
   }
 
+  /** 任一权限命中即返回 true（操作列「权限全无则整列收起」统一判定用） */
+  function hasAnyPerm(perms: string[]) {
+    return perms.some((p) => permissions.value.includes(p))
+  }
+
   return {
     token,
     userInfo,
@@ -110,5 +115,6 @@ export const useUserStore = defineStore('user', () => {
     logout,
     logoutLocal,
     hasPermission,
+    hasAnyPerm,
   }
 })

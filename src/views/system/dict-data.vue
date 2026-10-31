@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance } from 'element-plus'
@@ -16,6 +17,8 @@ import {
 } from '@/api/dict'
 import type { DictDataFormData, DictDataVO } from '@/types/dict'
 import { loadDictOptions, type DictOption } from '@/composables/useDict'
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['dict:data:delete', 'dict:data:edit']))
 
 // ===== 上下文：所属字典类型（路由 query typeCode，菜单表里该页 visible=0 不在侧栏显示）=====
 const route = useRoute()
@@ -241,7 +244,7 @@ onMounted(reloadAll)
       <el-table-column prop="remark" label="备注" min-width="160">
         <template #default="{ row }">{{ row.remark || '—' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right" align="center">
+      <el-table-column label="操作" width="140" fixed="right" align="center" v-if="opVisible">
         <template #default="{ row }">
           <el-button link type="primary" size="small" v-has-perm="'dict:data:edit'" @click="openEdit(row)">修改</el-button>
           <el-button link type="danger" size="small" v-has-perm="'dict:data:delete'" @click="handleDelete(row)">删除</el-button>

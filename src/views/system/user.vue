@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import type { FormInstance } from 'element-plus'
 import { Delete, Plus, Refresh, Search } from '@element-plus/icons-vue'
@@ -18,6 +19,8 @@ import type { RoleManageVO } from '@/types/role'
 import type { PostOptionVO } from '@/types/post'
 import type { LevelOptionVO } from '@/types/level'
 import { formatDateTime } from '@/utils/datetime'
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['user:delete', 'user:edit']))
 
 // ===== 查询条件 =====
 const query = reactive({
@@ -318,7 +321,7 @@ onMounted(() => {
       <el-table-column label="最后登录" min-width="170">
         <template #default="{ row }">{{ formatTime(row.lastLoginAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right" align="center">
+      <el-table-column label="操作" width="140" fixed="right" align="center" v-if="opVisible">
         <template #default="{ row }">
           <el-button link type="primary" size="small" v-has-perm="'user:edit'" @click="openEdit(row)">修改</el-button>
           <el-button link type="danger" size="small" :icon="Delete" v-has-perm="'user:delete'" @click="handleDelete(row)">删除</el-button>

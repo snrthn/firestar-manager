@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref } from 'vue'
+import {nextTick, onMounted, reactive, ref, computed} from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import type { FormInstance } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
@@ -9,6 +10,8 @@ import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import { listLevels, createLevel, updateLevel, deleteLevel } from '@/api/level'
 import type { LevelFormData, LevelVO } from '@/types/level'
 import DictSelect from '@/components/DictSelect.vue'
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['level:delete', 'level:edit']))
 
 // ===== 查询条件 =====
 const query = reactive({
@@ -214,7 +217,7 @@ onMounted(loadLevels)
       <el-table-column prop="remark" label="备注" min-width="200">
         <template #default="{ row }">{{ row.remark || '—' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right" align="center">
+      <el-table-column label="操作" width="180" fixed="right" align="center" v-if="opVisible">
         <template #default="{ row }">
           <el-button link type="primary" size="small" v-has-perm="'level:edit'" @click="openEdit(row)">修改</el-button>
           <el-button link type="danger" size="small" v-has-perm="'level:delete'" @click="handleDelete(row)">删除</el-button>

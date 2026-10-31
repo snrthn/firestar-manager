@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { ElMessage } from 'element-plus'
-import { listTemplates, saveTemplate } from '@/api/notification'
+import { pageTemplates, saveTemplate } from '@/api/notification'
 import { useUserStore } from '@/stores/user'
 import type { NotificationTemplate } from '@/types/notification'
 
@@ -15,15 +15,52 @@ const templates = ref<NotificationTemplate[]>([])
 const userStore = useUserStore()
 const hasNotifyTemplateEdit = computed(() => userStore.hasPermission('notify:template:edit'))
 
+// ===== 筛选（模板编码 / 模板名称，模糊匹配）=====
+const filters = reactive({
+  code: '',
+  templateName: '',
+})
+
+// ===== 分页（默认每页 10 条，与后端默认值一致，同 notify-record 规格）=====
+const pageNum = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+
 async function load() {
   loading.value = true
   try {
-    templates.value = await listTemplates()
+    const page = await pageTemplates({
+      pageNum: pageNum.value,
+      pageSize: pageSize.value,
+      code: filters.code.trim() || undefined,
+      templateName: filters.templateName.trim() || undefined,
+    })
+    templates.value = page.records
+    total.value = page.total
   } catch {
     ElMessage.error('加载模板失败')
   } finally {
     loading.value = false
   }
+}
+
+/** 查询：条件变化回到第一页（否则可能停在一个不存在的页码上） */
+function handleQuery() {
+  pageNum.value = 1
+  load()
+}
+
+/** 切换每页条数：回到第一页再拉 */
+function handleSizeChange() {
+  pageNum.value = 1
+  load()
+}
+
+function resetFilters() {
+  filters.code = ''
+  filters.templateName = ''
+  pageNum.value = 1
+  load()
 }
 
 onMounted(load)
@@ -94,8 +131,31 @@ async function submit() {
       <el-button @click="load">刷新</el-button>
     </div>
 
+    <el-form :inline="true" :model="filters" class="query-bar" @submit.prevent>
+      <el-form-item label="模板编码">
+        <el-input
+          v-model="filters.code"
+          placeholder="模板编码"
+          clearable
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item label="模板名称">
+        <el-input
+          v-model="filters.templateName"
+          placeholder="模板名称"
+          clearable
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" @click="handleQuery">查询</el-button>
+        <el-button @click="resetFilters">重置</el-button>
+      </el-form-item>
+    </el-form>
+
     <el-table v-loading="loading" :data="templates" border stripe>
-      <el-table-column prop="code" label="编码" width="180" />
+      <el-table-column prop="code" label="模板编码" width="180" />
       <el-table-column prop="templateName" label="模板名称" width="140" show-overflow-tooltip />
       <el-table-column prop="titleTpl" label="标题模板" min-width="220" show-overflow-tooltip />
       <el-table-column prop="contentTpl" label="正文模板" min-width="280" show-overflow-tooltip />
@@ -120,6 +180,20 @@ async function submit() {
       <EmptyState />
     </template>
     </el-table>
+
+    <!-- 标准分页器：默认每页 10 条，与后端默认值一致（同 notify-record 规格） -->
+    <div class="pagination-bar">
+      <el-pagination
+        v-model:current-page="pageNum"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
+        @current-change="load"
+        @size-change="handleSizeChange"
+      />
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="`编辑模板：${form.code}`" width="640px">
       <el-form label-width="90px">

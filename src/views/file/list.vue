@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import {onMounted, reactive, ref, computed} from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import type { UploadUserFile } from 'element-plus'
 import { Delete, Download, Edit, Refresh, Search, Upload, View } from '@element-plus/icons-vue'
@@ -11,6 +12,8 @@ import { downloadViaBackend } from '@/utils/fileDownload'
 import { loadDictOptions, useDictLabels, type DictOption } from '@/composables/useDict'
 import { formatDateTime } from '@/utils/datetime'
 import type { FileVO } from '@/types/file'
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['file:alias', 'file:delete', 'file:download']))
 
 // ===== 查询条件 =====
 const query = reactive({ keyword: '' })
@@ -275,7 +278,7 @@ onMounted(loadFiles)
           <el-tag :type="statusTagType(row.status)" size="small">{{ fileStatusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="260" fixed="right" align="center">
+      <el-table-column label="操作" width="260" fixed="right" align="center" v-if="opVisible">
         <template #default="{ row }">
           <el-button link type="primary" size="small" :icon="View" @click="handlePreview(row)">预览</el-button>
           <el-button link type="primary" size="small" :icon="Download" v-has-perm="'file:download'" @click="handleDownload(row)">下载</el-button>

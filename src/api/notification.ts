@@ -52,9 +52,21 @@ export function listRecords(params: {
     .then((r) => r.data.data as { records: NotificationVO[]; total: number })
 }
 
-/** 模板列表 */
+/** 模板列表（下拉全量） */
 export function listTemplates() {
   return request.get('/admin/notifications/templates').then((r) => r.data.data as NotificationTemplate[])
+}
+
+/** 模板分页检索（列表页）：按编码 / 模板名称模糊匹配，返回 records + total */
+export function pageTemplates(params: {
+  pageNum?: number
+  pageSize?: number
+  code?: string
+  templateName?: string
+}) {
+  return request
+    .get('/admin/notifications/templates/page', { params })
+    .then((r) => r.data.data as { records: NotificationTemplate[]; total: number })
 }
 
 /** 保存模板文案/开关 */

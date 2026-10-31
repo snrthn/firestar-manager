@@ -103,7 +103,7 @@
               <span class="pt-adv-value">{{ row.configValue || '-' }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="90" fixed="right">
+          <el-table-column label="操作" width="90" fixed="right" v-if="opVisible">
             <template #default="{ row }">
               <el-button link type="primary" size="small" v-has-perm="'config:create'" @click="openEditDialog(row)">编辑</el-button>
             </template>
@@ -165,6 +165,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { getGroup, updateValues, createConfig, updateConfigItem } from '../../api/config'
@@ -172,6 +173,8 @@ import { useAppStore } from '@/stores/app'
 import AgreementManage from './agreement-manage.vue'
 import RichEditor from '@/components/RichEditor.vue'
 import type { ConfigItemVO } from '../../types/agreement'
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['config:create']))
 
 const activeTab = ref('basic')
 const appStore = useAppStore()

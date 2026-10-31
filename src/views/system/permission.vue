@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref } from 'vue'
+import {nextTick, onMounted, reactive, ref, computed} from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import type { FormInstance } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
@@ -15,6 +16,8 @@ import {
 import type { PermissionFormData, PermissionVO } from '@/types/permission'
 import DictSelect from '@/components/DictSelect.vue'
 import { useDictLabels } from '@/composables/useDict'
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['permission:delete', 'permission:edit']))
 
 // 表格展示标签：资源类型/操作类型/状态全部走字典，不再裸显英文域值或自写硬编码映射。
 // permission_action 自 V22 起对齐真实域值 READ/WRITE/EXECUTE（原 VIEW/CREATE/... 与存量数据对不上）。
@@ -224,7 +227,7 @@ onMounted(() => {
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right" align="center">
+      <el-table-column label="操作" width="180" fixed="right" align="center" v-if="opVisible">
         <template #default="{ row }">
           <el-button link type="primary" size="small" v-has-perm="'permission:edit'" @click="openEdit(row)">修改</el-button>
           <el-button link type="danger" size="small" v-has-perm="'permission:delete'" @click="handleDelete(row)">删除</el-button>

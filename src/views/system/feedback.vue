@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
@@ -52,6 +53,10 @@ loadDictOptions('feedback_status').then(() => {
     CLOSED: 'info',
   }
 })
+
+// ===== 操作列隐藏：角色无 feedback:view 时整列收起（不再渲染空列/占位）=====
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['feedback:view']))
 
 // ===== 列表 =====
 const activeTab = ref<'my' | 'received'>('my')
@@ -282,9 +287,9 @@ async function submitCreate() {
       <el-table-column label="提交时间" width="170">
         <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="90" align="center">
+      <el-table-column label="操作" width="90" align="center" v-if="opVisible">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+          <el-button link type="primary" v-has-perm="'feedback:view'" @click="openDetail(row)">详情</el-button>
         </template>
       </el-table-column>
     <template #empty>

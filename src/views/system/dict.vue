@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref } from 'vue'
+import {nextTick, onMounted, reactive, ref, computed} from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import { useRouter } from 'vue-router'
 import type { FormInstance } from 'element-plus'
@@ -15,6 +16,8 @@ import {
   deleteDictType,
 } from '@/api/dict'
 import type { DictTypeFormData, DictTypeVO } from '@/types/dict'
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['dict:delete', 'dict:edit']))
 
 // ===== 查询条件（顶部查询栏：字典名称/字典类型模糊、状态精确；空则不参与过滤）=====
 const query = reactive({
@@ -211,7 +214,7 @@ onMounted(loadTypes)
       <el-table-column prop="remark" label="备注" min-width="200">
         <template #default="{ row }">{{ row.remark || '—' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right" align="center">
+      <el-table-column label="操作" width="200" fixed="right" align="center" v-if="opVisible">
         <template #default="{ row }">
           <el-button link type="primary" size="small" :icon="Search" @click="openDictData(row)">
             字典数据

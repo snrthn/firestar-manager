@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref } from 'vue'
+import {nextTick, onMounted, reactive, ref, computed} from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import type { FormInstance } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
@@ -22,6 +23,8 @@ import { listMenus } from '@/api/menu'
 import type { RoleFormData, RoleManageVO } from '@/types/role'
 import type { PermissionVO } from '@/types/permission'
 import type { MenuVO } from '@/types/auth'
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['role:assign', 'role:delete', 'role:edit']))
 
 // ===== 查询条件 =====
 const query = reactive({
@@ -557,7 +560,7 @@ onMounted(loadRoles)
       <el-table-column prop="remark" label="备注" min-width="180">
         <template #default="{ row }">{{ row.remark || '—' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right" align="center">
+      <el-table-column label="操作" width="220" fixed="right" align="center" v-if="opVisible">
         <template #default="{ row }">
           <el-button link type="primary" size="small" v-has-perm="'role:edit'" @click="openEdit(row)">修改</el-button>
           <el-button link type="primary" size="small" v-has-perm="'role:assign'" @click="openAssignPerms(row)">分配权限</el-button>

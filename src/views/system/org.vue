@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import type { FormInstance } from 'element-plus'
 import { Expand, Fold, Plus, Refresh, Search } from '@element-plus/icons-vue'
@@ -11,6 +12,8 @@ import { listUserOptions } from '@/api/user'
 import type { OrgFormData, OrgVO } from '@/types/org'
 import type { UserOptionVO } from '@/types/user'
 import DictSelect from '@/components/DictSelect.vue'
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['org:create', 'org:delete', 'org:edit']))
 
 // ===== 列表数据 =====
 const loading = ref(false)
@@ -311,7 +314,7 @@ onMounted(() => {
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right" align="center">
+      <el-table-column label="操作" width="180" fixed="right" align="center" v-if="opVisible">
         <template #default="{ row }">
           <el-button link type="primary" size="small" v-has-perm="'org:create'" @click="openCreate(row.id)">新增</el-button>
           <el-button link type="primary" size="small" v-has-perm="'org:edit'" @click="openEdit(row)">修改</el-button>

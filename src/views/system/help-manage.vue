@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import {onMounted, reactive, ref, computed} from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import { Search, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
@@ -16,6 +17,8 @@ import RichEditor from '@/components/RichEditor.vue'
 import DictSelect from '@/components/DictSelect.vue'
 import { useDictLabels } from '@/composables/useDict'
 import { formatDateTime } from '@/utils/datetime'
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['help:delete', 'help:edit', 'help:toggle']))
 
 /**
  * 帮助中心维护页（隐藏菜单 /system/help-manage，perm=system:help，管理员）。
@@ -209,7 +212,7 @@ async function remove(row: HelpArticle) {
       <el-table-column prop="updatedAt" label="更新时间" width="170">
         <template #default="{ row }">{{ formatDateTime(row.updatedAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="180" align="center">
+      <el-table-column label="操作" width="180" align="center" v-if="opVisible">
         <template #default="{ row }">
           <el-button link type="primary" v-has-perm="'help:edit'" @click="openEdit(row)">编辑</el-button>
           <el-button link :type="row.status === 'ENABLED' ? 'warning' : 'success'" v-has-perm="'help:toggle'" @click="toggleStatus(row)">

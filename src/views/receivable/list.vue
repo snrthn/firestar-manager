@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import { Refresh, Search, Download } from '@element-plus/icons-vue'
 import { downloadViaBackend } from '@/utils/fileDownload'
@@ -116,6 +117,10 @@ const redRowClass = ({ row }: { row: ReceivableVO }): string => (isRed(row) ? 'r
 
 const { label: statusLabel, style: statusStyle } = useDictLabels('receivable_status')
 const { label: sourceTypeLabel, style: sourceTypeStyle } = useDictLabels('receivable_source')
+
+// 操作列隐藏：角色无 receivable:view 时整列收起（不再渲染空列/占位）
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['receivable:view']))
 
 const detailVisible = ref(false)
 const detailId = ref<number | null>(null)
@@ -241,9 +246,9 @@ onMounted(() => {
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100" fixed="right" align="center">
+      <el-table-column label="操作" width="100" fixed="right" align="center" v-if="opVisible">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
+          <el-button link type="primary" size="small" v-has-perm="'receivable:view'" @click="openDetail(row)">详情</el-button>
         </template>
       </el-table-column>
     <template #empty>
