@@ -82,7 +82,8 @@ const customUpload = async (options: { file: File }) => {
     const fd = new FormData()
     fd.append('file', options.file)
     fd.append('bizType', ATTACH_BIZ_TYPE)
-    fd.append('bizId', String(props.invoiceId))
+    // 刻意不传 bizId：上传 ≠ 确认。改由后端在开票提交时统一挂载（rebindAttachments），
+    // 否则传错后被移除的文件、以及关窗重传留下的文件会永久挂在本单，详情把它们全查出来。
     const vo = await uploadFile(fd)
     attachments.value.push(vo)
   } catch (e) {

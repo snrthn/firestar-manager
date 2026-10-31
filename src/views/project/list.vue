@@ -357,7 +357,8 @@ const handleContractUpload = async (options: { file: File }) => {
     const fd = new FormData()
     fd.append('file', options.file)
     fd.append('bizType', CONTRACT_BIZ_TYPE)
-    fd.append('bizId', String(signRow.value.id))
+    // 刻意不传 bizId：上传 ≠ 签约。改由后端在签约提交时 bindContractFiles 统一挂载。
+    // 之前上传即绑定，传错后移除的合同仍挂着 bizId=项目ID，文件管理里会出现一堆废文件。
     const vo = await uploadFile(fd)
     contractFiles.value.push(vo)
   } catch (e) {

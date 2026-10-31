@@ -206,7 +206,9 @@ const customUpload = async (options: { file: File }) => {
     const fd = new FormData()
     fd.append('file', options.file)
     fd.append('bizType', 'shipment_receive_proof')
-    fd.append('bizId', String(detail.value.id))
+    // 刻意不传 bizId：上传 ≠ 确认收货。改由点「确认收货」时后端 bindProofFiles 统一挂载。
+    // 说明：发货单支持部分收货多次续收，后端刻意**不用**差分解绑（否则第二轮会抹掉头一轮证据），
+    // 因此必须在前端掐断"上传即绑定"，否则传错后移除的文件会永久留在本单上。
     const vo = await uploadFile(fd)
     recvFiles.value.push(vo)
     // 图片：直接用刚上传的 File 建本地 blob 缩略图，免再走一次下载接口

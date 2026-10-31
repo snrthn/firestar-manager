@@ -292,10 +292,8 @@ const customUpload = async (options: { file: File }) => {
     const fd = new FormData()
     fd.append('file', options.file)
     fd.append('bizType', ATTACH_BIZ_TYPE)
-    // 新建时单据 id 尚未生成 → 不传 bizId，落库后由后端 bindAttachments 统一挂载
-    if (props.receiptId != null) {
-      fd.append('bizId', String(props.receiptId))
-    }
+    // 刻意不传 bizId（**编辑态也不传**）：上传 ≠ 保存。无论新建还是编辑，统一由后端在提交时
+    // rebindAttachments 挂载。此前编辑态带 bizId 上传，导致移除/关窗重传的废文件永久挂在本单。
     const vo = await uploadFile(fd)
     attachments.value.push(vo)
   } catch (e) {
