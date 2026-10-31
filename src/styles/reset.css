@@ -56,3 +56,82 @@ a {
 #app {
   height: 100%;
 }
+
+/* ============================================================
+ * 全局迷你滚动条（2026-11-01 虎哥要求：宽度改迷你，尺寸与颜色取业界标准，不自拟）
+ *
+ * 取值出处 —— 三份业界实现互相印证后取共性（非自拍脑袋）：
+ *   ① Ruoyi Plus《组件定制 · 滚动条美化》
+ *      width/height 6px、border-radius 3px、
+ *      thumb rgba(0,0,0,.15) / hover rgba(0,0,0,.25)、track 透明、Firefox scrollbar-width:thin
+ *   ② Ant Design《侧边导航滚动条优化指南》
+ *      width 6px（"极窄设计，减少视觉侵入"）、thumb rgba(0,0,0,.2)、track transparent、圆角=半宽
+ *   ③ Ruoyi Plus《主内容区 AppMain》
+ *      6px + Element 语义色 --el-border-color-lighter / --el-border-color
+ *
+ * 三者共性（即本段采用的规格）：
+ *   宽度 6px ｜ 圆角 3px（= 宽/2 的胶囊形）｜ 半透明黑滑块 ｜ 完全透明轨道
+ *   说明：半透明黑而非固定灰 —— 前景越浅入射对比越弱，视觉负担最小；
+ *         track 透明而非浅灰 —— 消除"凹槽"厚重感，滚动条才显得贴浮在内容之上。
+ *
+ * 作用域说明（勿重复定义）：
+ *   本段是全局兜底。另有 12 个业务弹窗在 scoped 里对 .detail-scroll / .dialog-scroll
+ *   单独定义了同规格（6px）样式，选择器优先级更高会覆盖本段，二者尺寸一致故无需改动。
+ *   它们的 thumb 用的是 Element 默认色（#c0c4cc 常态 / #909399 hover），比本段略重。
+ * ============================================================ */
+
+/* Firefox：标准属性，必须声明在元素本身（不是伪元素） */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+/* WebKit / Blink（Chrome、Edge、Safari）：伪元素方案 */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* 双向滚动时的右下角交汇方块（表格多见），默认会是一坨实色，需透明化 */
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ---- Element Plus 自绘滚动条（el-scrollbar，如侧边栏 .menu-scroll）----
+ * 它是 JS 渲染的 div，不吃上面的 ::-webkit-* 伪元素，必须单独指到 __thumb。
+ * 实测 Element Plus 默认：.el-scrollbar__bar.is-vertical { width: 12px; padding: 2px 0 }
+ * （见 node_modules/element-plus/theme-chalk/el-scrollbar.css）—— 比原生还宽，
+ * 故这里显式压到 6px 与全局对齐；颜色取同一套半透明黑，保证两种滚动条视觉一致。
+ * 显隐动画（默认 hover 容器才淡入）属 Element 自带行为，此处不改。 */
+.el-scrollbar__bar.is-vertical {
+  width: 6px;
+  padding: 0;
+}
+
+.el-scrollbar__bar.is-horizontal {
+  height: 6px;
+  padding: 0;
+}
+
+.el-scrollbar__thumb {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+.el-scrollbar__thumb:hover {
+  background-color: rgba(0, 0, 0, 0.25);
+}

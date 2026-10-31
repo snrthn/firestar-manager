@@ -41,7 +41,7 @@
               </template>
             </el-table-column>
           <template #empty>
-            <EmptyState />
+            <EmptyState description="暂无协议版本" />
           </template>
           </el-table>
         </el-card>

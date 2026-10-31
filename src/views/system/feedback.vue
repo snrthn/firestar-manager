@@ -293,7 +293,7 @@ async function submitCreate() {
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无反馈记录" />
     </template>
     </el-table>
 

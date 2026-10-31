@@ -420,7 +420,7 @@ const handleWithdraw = async () => {
        全局样式块在 CSS 变量体系下注入顺序不稳（2026-10-23 实测滚动条未生效） -->
   <el-dialog v-model="visible" :title="dialogTitle()" width="1000px" top="7vh">
     <div v-loading="loading" class="detail-scroll">
-      <el-empty v-if="!detail" description="暂无数据" :image-size="60" />
+      <el-empty v-if="!detail" description="暂无发货数据" :image-size="60" />
       <template v-else>
         <!-- 头部信息 -->
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
@@ -464,7 +464,7 @@ const handleWithdraw = async () => {
             <template #default="{ row }">{{ formatAmount(row.lineAmount) }}</template>
           </el-table-column>
           <template #empty>
-            <EmptyState />
+            <EmptyState description="暂无发货明细" />
           </template>
         </el-table>
 
@@ -635,7 +635,7 @@ const handleWithdraw = async () => {
 
       <el-table :data="detail?.lines || []" border size="small" style="margin-top: 12px">
         <template #empty>
-          <EmptyState />
+          <EmptyState description="暂无收货明细" />
         </template>
         <el-table-column prop="itemName" label="货物" min-width="160" show-overflow-tooltip />
         <el-table-column prop="shipmentQty" label="发货量" width="80" align="right" />

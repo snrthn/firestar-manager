@@ -322,7 +322,7 @@ onMounted(() => {
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无部门" />
     </template>
     </el-table>
   </el-card>

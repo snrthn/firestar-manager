@@ -265,7 +265,7 @@ watch(
             </template>
           </el-table-column>
         <template #empty>
-          <EmptyState />
+          <EmptyState description="暂无可发货明细" />
         </template>
         </el-table>
 

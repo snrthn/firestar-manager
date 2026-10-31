@@ -221,7 +221,7 @@ const handleWithdraw = async () => {
 <template>
   <el-dialog v-model="visible" :title="dialogTitle()" width="1000px" top="7vh">
     <div v-loading="loading" class="detail-scroll">
-      <el-empty v-if="!detail" description="暂无数据" :image-size="60" />
+      <el-empty v-if="!detail" description="暂无收款数据" :image-size="60" />
       <template v-else>
         <!-- 头部信息 -->
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">

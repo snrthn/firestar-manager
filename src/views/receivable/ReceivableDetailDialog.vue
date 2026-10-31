@@ -64,7 +64,7 @@ watch(
   <!-- 宽度/垂直位置走全站详情档 1000px + top 7vh（2026-10-25 与立项/发货/回款/发票/退货统一） -->
   <el-dialog v-model="visible" title="应收单详情" width="1000px" top="7vh">
     <div v-loading="loading" class="detail-scroll">
-      <el-empty v-if="!detail" description="暂无数据" :image-size="60" />
+      <el-empty v-if="!detail" description="暂无应收数据" :image-size="60" />
       <template v-else>
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
           <el-descriptions-item label="应收单号">{{ detail.receivableNo || '—' }}</el-descriptions-item>

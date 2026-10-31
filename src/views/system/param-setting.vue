@@ -109,7 +109,7 @@
             </template>
           </el-table-column>
         <template #empty>
-          <EmptyState />
+          <EmptyState description="暂无参数配置" />
         </template>
         </el-table>
 

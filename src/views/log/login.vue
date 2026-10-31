@@ -119,7 +119,7 @@ onMounted(loadLogs)
         <template #default="{ row }">{{ formatDateTime(row.loginAt) }}</template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无登录日志" />
     </template>
     </el-table>
 

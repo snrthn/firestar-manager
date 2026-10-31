@@ -233,7 +233,7 @@ const itemsTotal = computed(() =>
 <template>
   <el-dialog v-model="visible" :title="dialogTitle()" width="1000px" top="7vh">
     <div v-loading="loading" class="detail-scroll">
-      <el-empty v-if="!detail" description="暂无数据" :image-size="60" />
+      <el-empty v-if="!detail" description="暂无项目数据" :image-size="60" />
       <template v-else>
         <!-- 基本信息（不含金额，金额统一收进下方「业财口径」分区，毛/净分离 + 红字行） -->
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
@@ -348,7 +348,7 @@ const itemsTotal = computed(() =>
             <template #default="{ row }">{{ formatAmount(row.totalAmount) }}</template>
           </el-table-column>
           <template #empty>
-            <EmptyState />
+            <EmptyState description="暂无货物明细" />
           </template>
         </el-table>
 

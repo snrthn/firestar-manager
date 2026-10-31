@@ -166,7 +166,7 @@ onMounted(loadLogs)
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无操作日志" />
     </template>
     </el-table>
 
@@ -210,7 +210,7 @@ onMounted(loadLogs)
           <template #default="{ row: d }">{{ d.after }}</template>
         </el-table-column>
       <template #empty>
-        <EmptyState />
+        <EmptyState description="暂无字段变更记录" />
       </template>
       </el-table>
       <el-empty v-else description="无关键字段快照" :image-size="60" />

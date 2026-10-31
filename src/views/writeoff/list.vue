@@ -314,7 +314,7 @@ onMounted(() => {
             </template>
           </el-table-column>
           <template #empty>
-            <EmptyState />
+            <EmptyState description="暂无核销记录" />
           </template>
         </el-table>
 
@@ -452,7 +452,7 @@ onMounted(() => {
         <template #default="{ row }">{{ formatAmount(row.amount) }}</template>
       </el-table-column>
       <template #empty>
-        <EmptyState />
+        <EmptyState description="暂无核销配对结果" />
       </template>
     </el-table>
     <template #footer>

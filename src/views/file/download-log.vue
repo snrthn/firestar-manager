@@ -78,7 +78,7 @@ onMounted(loadLogs)
         <template #default="{ row }">{{ formatDateTime(row.downloadedAt) }}</template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无下载记录" />
     </template>
     </el-table>
 

@@ -251,7 +251,7 @@ onMounted(reloadAll)
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无字典数据" />
     </template>
     </el-table>
 

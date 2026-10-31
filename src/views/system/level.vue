@@ -224,7 +224,7 @@ onMounted(loadLevels)
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无职级" />
     </template>
     </el-table>
 

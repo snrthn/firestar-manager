@@ -328,7 +328,7 @@ onMounted(() => {
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无用户" />
     </template>
     </el-table>
 

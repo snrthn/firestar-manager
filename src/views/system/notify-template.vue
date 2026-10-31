@@ -177,7 +177,7 @@ async function submit() {
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无通知模板" />
     </template>
     </el-table>
 

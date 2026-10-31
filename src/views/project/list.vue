@@ -599,7 +599,7 @@ onMounted(() => {
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无立项记录" />
     </template>
     </el-table>
 
@@ -802,7 +802,7 @@ onMounted(() => {
             </template>
           </el-table-column>
         <template #empty>
-          <EmptyState />
+          <EmptyState plain description="暂无货物明细，点下方「添加货物」新增" />
         </template>
         </el-table>
         <div class="item-actions">

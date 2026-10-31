@@ -23,18 +23,38 @@ withDefaults(
     description?: string
     /** 插画尺寸，默认 80 与对照基准一致 */
     imageSize?: number
+    /**
+     * 纯文字模式：不渲染插画，只出一行文案。
+     *
+     * 用于空间紧张的容器（典型：弹窗内的明细表格）。默认插画 80px 会把表格撑到
+     * ~130px 高，在分辨率小的机器上会把下方的操作按钮（如「添加货物」）挤出可视区。
+     * 本模式的形态对齐 el-table 自带空态文本（矮、单行），不占额外高度。
+     */
+    plain?: boolean
   }>(),
   {
     description: '暂无数据',
     imageSize: 80,
+    plain: false,
   },
 )
 </script>
 
 <template>
-  <el-empty :image-size="imageSize" :description="description">
+  <div v-if="plain" class="fs-empty-plain">{{ description }}</div>
+  <el-empty v-else :image-size="imageSize" :description="description">
     <template v-if="$slots.default" #default>
       <slot />
     </template>
   </el-empty>
 </template>
+
+<style scoped>
+/* 纯文字空态：形态对齐列表默认空态文本，高度仅由文案本身决定 */
+.fs-empty-plain {
+  padding: 12px 0;
+  color: var(--el-text-color-secondary, #909399);
+  font-size: 14px;
+  line-height: 1.5;
+}
+</style>

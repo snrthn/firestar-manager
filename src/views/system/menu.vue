@@ -674,7 +674,7 @@ onMounted(() => {
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无菜单" />
     </template>
     </el-table>
   </el-card>

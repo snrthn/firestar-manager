@@ -224,7 +224,7 @@ onMounted(loadTypes)
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无字典" />
     </template>
     </el-table>
 

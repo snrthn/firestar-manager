@@ -217,7 +217,7 @@ onMounted(loadPosts)
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无岗位" />
     </template>
     </el-table>
 

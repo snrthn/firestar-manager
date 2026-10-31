@@ -92,7 +92,7 @@ const pctText = (v: number | null | undefined) => {
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无项目数据" />
     </template>
     </el-table>
 

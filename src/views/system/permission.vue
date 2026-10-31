@@ -234,7 +234,7 @@ onMounted(() => {
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无权限点" />
     </template>
     </el-table>
 

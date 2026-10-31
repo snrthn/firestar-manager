@@ -287,7 +287,7 @@ onMounted(loadFiles)
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无文件记录" />
     </template>
     </el-table>
 

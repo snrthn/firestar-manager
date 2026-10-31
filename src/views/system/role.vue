@@ -568,7 +568,7 @@ onMounted(loadRoles)
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无角色" />
     </template>
     </el-table>
 

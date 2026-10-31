@@ -222,7 +222,7 @@ async function remove(row: HelpArticle) {
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无帮助条目" />
     </template>
     </el-table>
 

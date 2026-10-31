@@ -293,7 +293,7 @@ async function submitPublish() {
         </template>
       </el-table-column>
     <template #empty>
-      <EmptyState />
+      <EmptyState description="暂无通知记录" />
     </template>
     </el-table>
 

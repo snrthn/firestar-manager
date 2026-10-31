@@ -297,7 +297,7 @@ watch(
               </template>
             </el-table-column>
           <template #empty>
-            <EmptyState />
+            <EmptyState description="暂无可退货物明细" />
           </template>
           </el-table>
 
