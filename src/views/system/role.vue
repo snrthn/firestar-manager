@@ -239,7 +239,6 @@ const openAssignPerms = async (row: RoleManageVO) => {
     menuCheckedSet = new Set(mids.filter((id) => allIds.has(id)))
     checkedMenuIds.value = [...menuCheckedSet]
     buildMenuDescLeafMap(menuTree.value)
-    buildPageAuthBase(menuTree.value)
     reconcilePageNodes()
     applyMenuTreeState()
     // 重开弹窗时把筛选关键字重新投射到树上：
@@ -385,10 +384,6 @@ const clearPerm = () => {
 let menuCheckedSet = new Set<number>()
 // 每个节点的「可授权叶子」集合（含自身可授权 id + 全部后代可授权 id），用于推导半选/全选
 const menuDescLeafMap = new Map<number, number[]>()
-// 「带按钮的 MENU 页」原始授权态：openAssignPerms 初始化时记录每个页面节点的 pageId
-// 是否已在 mids 中（=该页原本就被授权）。用于 reconcilePageNodes 的「全取消→回原始态」
-// 判定：原始已授权页即便按钮全清，页面仍可见（半选）；原始未授权页按钮全清则整页不可见。
-const pageAuthBase = new Map<number, boolean>()
 
 const collectAllIds = (nodes: MenuVO[]): Set<number> => {
   const s = new Set<number>()
@@ -464,21 +459,7 @@ const buildMenuDescLeafMap = (nodes: MenuVO[]) => {
   nodes.forEach(walk)
 }
 
-// 记录每个「带按钮的 MENU 页」的原始授权态（pageId 是否在初始化 mids 中）
-const buildPageAuthBase = (nodes: MenuVO[]) => {
-  pageAuthBase.clear()
-  const walk = (n: MenuVO) => {
-    const kids = n.children ?? []
-    const btnKids = kids.filter((c) => c.menuType === 'BUTTON')
-    if (n.menuType === 'MENU' && btnKids.length > 0) {
-      pageAuthBase.set(n.id, menuCheckedSet.has(n.id))
-    }
-    kids.forEach(walk)
-  }
-  nodes.forEach(walk)
-}
-
-// 页面节点一致性对账：带按钮的 MENU 页，只要「全部按钮勾选 / 部分按钮勾选 / 原始即授权」
+// 页面节点一致性对账：带按钮的 MENU 页，只要「全部按钮勾选 / 部分按钮勾选 / 页面自身已在集」
 // 任一成立即视为页面可见，pageId 必须进集（否则后端 menus() 不返回该页 → 侧栏看不见、
 // 其上按钮也就无从使用）；三者皆否则从集移除（页面不可见）。
 // 这是修复「勾完按钮父页面仍半选、到不了已选」的关键：按钮勾选态必须同步反映到页面节点。
@@ -489,8 +470,13 @@ const reconcilePageNodes = () => {
     if (n.menuType === 'MENU' && btnKids.length > 0) {
       const allBtns = btnKids.every((c) => menuCheckedSet.has(c.id))
       const someBtns = btnKids.some((c) => menuCheckedSet.has(c.id))
-      const base = pageAuthBase.get(n.id) ?? false
-      const visible = allBtns || someBtns || base
+      // 页面可见性 = 全按钮勾选 / 部分按钮勾选 / 页面自身已在集(onSelf)。
+      // 用 onSelf 替代旧的 pageAuthBase 初始化快照：旧快照在用户点「清空」后不失效，导致
+      // 「全选→清空→勾一个按钮」时所有原本全选的页面被拉回集合（虎哥 2026-10-31 复现：
+      // 勾用户创建却多提交 25 个页面节点）。onSelf 只认当前实时集合，清空后页面出集、
+      // 勾按钮只联动其直接父页面，不再牵连兄弟/跨模块页面。
+      const onSelf = menuCheckedSet.has(n.id)
+      const visible = allBtns || someBtns || onSelf
       if (visible) menuCheckedSet.add(n.id)
       else menuCheckedSet.delete(n.id)
     }
