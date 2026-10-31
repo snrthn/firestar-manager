@@ -492,16 +492,23 @@ const itemsTotal = computed(() =>
   gap: 12px;
   line-height: 22px;
 }
+/* line-height 必须显式给 1.5（与 InvoiceDetailDialog / InvoiceIssueDialog / project-list /
+   ReceiptCreateDialog 四处同款，2026-10-25 定稿成例）：
+   `.el-button{ line-height:1 }` 是 Element Plus 自带、**直接命中 button 元素**的样式 ——
+   CSS 里「直接指定永远赢过继承」，父容器 .attach-item 的 line-height:22px 根本传不进去。
+   于是 12px 文字落进 12px 行盒，g/j/p/q/y 的下半截被 overflow:hidden 切掉。
+   ⚠️ 不要试图用 vertical-align:bottom 补救：inline-block + bottom 会把下降部进一步推向盒底，切得更狠。 */
 .attach-name {
-  line-height: 1;
+  line-height: 1.5;
 }
 .attach-name-text {
-  display: inline-block;
+  display: block;
+  min-width: 0;
   max-width: 320px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: bottom;
+  line-height: 1.5;
 }
 .muted {
   color: #909399;

@@ -166,7 +166,7 @@ const handleSubmit = async () => {
 
       <el-form label-width="92px">
         <el-form-item label="发票号码" required>
-          <el-input v-model="form.invoiceNo" placeholder="真实税务发票号（不随机生成）" style="width: 100%" />
+          <el-input v-model="form.invoiceNo" placeholder="真实税务发票号" style="width: 100%" />
         </el-form-item>
         <el-form-item label="发票代码">
           <el-input v-model="form.invoiceCode" placeholder="选填（纸质票有）" style="width: 100%" />

@@ -243,6 +243,11 @@ onMounted(() => {
     </div>
 
     <el-table v-loading="loading" :data="list" border>
+      <!-- 业务单号置首列（V95 2026-11-01）：applyNo 创建即生成、每张单必有；
+           而发票号码/代码/日期属于「开票」节点，申请阶段恒为「—」，不适合当首列锚点 -->
+      <el-table-column label="业务单号" width="170" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.applyNo || '—' }}</template>
+      </el-table-column>
       <el-table-column prop="invoiceNo" label="发票号码" min-width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ row.invoiceNo || '—' }}</template>
       </el-table-column>
@@ -252,9 +257,6 @@ onMounted(() => {
       <el-table-column prop="projectName" label="项目名称" min-width="180" show-overflow-tooltip />
       <el-table-column label="关联应收单" min-width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ row.receivableNo || '—' }}</template>
-      </el-table-column>
-      <el-table-column label="业务单号" width="170" align="center">
-        <template #default="{ row }">{{ row.applyNo || '—' }}</template>
       </el-table-column>
       <el-table-column label="发票类型" width="130" align="center">
         <template #default="{ row }">
@@ -294,7 +296,16 @@ onMounted(() => {
       </el-table-column>
       <!-- 操作列：编辑 + 详情两位固定；提交/撤回等业务动作收在详情弹窗内 -->
       <el-table-column label="操作" width="140" fixed="right" align="center">
-        <template #default="{ row }">
+        <template #default="{ row }">          
+          <!-- 开票（V95）：仅审批通过待开票（SUBMITTED）态显示，受 invoice:issue 权限门禁 -->
+          <el-button
+            v-if="row.approvalStatus === 'SUBMITTED'"
+            v-has-perm="'invoice:issue'"
+            link
+            type="success"
+            size="small"
+            @click="openIssue(row)"
+          >开票</el-button>
           <!-- 草稿态 + 已驳回态可编辑（驳回=回到编写中，用友范式，可改后重提） -->
           <el-button
             v-if="row.approvalStatus === 'DRAFT' || row.approvalStatus === 'REJECTED'"
@@ -305,15 +316,6 @@ onMounted(() => {
             @click="openEdit(row)"
           >编辑</el-button>
           <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
-          <!-- 开票（V95）：仅审批通过待开票（SUBMITTED）态显示，受 invoice:issue 权限门禁 -->
-          <el-button
-            v-if="row.approvalStatus === 'SUBMITTED'"
-            v-has-perm="'invoice:issue'"
-            link
-            type="success"
-            size="small"
-            @click="openIssue(row)"
-          >开票</el-button>
         </template>
       </el-table-column>
     <template #empty>

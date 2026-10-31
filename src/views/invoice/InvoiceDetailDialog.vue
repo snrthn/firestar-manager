@@ -231,7 +231,7 @@ const handleWithdraw = async () => {
           <el-descriptions-item v-if="detail.originalInvoiceId" label="原单">
             {{ detail.originalInvoiceNo || `发票#${detail.originalInvoiceId}` }}
           </el-descriptions-item>
-          <el-descriptions-item label="核销分配" :span="2">
+          <el-descriptions-item label="核销分配" :span="1">
             <span v-if="!detail.allocations?.length" class="muted">—（主应收单独享）</span>
             <div v-else class="attach-list">
               <div v-for="a in detail.allocations" :key="a.receivableId" class="attach-item">
@@ -270,9 +270,9 @@ const handleWithdraw = async () => {
           <el-descriptions-item label="购方名称">{{ detail.buyerName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="纳税人识别号">{{ detail.buyerTaxNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="购方电话">{{ detail.buyerPhone || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="购方地址" :span="3">{{ detail.buyerAddress || '—' }}</el-descriptions-item>
           <el-descriptions-item label="开户银行">{{ detail.buyerBankName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="银行账号" :span="2">{{ detail.buyerBankAccount || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="购方地址" :span="3">{{ detail.buyerAddress || '—' }}</el-descriptions-item>
         </el-descriptions>
 
         <h4 class="block-title">审批时间线</h4>

@@ -483,7 +483,7 @@ watch(
   <el-dialog
     v-model="visible"
     :title="isRedFlush() ? '红冲发票单' : isEdit() ? '编辑发票单' : '新建发票单'"
-    width="640px"
+    width="680px"
     top="7vh"
   >
     <div class="detail-scroll">
