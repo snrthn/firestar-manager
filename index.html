@@ -6,9 +6,33 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>火星财务管理系统</title>
+    <style>
+      html, body { margin: 0; padding: 0; }
+      #app { min-height: 100vh; }
+      /* 首屏骨架屏：Vue 挂载前（JS 未执行/chunk 下载中）显示加载占位，
+         消除 index.html 纯白观感；app.mount('#app') 会清空 #app 子节点，自动消失。 */
+      .app-boot {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        height: 100vh; gap: 16px; box-sizing: border-box;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: #909399; background: #fff;
+      }
+      .app-boot__spinner {
+        width: 36px; height: 36px; border: 3px solid #ebeef5;
+        border-top-color: #409eff; border-radius: 50%;
+        animation: app-boot-spin 0.8s linear infinite;
+      }
+      .app-boot__text { font-size: 14px; letter-spacing: 1px; }
+      @keyframes app-boot-spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="app-boot">
+        <div class="app-boot__spinner"></div>
+        <div class="app-boot__text">火星财务管理系统加载中…</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -125,6 +125,8 @@ interface DynRoute {
   path: string
 }
 const dynamicRoutes: DynRoute[] = []
+// 已预取的页面 component 集合：避免 syncDynamicRoutes 每次重跑重复触发 import()
+const prefetchedViews = new Set<string>()
 // 已同步的菜单数据引用（身份比对）：menus 换成新引用才重跑同步，
 // 避免每次导航都 remove+add 把页面组件重挂
 let syncedMenus: MenuVO[] | null = null
@@ -161,6 +163,21 @@ function syncDynamicRoutes(menus: MenuVO[]) {
     })
     dynamicRoutes.push({ name, path })
   }
+  // 方案 A（2026-11-01）：已授权页面 chunk 提前下载（fire-and-forget）。
+  // 浏览器空闲时 import() 预热，命中后点击路由直接走内存模块，消除内容区空白。
+  // 失败静默吞掉（.catch 空函数），避免未捕获 Promise 进控制台；
+  // 用 idle 回调避免与首屏渲染抢带宽。
+  const idle =
+    (window as any).requestIdleCallback ??
+    ((fn: () => void) => setTimeout(fn, 200))
+  idle(() => {
+    for (const vo of desired.values()) {
+      if (!vo.component || prefetchedViews.has(vo.component)) continue
+      prefetchedViews.add(vo.component)
+      const loader = viewModules[`../views/${vo.component}.vue`]
+      if (loader) loader().catch(() => {})
+    }
+  })
 }
 
 // 本地校验 JWT 是否在有效期内：只解 payload 不验签（签名校验归后端），
