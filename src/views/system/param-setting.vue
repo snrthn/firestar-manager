@@ -20,7 +20,7 @@
             <el-form-item label="应用版本号">
               <el-input v-model="basicForm.app_version" placeholder="如：0.0.1" />
             </el-form-item>
-            <el-form-item label="登录页公告">
+            <el-form-item label="系统公告">
               <el-input v-model="basicForm.login_notice" type="textarea" :rows="3" />
             </el-form-item>
             <el-form-item label="通知总开关">

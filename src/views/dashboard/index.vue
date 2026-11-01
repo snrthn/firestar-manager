@@ -6,6 +6,7 @@ import {
   HomeFilled,
   Tickets,
   Bell,
+  WarningFilled,
   DataLine,
   Files,
   Van,
@@ -21,7 +22,7 @@ import { flattenMenus } from '@/utils/menuRoute'
 import request from '@/api/request'
 import { statsOverview, statsPlatform } from '@/api/stats'
 import { myTasksPage } from '@/api/approval'
-import { getFlags } from '@/api/config'
+import { getFlags, getAnnouncement } from '@/api/config'
 import type { OverviewVO, PlatformStatsVO } from '@/types/stats'
 
 const router = useRouter()
@@ -111,6 +112,17 @@ async function loadFlags() {
     flags.value = await getFlags()
   } catch {
     /* 网络失败不打断渲染，缺省隐藏 */
+  }
+}
+
+/* ---------- 系统公告（全员弱提示，常驻展示） ---------- */
+// 登录即可访问 /system/config/announcement；空串 → 不展示。
+const announcement = ref('')
+async function loadAnnouncement() {
+  try {
+    announcement.value = await getAnnouncement()
+  } catch {
+    /* 网络失败不打断渲染，缺省空串不展示 */
   }
 }
 // 工作台【系统状态】卡片：默认隐藏，仅当 dashboard_status_visible='true' 展示（调试用）
@@ -242,6 +254,7 @@ onMounted(() => {
   loadTodo()
   loadPlatform()
   loadFlags()
+  loadAnnouncement()
   // SSE 已实时推送未读数；此处再校正一次，覆盖刚登录尚未收到推送的情况
   notifyStore.refreshUnread()
 })
@@ -249,6 +262,12 @@ onMounted(() => {
 
 <template>
   <div class="home">
+    <!-- 系统公告（全员弱提示，置顶 warning 样式，有内容才展示，长文内部滚动） -->
+    <div v-if="announcement" class="announce-bar">
+      <el-icon class="announce-icon"><WarningFilled /></el-icon>
+      <div class="announce-text">{{ announcement }}</div>
+    </div>
+
     <!-- 欢迎横幅 -->
     <div class="welcome-banner">
       <div class="banner-info">
@@ -457,6 +476,33 @@ onMounted(() => {
   align-self: flex-end;
   position: relative;
   top: 10px;
+}
+
+/* 系统公告（全员弱提示条，置顶 warning 样式） */
+.announce-bar {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--el-color-warning) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--el-color-warning) 35%, transparent);
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.announce-icon {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--el-color-warning);
+}
+.announce-text {
+  flex: 1;
+  max-height: 120px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* KPI 概览 */

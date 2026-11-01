@@ -37,3 +37,10 @@ export function getFlags() {
     .get('/system/config/flags')
     .then((r) => (r.data.data ?? {}) as Record<string, string>)
 }
+
+/** 系统公告（登录即可访问）：返回 login_notice 文本，缺省空串。用于工作台全员弱提示。 */
+export function getAnnouncement() {
+  return request
+    .get('/system/config/announcement')
+    .then((r) => (r.data.data ?? '') as string)
+}
