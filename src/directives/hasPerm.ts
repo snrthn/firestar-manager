@@ -14,7 +14,7 @@ import { useUserStore } from '@/stores/user'
  * 默认打开：新权限点创建后由迁移脚本分配给 ROLE_ADMIN（+ 持有模块 :manage 的角色），
  * 故存量用户不会凭空丢失按钮。
  */
-const hasPerm: Directive = {
+export const hasPerm: Directive = {
   mounted(el: HTMLElement, binding: DirectiveBinding<string | string[]>) {
     const required = binding.value
     if (!required) return

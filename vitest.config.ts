@@ -2,8 +2,10 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    // 纯函数/工具类单测无需 DOM，用 node 环境即可；后续如需组件测试再切 jsdom 并加 @vue/test-utils
-    environment: 'node',
+    // 组件/业务流程测试需要 DOM，切 jsdom（happy-dom 提供），并挂 setup 文件补齐 jsdom 缺失 API
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.ts'],
     // 覆盖率（2026-10-27）：此前无任何覆盖率工具，业务代码覆盖度无法度量。
     // provider 用 v8（@vitest/coverage-v8@2.1.9，与 vitest 2.1.8 同主版本，勿升 5.x）。
