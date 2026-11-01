@@ -219,14 +219,14 @@ onMounted(() => {
               />
             </el-select>
           </el-form-item>
-          <el-form-item label="类型">
+          <el-form-item label="核销类型">
             <!-- 宽度走 pages.css 的 .query-bar 统一规范（200px），不再内联绕过 -->
             <el-select v-model="query.ledgerType" clearable placeholder="全部">
               <el-option label="回款核销" value="RECEIPT" />
               <el-option label="开票核销" value="INVOICE" />
             </el-select>
           </el-form-item>
-          <el-form-item label="状态">
+          <el-form-item label="核销状态">
             <DictSelect v-model="query.status" type-code="writeoff_status" placeholder="全部" />
           </el-form-item>
           <el-form-item label="核销单号">

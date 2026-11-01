@@ -212,12 +212,12 @@ async function submitPublish() {
     </div>
 
     <el-form :inline="true" :model="filters" class="query-bar" @submit.prevent>
-      <el-form-item label="类型">
+      <el-form-item label="通知类型">
         <el-select v-model="filters.type" placeholder="全部" clearable>
           <el-option v-for="t in templates" :key="t.code" :label="templateLabel(t)" :value="t.type" />
         </el-select>
       </el-form-item>
-      <el-form-item label="收件人">
+      <el-form-item label="收件用户">
         <el-input
           v-model="filters.receiver"
           placeholder="用户名 / 昵称"

@@ -18,6 +18,7 @@ import AllocationEditorDialog from '@/components/AllocationEditorDialog.vue'
 // 本窗不自己拼 URL，也不算 OSS/本地分流，图片/PDF/音视频判定、blob 取字节、
 // objectURL 泄漏回收、全屏、复制链接、失败重试全在组件内，行为与文件管理页一致。
 import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
+import CopyableText from '@/components/CopyableText.vue'
 import { useTaskApproval } from '@/composables/useTaskApproval'
 import { useDictLabels } from '@/composables/useDict'
 import { useReceiptTypeLabels } from '@/composables/useReceiptType'
@@ -225,8 +226,8 @@ const handleWithdraw = async () => {
       <template v-else>
         <!-- 头部信息 -->
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
-          <el-descriptions-item label="收款单号">{{ detail.receiptNo || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="项目编号">{{ detail.projectNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="收款单号"><CopyableText :value="detail.receiptNo" /></el-descriptions-item>
+          <el-descriptions-item label="项目编号"><CopyableText :value="detail.projectNo" /></el-descriptions-item>
           <el-descriptions-item label="项目名称">{{ detail.projectName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="客户">{{ detail.customerName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="收款状态">

@@ -16,6 +16,7 @@ import ApprovalActionForm from '@/components/ApprovalActionForm.vue'
 // 本窗不自己拼 URL，也不算 OSS/本地分流，图片/PDF/音视频判定、blob 取字节、
 // objectURL 泄漏回收、全屏、复制链接、失败重试全在组件内，行为与文件管理页一致。
 import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
+import CopyableText from '@/components/CopyableText.vue'
 import { useTaskApproval } from '@/composables/useTaskApproval'
 import { useDictLabels } from '@/composables/useDict'
 import { formatDate, formatDateTime } from '@/utils/datetime'
@@ -202,16 +203,16 @@ const handleWithdraw = async () => {
       <el-empty v-if="!detail" description="暂无发票数据" :image-size="60" />
       <template v-else>
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
-          <el-descriptions-item label="业务单号">{{ detail.applyNo || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="发票号码">{{ detail.invoiceNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="业务单号"><CopyableText :value="detail.applyNo" /></el-descriptions-item>
+          <el-descriptions-item label="发票号码"><CopyableText :value="detail.invoiceNo" /></el-descriptions-item>
           <el-descriptions-item label="发票类型">
             <el-tag :type="typeStyle(detail.invoiceType) || 'info'" size="small">
               {{ typeLabel(detail.invoiceType) }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="发票代码">{{ detail.invoiceCode || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="发票代码"><CopyableText :value="detail.invoiceCode" /></el-descriptions-item>
           <el-descriptions-item label="项目名称">{{ detail.projectName || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="关联应收单">{{ detail.receivableNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="关联应收单"><CopyableText :value="detail.receivableNo" /></el-descriptions-item>
           <el-descriptions-item label="开票金额">{{ formatAmount(detail.invoiceAmount) }}</el-descriptions-item>
           <el-descriptions-item label="税率">
             {{ detail.taxRate == null ? '—' : `${Number(detail.taxRate) * 100}%` }}
@@ -268,10 +269,10 @@ const handleWithdraw = async () => {
         <h4 class="block-title">购方信息（发票抬头）</h4>
         <el-descriptions :column="3" border size="small" class="kv-desc">
           <el-descriptions-item label="购方名称">{{ detail.buyerName || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="纳税人识别号">{{ detail.buyerTaxNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="纳税人识别号"><CopyableText :value="detail.buyerTaxNo" /></el-descriptions-item>
           <el-descriptions-item label="购方电话">{{ detail.buyerPhone || '—' }}</el-descriptions-item>
           <el-descriptions-item label="开户银行">{{ detail.buyerBankName || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="银行账号" :span="2">{{ detail.buyerBankAccount || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="银行账号" :span="2"><CopyableText :value="detail.buyerBankAccount" /></el-descriptions-item>
           <el-descriptions-item label="购方地址" :span="3">{{ detail.buyerAddress || '—' }}</el-descriptions-item>
         </el-descriptions>
 

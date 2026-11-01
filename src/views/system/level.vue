@@ -179,7 +179,7 @@ onMounted(loadLevels)
       <el-form-item label="职级编码">
         <el-input v-model="query.levelCode" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
-      <el-form-item label="状态">
+      <el-form-item label="职级状态">
         <!-- 状态：字典 common_status 消费（DictSelect 统一封装），不再硬编码 -->
         <DictSelect v-model="query.status" type-code="common_status" placeholder="全部" />
       </el-form-item>

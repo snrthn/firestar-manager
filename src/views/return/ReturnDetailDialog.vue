@@ -7,6 +7,7 @@ import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
 import ApprovalTimeline from '@/components/ApprovalTimeline.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { completeReturnTask, rejectReturnTask, returnDetail } from '@/api/return'
+import CopyableText from '@/components/CopyableText.vue'
 import type { ReturnVO } from '@/types/return'
 
 // 退货详情（V67）：基本信息 + 退货明细 + 三级审批时间线 + 三冲减结果。
@@ -112,11 +113,11 @@ watch(
     <div v-loading="loading" class="dialog-scroll">
       <template v-if="detail">
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
-          <el-descriptions-item label="退货单号">{{ detail.returnNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="退货单号"><CopyableText :value="detail.returnNo" /></el-descriptions-item>
           <el-descriptions-item label="项目">
             {{ detail.projectNo || '—' }} {{ detail.projectName || '' }}
           </el-descriptions-item>
-          <el-descriptions-item label="发货批次">{{ detail.shipmentBatchNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="发货批次"><CopyableText :value="detail.shipmentBatchNo" /></el-descriptions-item>
           <el-descriptions-item label="退货金额">
             <b class="amount">¥{{ formatAmount(detail.returnAmount) }}</b>
           </el-descriptions-item>
@@ -174,7 +175,7 @@ watch(
           <h4 class="block-title">自动冲减结果</h4>
           <el-descriptions :column="3" border size="small" class="kv-desc">
             <el-descriptions-item label="红字应收单">
-              {{ detail.writeoffDetail.redReceivableNo || '—' }}
+              <CopyableText :value="detail.writeoffDetail?.redReceivableNo" />
               <span v-if="detail.writeoffDetail.originalReceivableNo" class="muted">
                 （原 {{ detail.writeoffDetail.originalReceivableNo }}）
               </span>

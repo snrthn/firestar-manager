@@ -250,13 +250,13 @@ onMounted(() => {
   <el-card shadow="never">
     <!-- 查询区 -->
     <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
-      <el-form-item label="用户名">
+      <el-form-item label="用户账号">
         <el-input v-model="query.username" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
-      <el-form-item label="姓名">
+      <el-form-item label="用户姓名">
         <el-input v-model="query.nickname" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
-      <el-form-item label="部门">
+      <el-form-item label="所属部门">
         <el-tree-select
           v-model="query.deptId"
           :data="orgTree"
@@ -268,7 +268,7 @@ onMounted(() => {
           class="query-tree-select"
         />
       </el-form-item>
-      <el-form-item label="状态">
+      <el-form-item label="账号状态">
         <!-- 状态：字典 common_status 消费（DictSelect 统一封装），不再硬编码 -->
         <DictSelect v-model="query.status" type-code="common_status" placeholder="全部" />
       </el-form-item>

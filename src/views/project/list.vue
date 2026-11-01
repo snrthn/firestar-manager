@@ -537,7 +537,7 @@ onMounted(() => {
     </div>
 
     <el-table v-loading="loading" :data="list" border>
-      <el-table-column prop="projectNo" label="项目编号" min-width="140" show-overflow-tooltip>
+      <el-table-column prop="projectNo" label="项目编号" min-width="180" show-overflow-tooltip>
         <template #default="{ row }">{{ row.projectNo || '—' }}</template>
       </el-table-column>
       <el-table-column prop="projectName" label="项目名称" min-width="180" show-overflow-tooltip />

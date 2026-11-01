@@ -174,7 +174,7 @@ async function remove(row: HelpArticle) {
     <!-- 查询区：与 user.vue 等列表页同款 query-bar（label + 统一 200px 宽度 + 查询/重置，
          宽度由全局 pages.css 的 .query-bar 规则收口） -->
     <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
-      <el-form-item label="标题">
+      <el-form-item label="通知标题">
         <el-input
           v-model="query.keyword"
           placeholder="模糊匹配"
@@ -183,7 +183,7 @@ async function remove(row: HelpArticle) {
         />
       </el-form-item>
       <!-- 分类筛选：字典 help_category（V35），与新建弹窗同一个字典 -->
-      <el-form-item label="分类">
+      <el-form-item label="通知分类">
         <DictSelect v-model="query.category" type-code="help_category" placeholder="全部分类" />
       </el-form-item>
       <el-form-item>

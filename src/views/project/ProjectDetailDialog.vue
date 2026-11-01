@@ -15,6 +15,7 @@ import EmptyState from '@/components/EmptyState.vue'
 // 合同附件预览复用文件管理模块的预览弹窗（与发票详情同口径，2026-10-25 虎哥要求）：
 // 图片/PDF/音视频判定、blob 取字节与 objectURL 回收全在组件内，本窗不自己拼 URL
 import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
+import CopyableText from '@/components/CopyableText.vue'
 import { downloadViaBackend } from '@/utils/fileDownload'
 import { useTaskApproval } from '@/composables/useTaskApproval'
 import { useDictLabels } from '@/composables/useDict'
@@ -238,7 +239,7 @@ const itemsTotal = computed(() =>
         <!-- 基本信息（不含金额，金额统一收进下方「业财口径」分区，毛/净分离 + 红字行） -->
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
           <el-descriptions-item label="项目名称">{{ detail.projectName || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="项目编号">{{ detail.projectNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="项目编号"><CopyableText :value="detail.projectNo" /></el-descriptions-item>
           <el-descriptions-item label="客户">{{ detail.customerName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="销售经理">{{ detail.salesManagerName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="审批状态">

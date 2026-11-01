@@ -7,6 +7,7 @@ import { shipmentDetail } from '@/api/shipment'
 import type { ReceivableVO } from '@/types/receivable'
 import { useDictLabels } from '@/composables/useDict'
 import { formatDate } from '@/utils/datetime'
+import CopyableText from '@/components/CopyableText.vue'
 
 // 应收单详情弹窗（只读）。
 // 应收单由发货「客户已收货」时点自动生成，无审批流，故本弹窗不做时间线与任何动作。
@@ -67,7 +68,7 @@ watch(
       <el-empty v-if="!detail" description="暂无应收数据" :image-size="60" />
       <template v-else>
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
-          <el-descriptions-item label="应收单号">{{ detail.receivableNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="应收单号"><CopyableText :value="detail.receivableNo" /></el-descriptions-item>
           <el-descriptions-item label="状态">
             <el-tag :type="statusStyle(detail.status) || 'info'" size="small">
               {{ statusLabel(detail.status) }}
@@ -83,9 +84,9 @@ watch(
               {{ sourceTypeLabel(detail.sourceType) }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="项目编号">{{ detail.projectNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="项目编号"><CopyableText :value="detail.projectNo" /></el-descriptions-item>
           <el-descriptions-item label="项目名称">{{ detail.projectName || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="来源发货单">{{ shipmentNo || detail.shipmentId || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="来源发货单"><CopyableText :value="shipmentNo || detail.shipmentId" /></el-descriptions-item>
           <el-descriptions-item label="应收日期">{{ formatDate(detail.receivableDate) }}</el-descriptions-item>
         </el-descriptions>
 

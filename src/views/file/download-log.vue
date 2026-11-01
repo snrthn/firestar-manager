@@ -53,7 +53,7 @@ onMounted(loadLogs)
 <template>
   <el-card shadow="never">
     <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
-      <el-form-item label="文件名">
+      <el-form-item label="文件名称">
         <el-input v-model="query.keyword" placeholder="模糊匹配" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item>
@@ -63,7 +63,7 @@ onMounted(loadLogs)
     </el-form>
 
     <el-table v-loading="loading" :data="logList" border>
-      <el-table-column prop="fileName" label="文件名" min-width="200" show-overflow-tooltip>
+      <el-table-column prop="fileName" label="文件名称" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">{{ row.fileName || '—' }}</template>
       </el-table-column>
       <el-table-column label="别名" min-width="140" show-overflow-tooltip>

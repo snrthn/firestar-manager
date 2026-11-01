@@ -67,7 +67,7 @@
 
         <!-- 查询条件 -->
         <el-form :inline="true" class="pt-adv-query" @submit.prevent>
-          <el-form-item label="键">
+          <el-form-item label="键名">
             <el-input
               v-model="query.keywordKey"
               placeholder="模糊匹配键"

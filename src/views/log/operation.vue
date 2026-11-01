@@ -108,7 +108,7 @@ onMounted(loadLogs)
 <template>
   <el-card shadow="never">
     <el-form :inline="true" :model="query" class="query-bar" @submit.prevent>
-      <el-form-item label="操作人">
+      <el-form-item label="操作用户">
         <el-input v-model="query.operator" placeholder="模糊匹配账号" clearable @keyup.enter="handleQuery" />
       </el-form-item>
       <el-form-item label="目标类型">

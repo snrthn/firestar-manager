@@ -70,7 +70,7 @@ onMounted(loadOptions)
           <el-option v-for="o in presetOptions" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
       </el-form-item>
-      <el-form-item label="项目">
+      <el-form-item label="关联项目">
         <el-select
           v-model="query.projectId"
           filterable
@@ -80,7 +80,7 @@ onMounted(loadOptions)
           <el-option v-for="p in projectOpts" :key="p.id" :label="`${p.projectNo} ${p.projectName}`" :value="p.id" />
         </el-select>
       </el-form-item>
-      <el-form-item label="客户">
+      <el-form-item label="客户名称">
         <el-select
           v-model="query.customerId"
           filterable
@@ -90,7 +90,7 @@ onMounted(loadOptions)
           <el-option v-for="c in customerOpts" :key="c.id" :label="c.customerName" :value="c.id" />
         </el-select>
       </el-form-item>
-      <el-form-item label="货物">
+      <el-form-item label="货物信息">
         <el-select
           v-model="query.goodsId"
           filterable

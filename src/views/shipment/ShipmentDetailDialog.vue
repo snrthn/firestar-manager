@@ -20,6 +20,7 @@ import type { TaskInfoVO } from '@/types/approval'
 import ApprovalTimeline from '@/components/ApprovalTimeline.vue'
 import ApprovalActionForm from '@/components/ApprovalActionForm.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import CopyableText from '@/components/CopyableText.vue'
 import { useTaskApproval } from '@/composables/useTaskApproval'
 import { useDictLabels, loadDictOptions } from '@/composables/useDict'
 import type { DictOption } from '@/composables/useDict'
@@ -542,8 +543,8 @@ const handleWithdraw = async () => {
       <template v-else>
         <!-- 头部信息 -->
         <el-descriptions :column="3" border size="small" class="head-desc kv-desc">
-          <el-descriptions-item label="批次编号">{{ detail.batchNo || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="项目编号">{{ detail.projectNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="批次编号"><CopyableText :value="detail.batchNo" /></el-descriptions-item>
+          <el-descriptions-item label="项目编号"><CopyableText :value="detail.projectNo" /></el-descriptions-item>
           <el-descriptions-item label="项目名称">{{ detail.projectName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="客户">{{ detail.customerName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="发货状态">
@@ -562,7 +563,7 @@ const handleWithdraw = async () => {
           <el-descriptions-item label="确认人">{{ detail.confirmedByName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="发货时间">{{ formatDateTime(detail.shipmentDate) }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.trackingNo" label="承运商">{{ detail.carrierName || detail.carrier || '—' }}</el-descriptions-item>
-          <el-descriptions-item v-if="detail.trackingNo" label="运单号">{{ detail.trackingNo }}</el-descriptions-item>
+          <el-descriptions-item v-if="detail.trackingNo" label="运单号"><CopyableText :value="detail.trackingNo" /></el-descriptions-item>
           <el-descriptions-item v-if="detail.dispatchFileIds && detail.dispatchFileIds.length" label="发货附件">
             {{ detail.dispatchFileIds.length }} 件
           </el-descriptions-item>
@@ -596,7 +597,7 @@ const handleWithdraw = async () => {
           <h4 class="block-title">关联应收单</h4>
           <el-card shadow="never" class="recv-card">
             <el-descriptions :column="3" border size="small" class="kv-desc">
-              <el-descriptions-item label="应收单号">{{ detail.receivable.receivableNo || '—' }}</el-descriptions-item>
+              <el-descriptions-item label="应收单号"><CopyableText :value="detail.receivable?.receivableNo" /></el-descriptions-item>
               <el-descriptions-item label="单据方向">{{ docDirLabel(detail.receivable.docDirection) }}</el-descriptions-item>
               <el-descriptions-item label="来源">{{ recvSourceLabel(detail.receivable.sourceType) }}</el-descriptions-item>
               <el-descriptions-item label="应收金额">{{ formatAmount(detail.receivable.receivableAmount) }}</el-descriptions-item>
