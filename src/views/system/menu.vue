@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { useUserStore } from '@/stores/user'
+const userStore = useUserStore()
+// 操作列隐藏（约定：列内按钮全无权限时整列隐藏）
+const opVisible = computed(() => userStore.hasAnyPerm(['menu:create', 'menu:edit', 'menu:delete']))
 import EmptyState from '@/components/EmptyState.vue'
 import type { FormInstance } from 'element-plus'
 import { Expand, Fold, Plus, Refresh, Folder, Search } from '@element-plus/icons-vue'
@@ -659,7 +663,7 @@ onMounted(() => {
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right" align="center">
+      <el-table-column label="操作" width="180" fixed="right" align="center" v-if="opVisible">
         <template #default="{ row }">
           <el-button
             link

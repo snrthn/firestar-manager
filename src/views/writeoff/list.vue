@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useUserStore } from '@/stores/user'
+const userStore = useUserStore()
+// 操作列隐藏（约定：列内按钮全无权限时整列隐藏）
+const opVisible = computed(() => userStore.hasAnyPerm(['writeoff:reverse', 'writeoff:writeoff']))
 import { MagicStick, Refresh, Search, Download } from '@element-plus/icons-vue'
 import { downloadViaBackend } from '@/utils/fileDownload'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
@@ -299,7 +303,7 @@ onMounted(() => {
           <el-table-column label="创建时间" min-width="170">
             <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="90" fixed="right" align="center">
+          <el-table-column label="操作" width="90" fixed="right" align="center" v-if="opVisible">
             <template #default="{ row }">
               <!-- 反核销：仅 NORMAL 行可操作（REVERSED 已是终态；红冲单的核销行反核销=加回，后端处理方向） -->
               <el-button
@@ -392,7 +396,7 @@ onMounted(() => {
               <span v-else class="pool-empty">已配平</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="120" fixed="right" align="center">
+          <el-table-column label="操作" width="120" fixed="right" align="center" v-if="opVisible">
             <template #default="{ row }">
               <el-button
                 link

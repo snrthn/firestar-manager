@@ -36,7 +36,7 @@
       <el-table-column prop="defVersion" label="版本" width="80" align="center" />
       <el-table-column prop="flowableDeploymentId" label="部署ID" min-width="180" show-overflow-tooltip />
       <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
-      <el-table-column label="操作" width="270" fixed="right" align="center">
+      <el-table-column label="操作" width="270" fixed="right" align="center" v-if="opVisible">
         <template #default="{ row }">
           <el-button link type="primary" size="small" v-has-perm="'process:edit'" @click="openEdit(row)">编辑</el-button>
           <el-button link type="warning" size="small" v-has-perm="'process:edit'" @click="openNodes(row)">配置节点</el-button>
@@ -166,7 +166,7 @@
               <el-checkbox v-model="row.rejectable" />
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="140" align="center">
+          <el-table-column label="操作" width="140" align="center" v-if="opVisible">
             <template #default="{ $index }">
               <el-button link type="primary" size="small" :disabled="$index === 0" v-has-perm="'process:edit'" @click="move($index, -1)">上移</el-button>
               <el-button link type="primary" size="small" :disabled="$index === editingNodes.length - 1" v-has-perm="'process:edit'" @click="move($index, 1)">下移</el-button>
@@ -201,7 +201,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useUserStore } from '@/stores/user'
+const userStore = useUserStore()
+// 操作列隐藏（约定：列内按钮全无权限时整列隐藏）
+const opVisible = computed(() => userStore.hasAnyPerm(['process:edit', 'process:deploy', 'process:toggle']))
 import EmptyState from '@/components/EmptyState.vue'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
