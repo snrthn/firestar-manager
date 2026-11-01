@@ -75,7 +75,7 @@ const activePath = computed(() => route.path)
   align-items: center;
   gap: 10px;
   padding: 0 16px;
-  border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-bottom: 1px solid #f9f9f9;
   overflow: hidden;
 }
 .logo-mark {

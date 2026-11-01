@@ -205,6 +205,7 @@ async function onInstall() {
 <style scoped>
 .install-wrap {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: flex-start;
   justify-content: center;

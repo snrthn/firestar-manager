@@ -420,6 +420,7 @@ async function submitCreate() {
   background: #fff;
   border-radius: 8px;
   min-height: calc(100vh - var(--fs-header-height, 56px) - 68px);
+  min-height: calc(100dvh - var(--fs-header-height, 56px) - 68px);
 }
 .toolbar {
   display: flex;
