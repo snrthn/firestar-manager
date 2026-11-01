@@ -46,6 +46,14 @@ export interface ShipmentVO {
   applicantName: string | null
   shippedById: number | null
   shippedByName: string | null
+  /** 物流运单号（标记已发货必填；库内唯一） */
+  trackingNo: string | null
+  /** 承运商（字典 logistics_carrier 的 dict_value，如 SF） */
+  carrier: string | null
+  /** 承运商中文名（字典 logistics_carrier 的 dict_label） */
+  carrierName: string | null
+  /** 发货附件文件 ID 列表（bizType=shipment_dispatch，shippedById 非空时有值） */
+  dispatchFileIds: number[] | null
   confirmedById: number | null
   confirmedByName: string | null
   createdAt: string | null
@@ -119,6 +127,16 @@ export interface ShipmentConfirmForm {
   shipmentId: number
   proofFileIds: number[]
   lines: ShipmentLineReceiveForm[]
+}
+
+/**
+ * 标记已发货（三部曲：选承运商 + 运单号 + 上传附件）。
+ * 三者缺一后端拒绝推进 SHIPPED（与标记客户收货必传签收证据对称）。
+ */
+export interface ShipmentMarkShippedForm {
+  carrier: string
+  trackingNo: string
+  fileIds: number[]
 }
 
 /** 客户收货单行（itemId + 本次收货数量） */

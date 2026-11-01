@@ -36,7 +36,7 @@
       <el-table-column prop="defVersion" label="版本" width="80" align="center" />
       <el-table-column prop="flowableDeploymentId" label="部署ID" min-width="180" show-overflow-tooltip />
       <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
-      <el-table-column label="操作" width="300" fixed="right" align="center">
+      <el-table-column label="操作" width="270" fixed="right" align="center">
         <template #default="{ row }">
           <el-button link type="primary" size="small" v-has-perm="'process:edit'" @click="openEdit(row)">编辑</el-button>
           <el-button link type="warning" size="small" v-has-perm="'process:edit'" @click="openNodes(row)">配置节点</el-button>

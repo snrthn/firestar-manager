@@ -6,6 +6,7 @@ import type {
   ItemVO,
   ShipmentCreateForm,
   ShipmentConfirmForm,
+  ShipmentMarkShippedForm,
 } from '@/types/shipment'
 import type { TimelineNodeVO } from '@/types/project'
 
@@ -66,9 +67,9 @@ export function withdrawShipment(id: number) {
   return request.post<ApiResult<null>>(`/shipment/${id}/withdraw`).then((r) => r.data)
 }
 
-/** 标记已发货（审批通过后；shippedById = 当前操作人，决策#2；后端端点 /shipment/{id}/ship） */
-export function markShipped(id: number) {
-  return request.post<ApiResult<null>>(`/shipment/${id}/ship`).then((r) => r.data)
+/** 标记已发货（三部曲：选承运商 + 运单号 + 上传附件；审批通过后；后端端点 /shipment/{id}/ship） */
+export function markShipped(id: number, data: ShipmentMarkShippedForm) {
+  return request.post<ApiResult<null>>(`/shipment/${id}/ship`, data).then((r) => r.data)
 }
 
 /** 标记客户收货（决策#6：必传证据；支持按行部分收货；联动生成应收单） */

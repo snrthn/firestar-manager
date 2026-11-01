@@ -13,7 +13,7 @@ import {
   submitShipment,
 } from '@/api/shipment'
 import { listFiles, uploadFile, downloadFileUrl, fetchFileBlob } from '@/api/file'
-import type { ShipmentVO, ShipmentConfirmForm, ShipmentLineReceiveForm } from '@/types/shipment'
+import type { ShipmentVO, ShipmentConfirmForm, ShipmentLineReceiveForm, ShipmentMarkShippedForm } from '@/types/shipment'
 import type { TimelineNodeVO } from '@/types/project'
 import type { FileVO } from '@/types/file'
 import type { TaskInfoVO } from '@/types/approval'
@@ -21,7 +21,8 @@ import ApprovalTimeline from '@/components/ApprovalTimeline.vue'
 import ApprovalActionForm from '@/components/ApprovalActionForm.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { useTaskApproval } from '@/composables/useTaskApproval'
-import { useDictLabels } from '@/composables/useDict'
+import { useDictLabels, loadDictOptions } from '@/composables/useDict'
+import type { DictOption } from '@/composables/useDict'
 import { formatDateTime } from '@/utils/datetime'
 
 // 发货详情弹窗（卡片化：信息 + 明细行 + 关联应收单 + 签收证据 + 审批时间线 + 状态推进）。
@@ -73,6 +74,8 @@ const loading = ref(false)
 const detail = ref<ShipmentVO | null>(null)
 const timeline = ref<TimelineNodeVO[]>([])
 const proofFiles = ref<FileVO[]>([])
+// 发货附件（只读展示用；上传在发货子弹窗，提交时后端 bindDispatchFiles 绑定到本单 bizType=shipment_dispatch）
+const dispatchFileList = ref<FileVO[]>([])
 
 // ===== 字典标签 / 颜色（集中消费，字典维护页改色即生效） =====
 // 注：shipment_line_status 行状态字典不再展示（2026-10-23 虎哥：待发货/已发货阶段与单头状态重复、
@@ -103,6 +106,13 @@ const load = async (id: number) => {
     } else {
       proofFiles.value = []
     }
+    // 发货附件：按 bizType+bizId 从文件表拉（V98 三部曲留痕；只读展示，不在详情窗修改）
+    if (d.dispatchFileIds && d.dispatchFileIds.length) {
+      const df = await listFiles(1, 200, { bizType: 'shipment_dispatch', keyword: undefined })
+      dispatchFileList.value = (df.records || []).filter((f) => f.bizId === id)
+    } else {
+      dispatchFileList.value = []
+    }
     // 图片证据预取字节（带 token 的 blob URL，供 el-image 缩略图 + 内置查看器预览）
     await loadImageThumbs()
   } catch (e) {
@@ -123,28 +133,10 @@ watch(
 // ===== 状态推进：标记已发货 / 标记客户收货（业务动作；审批在审批中心）=====
 const acting = ref(false)
 
-// ===== 标记已发货 =====
+// ===== 标记已发货（三部曲：承运商 + 运单号 + 附件）—— 打开发货表单弹窗 =====
 const handleMarkShipped = async () => {
   if (!detail.value) return
-  try {
-    await ElMessageBox.confirm(`确认将发货单 ${detail.value.batchNo} 标记为已发货？`, '标记已发货', {
-      type: 'warning',
-      confirmButtonText: '确认发货',
-      cancelButtonText: '取消',
-    })
-  } catch {
-    return
-  }
-  acting.value = true
-  try {
-    await markShipped(detail.value.id)
-    ElMessage.success('已标记发货')
-    await reload()
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  } finally {
-    acting.value = false
-  }
+  await openDispatch()
 }
 
 // ===== 标记客户收货（子弹窗） =====
@@ -262,6 +254,109 @@ const handleConfirmReceive = async () => {
   }
 }
 
+// ===== 标记已发货：发货表单弹窗（三部曲：承运商 + 运单号 + 附件）=====
+const dispatchVisible = ref(false)
+const dispatchCarrier = ref('')
+const dispatchTrackingNo = ref('')
+const dispatchFiles = ref<FileVO[]>([])
+const dispatchUploading = ref(false)
+const dispatchSaving = ref(false)
+const carrierOptions = ref<DictOption[]>([])
+
+const isDispatchImage = (file: File) =>
+  file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp)$/i.test(file.name)
+const dispatchFileThumbs = ref<Record<number, string>>({})
+const dispatchThumbList = computed(() =>
+  dispatchFiles.value.filter((f) => !!dispatchFileThumbs.value[f.id]).map((f) => dispatchFileThumbs.value[f.id]),
+)
+const dispatchThumbIndexOf = (fileId: number) =>
+  dispatchFiles.value.filter((f) => !!dispatchFileThumbs.value[f.id]).findIndex((f) => f.id === fileId)
+const releaseDispatchThumbs = () => {
+  for (const u of Object.values(dispatchFileThumbs.value)) {
+    if (u.startsWith('blob:')) URL.revokeObjectURL(u)
+  }
+  dispatchFileThumbs.value = {}
+}
+watch(
+  () => dispatchVisible.value,
+  (v) => {
+    if (!v) releaseDispatchThumbs()
+  },
+)
+
+const openDispatch = async () => {
+  releaseDispatchThumbs() // 防御：上次异常关窗可能残留
+  dispatchCarrier.value = ''
+  dispatchTrackingNo.value = ''
+  dispatchFiles.value = []
+  dispatchSaving.value = false
+  // 承运商下拉只拉启用态（loadDictOptions 已按 status==='ENABLED' 过滤，禁用项自然消失，不会显示中文'停用'）
+  carrierOptions.value = await loadDictOptions('logistics_carrier')
+  dispatchVisible.value = true
+}
+
+// el-upload 自定义上传：复用 FileController.upload（bizType=shipment_dispatch），刻意不传 bizId，
+// 改由点「确认发货」时后端 bindDispatchFiles 统一挂载（与收货证据同口径，防传错后移除的文件永久留痕）
+const customDispatchUpload = async (options: { file: File }) => {
+  if (!detail.value) return
+  dispatchUploading.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', options.file)
+    fd.append('bizType', 'shipment_dispatch')
+    const vo = await uploadFile(fd)
+    dispatchFiles.value.push(vo)
+    if (isDispatchImage(options.file)) {
+      dispatchFileThumbs.value[vo.id] = URL.createObjectURL(options.file)
+    }
+  } catch (e) {
+    ElMessage.error('发货附件上传失败：' + (e as Error).message)
+  } finally {
+    dispatchUploading.value = false
+  }
+}
+
+const removeDispatchFile = (idx: number) => {
+  const [removed] = dispatchFiles.value.splice(idx, 1)
+  if (removed) {
+    const u = dispatchFileThumbs.value[removed.id]
+    if (u && u.startsWith('blob:')) URL.revokeObjectURL(u)
+    delete dispatchFileThumbs.value[removed.id]
+  }
+}
+
+const handleDispatchSave = async () => {
+  if (!detail.value) return
+  if (!dispatchCarrier.value) {
+    ElMessage.warning('请选择承运商')
+    return
+  }
+  if (!dispatchTrackingNo.value.trim()) {
+    ElMessage.warning('请填写物流运单号')
+    return
+  }
+  if (dispatchFiles.value.length === 0) {
+    ElMessage.warning('请至少上传一件发货附件（运单 / 箱单 / 物流面单）')
+    return
+  }
+  dispatchSaving.value = true
+  try {
+    const payload: ShipmentMarkShippedForm = {
+      carrier: dispatchCarrier.value,
+      trackingNo: dispatchTrackingNo.value.trim(),
+      fileIds: dispatchFiles.value.map((f) => f.id),
+    }
+    await markShipped(detail.value.id, payload)
+    ElMessage.success('已标记发货，物流信息已留痕')
+    dispatchVisible.value = false
+    await reload()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    dispatchSaving.value = false
+  }
+}
+
 // ===== 文件打开（下载/预览）：OSS 绝对 URL 直开；本地相对路径走 fetch+blob =====
 const openFile = async (f: FileVO) => {
   try {
@@ -299,6 +394,17 @@ const imageThumbList = computed(() =>
 const imageIndexOf = (fileId: number) =>
   proofFiles.value.filter(isImageFile).findIndex((f) => f.id === fileId)
 
+/** 发货附件图片 URL 列表（查看器翻页用，按附件顺序） */
+const dispatchViewThumbList = computed(() =>
+  dispatchFileList.value
+    .filter(isImageFile)
+    .map((f) => imageThumbs.value[f.id])
+    .filter((u): u is string => !!u),
+)
+/** 当前发货附件图片在翻页列表中的索引（el-image initial-index） */
+const dispatchViewImageIndexOf = (fileId: number) =>
+  dispatchFileList.value.filter(isImageFile).findIndex((f) => f.id === fileId)
+
 const loadImageThumbs = async () => {
   // 先释放上一轮的 blob URL，防反复打开详情窗泄漏
   for (const u of Object.values(imageThumbs.value)) {
@@ -315,6 +421,18 @@ const loadImageThumbs = async () => {
         : URL.createObjectURL(await fetchFileBlob(url))
     } catch {
       // 单张失败不阻塞其余证据（点击下载时还会再试一次）
+    }
+  }
+  // 发货附件图片同样预取（与签收证据共用 imageThumbs 映射，关窗统一释放）
+  for (const f of dispatchFileList.value) {
+    if (!isImageFile(f)) continue
+    try {
+      const url = await downloadFileUrl(f.id)
+      imageThumbs.value[f.id] = url.startsWith('http')
+        ? url
+        : URL.createObjectURL(await fetchFileBlob(url))
+    } catch {
+      // 单张失败不阻塞其余附件（点击下载时还会再试一次）
     }
   }
 }
@@ -443,6 +561,11 @@ const handleWithdraw = async () => {
           <el-descriptions-item label="发货人">{{ detail.shippedByName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="确认人">{{ detail.confirmedByName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="发货时间">{{ formatDateTime(detail.shipmentDate) }}</el-descriptions-item>
+          <el-descriptions-item v-if="detail.trackingNo" label="承运商">{{ detail.carrierName || detail.carrier || '—' }}</el-descriptions-item>
+          <el-descriptions-item v-if="detail.trackingNo" label="运单号">{{ detail.trackingNo }}</el-descriptions-item>
+          <el-descriptions-item v-if="detail.dispatchFileIds && detail.dispatchFileIds.length" label="发货附件">
+            {{ detail.dispatchFileIds.length }} 件
+          </el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ formatDateTime(detail.createdAt) }}</el-descriptions-item>
           <el-descriptions-item label="已回款金额">{{ formatAmount(detail.receivedAmount) }}</el-descriptions-item>
           <el-descriptions-item label="退货金额">{{ formatAmount(detail.returnedAmount) }}</el-descriptions-item>
@@ -488,6 +611,38 @@ const handleWithdraw = async () => {
               </el-descriptions-item>
             </el-descriptions>
           </el-card>
+        </template>
+
+        <!-- 发货附件（V98 三部曲留痕；只读展示，与签收证据同款缩略图 + 点击预览/下载） -->
+        <template v-if="dispatchFileList.length">
+          <h4 class="block-title">发货附件</h4>
+          <div class="proof-list">
+            <template v-for="f in dispatchFileList" :key="f.id">
+              <!-- 图片：缩略图，点击弹内置查看器预览（支持上下页翻页） -->
+              <el-image
+                v-if="isImageFile(f) && imageThumbs[f.id]"
+                :src="imageThumbs[f.id]"
+                :preview-src-list="dispatchViewThumbList"
+                :initial-index="dispatchViewImageIndexOf(f.id)"
+                fit="cover"
+                class="proof-thumb"
+                :title="f.alias || f.originalName || ('文件#' + f.id)"
+                preview-teleported
+                hide-on-click-modal
+              />
+              <!-- 非图片：文件名标签，点击走带 token 的 blob 下载 -->
+              <el-tag
+                v-else
+                class="proof-tag"
+                type="info"
+                effect="plain"
+                @click="openFile(f)"
+              >
+                <el-icon><UploadFilled /></el-icon>
+                {{ f.alias || f.originalName || ('文件#' + f.id) }}
+              </el-tag>
+            </template>
+          </div>
         </template>
 
         <!-- 签收证据 -->
@@ -581,24 +736,47 @@ const handleWithdraw = async () => {
       </template>
     </template>
 
-    <!-- 标记客户收货子弹窗 -->
-    <el-dialog v-model="recvVisible" title="标记客户收货" width="1000px" append-to-body>
-      <!-- 必传提示 + 上传入口（2026-10-23 虎哥：上传按钮并入橙色提示区右对齐） -->
+    <!-- 标记客户收货子弹窗（2026-11-01 虎哥：宽度与发货单统一为 800px；上传控件移至底部） -->
+    <el-dialog v-model="recvVisible" title="标记客户收货" width="800px" append-to-body>
+      <!-- 必传提示（纯文本；上传入口已移至底部） -->
       <el-alert type="warning" :closable="false" class="recv-alert">
         <template #default>
-          <div class="recv-alert-row">
-            <span class="recv-alert-text">必传签收证据，支持按行部分收货。</span>
-            <el-upload
-              :show-file-list="false"
-              :http-request="customUpload"
-              :disabled="uploading"
-            >
-              <el-button :icon="UploadFilled" :loading="uploading" v-has-perm="'file:upload'">上传签收证据</el-button>
-            </el-upload>
-          </div>
+          <span class="recv-alert-text">必传签收证据，支持按行部分收货。</span>
         </template>
       </el-alert>
-      <div v-if="recvFiles.length" class="recv-file-list">
+
+      <el-table :data="detail?.lines || []" border size="small" style="margin-top: 12px">
+        <template #empty>
+          <EmptyState description="暂无收货明细" />
+        </template>
+        <el-table-column prop="itemName" label="货物" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="shipmentQty" label="发货量" width="80" align="right" />
+        <el-table-column prop="receivedQty" label="已收" width="80" align="right" />
+        <el-table-column prop="remainingCanReceive" label="剩余可收" width="90" align="right" />
+        <el-table-column label="本次收货" width="160" align="center">
+          <template #default="{ row }">
+            <el-input-number
+              v-model="recvLines[row.id]"
+              :min="0"
+              :max="row.remainingCanReceive"
+              :precision="0"
+              :controls-position="'right'"
+              style="width: 130px"
+            />
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 附件上传控件：上传按钮 + 已上传列表，统一移至底部（2026-11-01 虎哥） -->
+      <div class="attach-bottom">
+        <el-upload
+          :show-file-list="false"
+          :http-request="customUpload"
+          :disabled="uploading"
+        >
+          <el-button :icon="UploadFilled" :loading="uploading" v-has-perm="'file:upload'">上传签收证据</el-button>
+        </el-upload>
+        <div v-if="recvFiles.length" class="recv-file-list">
           <template v-for="(f, idx) in recvFiles" :key="f.id">
             <!-- 图片：缩略图，点击弹内置查看器预览（支持上下页翻页；与签收证据区一致） -->
             <div v-if="recvFileThumbs[f.id]" class="recv-thumb-wrap">
@@ -632,32 +810,81 @@ const handleWithdraw = async () => {
             >{{ f.alias || f.originalName || ('文件#' + f.id) }}</el-tag>
           </template>
         </div>
-
-      <el-table :data="detail?.lines || []" border size="small" style="margin-top: 12px">
-        <template #empty>
-          <EmptyState description="暂无收货明细" />
-        </template>
-        <el-table-column prop="itemName" label="货物" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="shipmentQty" label="发货量" width="80" align="right" />
-        <el-table-column prop="receivedQty" label="已收" width="80" align="right" />
-        <el-table-column prop="remainingCanReceive" label="剩余可收" width="90" align="right" />
-        <el-table-column label="本次收货" width="160" align="center">
-          <template #default="{ row }">
-            <el-input-number
-              v-model="recvLines[row.id]"
-              :min="0"
-              :max="row.remainingCanReceive"
-              :precision="0"
-              :controls-position="'right'"
-              style="width: 130px"
-            />
-          </template>
-        </el-table-column>
-      </el-table>
+      </div>
 
       <template #footer>
         <el-button @click="recvVisible = false">取消</el-button>
         <el-button type="primary" :loading="recvSaving" v-has-perm="'shipment:receive'" @click="handleConfirmReceive">确认收货</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 标记已发货：发货表单（三部曲：承运商 + 运单号 + 附件）；2026-11-01 虎哥：
+         宽度与收货单统一为 800px；上传控件移至底部 -->
+    <el-dialog v-model="dispatchVisible" title="标记已发货" width="800px" append-to-body>
+      <!-- 必填提示（纯文本；上传入口已移至底部） -->
+      <el-alert type="warning" :closable="false" class="recv-alert">
+        <template #default>
+          <span class="recv-alert-text">必填：承运商 + 运单号 + 至少一件发货附件（运单 / 箱单 / 物流面单）。</span>
+        </template>
+      </el-alert>
+
+      <el-form label-width="84px" style="margin-top: 12px">
+        <el-form-item label="承运商" required>
+          <el-select v-model="dispatchCarrier" placeholder="请选择承运商" filterable style="width: 100%">
+            <el-option v-for="o in carrierOptions" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="运单号" required>
+          <el-input v-model="dispatchTrackingNo" placeholder="填写物流运单号（库内唯一）" maxlength="64" />
+        </el-form-item>
+      </el-form>
+
+      <!-- 附件上传控件：上传按钮 + 已上传列表，统一移至底部（2026-11-01 虎哥） -->
+      <div class="attach-bottom">
+        <el-upload
+          :show-file-list="false"
+          :http-request="customDispatchUpload"
+          :disabled="dispatchUploading"
+        >
+          <el-button :icon="UploadFilled" :loading="dispatchUploading" v-has-perm="'file:upload'">上传发货附件</el-button>
+        </el-upload>
+        <div v-if="dispatchFiles.length" class="recv-file-list">
+          <template v-for="(f, idx) in dispatchFiles" :key="f.id">
+            <div v-if="dispatchFileThumbs[f.id]" class="recv-thumb-wrap">
+              <el-image
+                :src="dispatchFileThumbs[f.id]"
+                :preview-src-list="dispatchThumbList"
+                :initial-index="dispatchThumbIndexOf(f.id)"
+                fit="cover"
+                class="recv-thumb"
+                :title="f.alias || f.originalName || ('文件#' + f.id)"
+                preview-teleported
+                hide-on-click-modal
+              />
+              <el-button
+                class="recv-thumb-del"
+                circle
+                size="small"
+                :icon="Close"
+                title="移除该附件"
+                @click.stop="removeDispatchFile(idx)"
+              />
+            </div>
+            <el-tag
+              v-else
+              class="recv-file-tag"
+              type="success"
+              closable
+              @close="removeDispatchFile(idx)"
+              @click="openFile(f)"
+            >{{ f.alias || f.originalName || ('文件#' + f.id) }}</el-tag>
+          </template>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="dispatchVisible = false">取消</el-button>
+        <el-button type="primary" :loading="dispatchSaving" @click="handleDispatchSave">确认发货</el-button>
       </template>
     </el-dialog>
   </el-dialog>
@@ -710,21 +937,17 @@ const handleWithdraw = async () => {
 .proof-thumb:hover {
   transform: scale(1.04);
 }
-/* 收货提示区：文案 + 右对齐上传按钮（2026-10-23 虎哥：按钮并入橙色区域右对齐）。
-   el-alert 根是 flex，内容区默认不撑满 → :deep 补 flex:1，内层 row 才能 space-between */
+/* 收货提示区：纯文本提示。el-alert 根是 flex，内容区默认不撑满 → :deep 补 flex:1 */
 .recv-alert :deep(.el-alert__content) {
   flex: 1;
   min-width: 0;
 }
-.recv-alert-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
 .recv-alert-text {
-  flex: 1;
   line-height: 1.6;
+}
+/* 上传控件统一到底部：与表格/表单分区，margin-top 拉开间距（2026-11-01 虎哥） */
+.attach-bottom {
+  margin-top: 16px;
 }
 .recv-file-list {
   display: flex;
