@@ -78,7 +78,8 @@ export async function fetchFileBlob(relativeUrl: string): Promise<Blob> {
 
   // 401：token 缺失/过期/被顶下线 → 与 axios 拦截器同一条会话守卫出口
   if (res.status === 401) {
-    handleSessionExpired('登录状态已失效，请重新登录')
+    // 透传发送时刻的 token：若这是重登录前的旧请求 401，属僵尸请求，守卫静默忽略。
+    handleSessionExpired('登录状态已失效，请重新登录', token)
     throw new Error('登录状态已失效')
   }
   if (!res.ok) {

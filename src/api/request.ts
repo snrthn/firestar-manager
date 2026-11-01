@@ -38,7 +38,11 @@ request.interceptors.response.use(
     // 401：Token 无效/过期/已拉黑/账号在其它设备登录（后端 filter 直接写 401 JSON）
     // 统一收敛到会话守卫：单例模态框去重 + 静默挂起（页级 catch 不再弹重复错误）
     if (error.response?.status === 401) {
-      handleSessionExpired(error.response.data?.message)
+      // 把本次请求实际携带的 token 透传给守卫：若该请求用的是旧 token（重登录后
+      // localStorage 已是新会话），属僵尸请求 401，守卫会静默忽略，避免误清新 token。
+      const auth = error.config?.headers?.Authorization as string | undefined
+      const rejected = typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice(7) : undefined
+      handleSessionExpired(error.response.data?.message, rejected)
       return hangSilently()
     }
     // 其它非 2xx（如安装向导关闭后的真 403、db-check 的 503）：

@@ -11,7 +11,15 @@ import router from '@/router'
  */
 let showing = false
 
-export function handleSessionExpired(msg?: string) {
+export function handleSessionExpired(msg?: string, rejectedToken?: string | null) {
+  // 僵尸连接保护：若触发来源携带的是「旧 token」（当前 localStorage 已是新会话），
+  // 说明是被本机「旧 SSE 连接收到自己新登录推的 FORCE_LOGOUT / 旧请求 401」误伤，
+  // 静默忽略——不清当前 token、不弹窗、不跳登录。否则会出现「刚登录就被踢」的竞态。
+  // 各调用点负责把自己使用的 token 透传进来；不传则视为当前会话（照旧弹窗）。
+  const current = localStorage.getItem('token')
+  if (rejectedToken != null && rejectedToken !== current) {
+    return
+  }
   if (showing) return
   showing = true
   localStorage.removeItem('token')

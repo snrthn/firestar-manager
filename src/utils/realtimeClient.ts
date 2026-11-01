@@ -25,6 +25,8 @@ let abortCtrl: AbortController | null = null
 let retryTimer: ReturnType<typeof setTimeout> | null = null
 let retryDelay = RETRY_BASE_MS
 let running = false
+let boundToken: string | null = null // 当前 SSE 连接绑定的 token（connect 时刻快照），用于僵尸连接判定
+let generation = 0 // 每次 start/stop 自增，使被取代的旧连接异步回调失效，避免重复建连
 
 function scheduleReconnect() {
   if (!running || retryTimer) return
@@ -41,11 +43,13 @@ function scheduleReconnect() {
 }
 
 function connect() {
+  const myGen = generation
   const token = localStorage.getItem('token')
   if (!token) {
     running = false
     return
   }
+  boundToken = token
   abortCtrl = new AbortController()
   fetch(ENDPOINT, {
     method: 'GET',
@@ -53,20 +57,31 @@ function connect() {
     signal: abortCtrl.signal,
   })
     .then((res) => {
+      if (myGen !== generation) return // 已被新的 start/stop 取代，丢弃本次结果
       if (!res.ok || !res.body) {
         if (res.status === 401) {
-          // 握手即被拒（被顶号后旧会话重连）：优先展示后端 message
-          //（stream 端点已区分「已在其他设备登录」与「登录已过期」两种语义），
-          // 读不到再回落统一兜底文案，保证与 FORCE_LOGOUT 推送路径展示一致。
+          // 握手即被拒：区分「当前会话真失效」与「僵尸旧连接重连被拒」。
+          // 若本连接绑定的是旧 token（当前 localStorage 已是新会话），说明是
+          // 本机旧 SSE 收到自己新登录推的 FORCE_LOGOUT 后的重连，属自踢竞态，
+          // 静默断流即可，不弹窗、不清当前 token。
+          const isZombie = boundToken !== localStorage.getItem('token')
+          const rejected = boundToken
           // 动态 import 避开 sessionGuard→router→realtimeClient 的循环依赖
           import('@/api/sessionGuard').then((m) => {
+            if (isZombie) {
+              stopRealtime()
+              return
+            }
             res
               .json()
               .then((body: { message?: string }) => {
-                m.handleSessionExpired(body?.message || '您的账号已在其他设备登录，原会话已失效，请重新登录')
+                m.handleSessionExpired(
+                  body?.message || '您的账号已在其他设备登录，原会话已失效，请重新登录',
+                  rejected,
+                )
               })
               .catch(() => {
-                m.handleSessionExpired('您的账号已在其他设备登录，原会话已失效，请重新登录')
+                m.handleSessionExpired('您的账号已在其他设备登录，原会话已失效，请重新登录', rejected)
               })
           })
         }
@@ -86,6 +101,7 @@ function connect() {
       void readStream(res.body)
     })
     .catch(() => {
+      if (myGen !== generation) return // 已被取代，不再退避重连
       // 网络错误（后端重启等）：退避重连
       scheduleReconnect()
     })
@@ -131,21 +147,37 @@ function handleBlock(raw: string) {
     }
   }
   if (event === 'FORCE_LOGOUT') {
-    dispatchRealtime(event, parsed)
-    stopRealtime() // 被踢，立即断开当前流，不再重连（token 已被清）
+    // 僵尸连接保护：若本连接绑定的是旧 token（当前 localStorage 已是新会话），
+    // 说明是「本机旧 SSE 收到自己新登录推的 FORCE_LOGOUT」误伤——只静默断流，
+    // 绝不让 dispatchRealtime 走到 handleSessionExpired（否则刚登录就被踢）。
+    const isZombie = boundToken !== localStorage.getItem('token')
+    if (!isZombie) {
+      dispatchRealtime(event, parsed) // 仅真实被顶号才走弹窗分支
+    }
+    stopRealtime() // 不论真假都断开当前流（僵尸则清残留；真被顶则停重连）
     return
   }
   dispatchRealtime(event, parsed)
 }
 
 export function startRealtime() {
-  if (running) return
+  const current = localStorage.getItem('token')
+  // 已在跑且绑定的是当前 token：无需重启，保留长连接（避免每次路由切换都断流重连）。
+  if (running && boundToken === current) return
+  // 否则（未跑 / 绑的是旧 token）先停后起，确保 SSE 重新绑定到最新 token，
+  // 避免「同 tab 残留旧 SSE」导致新登录后 SSE 仍跑在旧 token 上、收不到新会话推送、
+  // 且旧连接收到 FORCE_LOGOUT 误伤新会话。generation++ 让旧连接的异步回调立即失效，
+  // 杜绝「先停后起」期间出现双连接。
+  generation++
+  stopRealtime()
+  generation++
   running = true
   retryDelay = RETRY_BASE_MS
   connect()
 }
 
 export function stopRealtime() {
+  generation++ // 使当前连接的异步回调失效，避免停止后旧回调仍触发重连
   running = false
   if (retryTimer) {
     clearTimeout(retryTimer)
