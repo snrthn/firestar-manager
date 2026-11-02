@@ -3,7 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { Camera } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { updateProfile, changePassword } from '@/api/auth'
-import { listConsents, withdraw } from '@/api/agreement'
+import { listConsents, withdraw, consent } from '@/api/agreement'
 import { updateAvatar } from '@/api/profile'
 import AvatarCropper from '@/components/AvatarCropper.vue'
 import { useAvatar } from '@/composables/useAvatar'
@@ -185,7 +185,7 @@ loadConsents()
 async function withdrawAgreement(item: AgreementVO) {
   try {
     await ElMessageBox.confirm(
-      `确定要撤回对《${item.name}》的同意吗？撤回后相关功能可能受限。`,
+      `确定要撤回对《${item.name}》的同意吗？撤回后下次进入系统将重新要求确认该协议。`,
       '撤回确认',
       { type: 'warning', confirmButtonText: '撤回', cancelButtonText: '取消' }
     )
@@ -194,10 +194,21 @@ async function withdrawAgreement(item: AgreementVO) {
   }
   try {
     await withdraw(item.agreementId, { versionId: item.versionId })
-    ElMessage.success('已撤回同意')
+    ElMessage.success('已撤回同意，下次进入系统将重新要求确认')
     await loadConsents()
   } catch (e: any) {
     ElMessage.error(e?.message || '撤回失败')
+  }
+}
+
+// 撤回后：个人中心内直接重新确认（无需等下次进站弹层）
+async function reconsentAgreement(item: AgreementVO) {
+  try {
+    await consent(item.agreementId, { versionId: item.versionId, channel: 'SETTINGS' })
+    ElMessage.success('已重新确认同意')
+    await loadConsents()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '确认失败')
   }
 }
 </script>
@@ -362,7 +373,14 @@ async function withdrawAgreement(item: AgreementVO) {
                 plain
                 @click="withdrawAgreement(item)"
               >撤回同意</el-button>
-              <el-tag v-else size="small" type="info" effect="plain">不可撤回</el-tag>
+              <el-button
+                v-else-if="item.lastAction === 'WITHDRAW'"
+                size="small"
+                type="primary"
+                plain
+                @click="reconsentAgreement(item)"
+              >重新确认</el-button>
+              <el-tag v-else size="small" type="info" effect="plain">未同意</el-tag>
             </div>
           </div>
         </el-tab-pane>
