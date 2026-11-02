@@ -279,7 +279,7 @@ onMounted(() => {
   font-size: 13px;
   color: #909399;
 }
-.agree-content {
+.agree-body {
   margin-top: 12px;
   max-height: 50vh;
   overflow: auto;
