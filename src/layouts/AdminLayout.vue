@@ -164,8 +164,13 @@ onMounted(() => {
       <AppSidebar :collapsed="false" />
     </aside>
 
-    <!-- 全局 AI 助手悬浮入口（设计 §10）：右下角按钮 + 抽屉；受 ai:assistant:use 权限控制显隐 -->
-    <AiAssistantFab v-has-perm="'ai:assistant:use'" />
+    <!-- 全局 AI 助手悬浮入口（设计 §10）：右下角按钮 + 抽屉；受 ai:assistant:use 权限控制显隐。
+         外层 div 承载 v-has-perm：AiAssistantFab 为 fragment 多根组件，指令直接挂组件会导致
+         "Runtime directive used on component with non-element root node" 警告且指令失效（无权限仍显示）。
+         包一层原生 div 后指令绑定到 div，无权限时整棵 FAB 子树被移除；FAB 用 fixed 定位、抽屉 append-to-body，不影响布局。 -->
+    <div v-has-perm="'ai:assistant:use'">
+      <AiAssistantFab />
+    </div>
 
     <!-- 协议强制确认弹层：不可绕过（modal 遮罩挡内容区，禁止点遮罩/ESC/关闭按钮关） -->
     <el-dialog

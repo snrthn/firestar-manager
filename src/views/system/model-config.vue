@@ -49,13 +49,15 @@
         </el-table-column>
         <el-table-column prop="baseUrl" label="Base URL" min-width="200" show-overflow-tooltip />
         <el-table-column prop="model" label="模型 / Bot" min-width="140" show-overflow-tooltip />
-        <el-table-column label="凭证状态" min-width="240">
+        <el-table-column label="凭证状态" min-width="280">
           <template #default="{ row }">
-            <el-space>
-              <span>BotId: <el-tag size="small" :type="row.botIdSet ? 'success' : 'info'">{{ row.botIdSet ? '已配置' : '未配置' }}</el-tag></span>
+            <!-- 凭证状态：coze 行仅显示 BotId + ApiKey；非 coze 行 BotId 由 v-if 隐藏，只剩 ApiKey。
+                 用显式 inline-flex 容器（不依赖 el-space 的注册时机），强制单行 + 16px 自然间距。 -->
+            <div style="display:inline-flex;align-items:center;gap:16px;white-space:nowrap">
+              <span v-if="row.provider === 'coze'">BotId: <el-tag size="small" :type="row.botIdSet ? 'success' : 'info'">{{ row.botIdSet ? '已配置' : '未配置' }}</el-tag></span>
               <span>ApiKey: <el-tag size="small" :type="row.apiKeySet ? 'success' : 'info'">{{ row.apiKeySet ? '已配置' : '未配置' }}</el-tag></span>
               <span v-if="row.extraSet">附加: <el-tag size="small" type="success">已配置</el-tag></span>
-            </el-space>
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="180" fixed="right">

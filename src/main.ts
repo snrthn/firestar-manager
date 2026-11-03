@@ -90,6 +90,9 @@ import ElScrollbar from 'element-plus/es/components/scrollbar/index.mjs'
 // 控制台 "Failed to resolve component: el-skeleton"（2026-10-21 虎哥截图实锤）。
 // ElSkeletonItem 没有独立包目录的 install，从 skeleton 入口具名导出。
 import ElSkeleton, { ElSkeletonItem } from 'element-plus/es/components/skeleton/index.mjs'
+// 间距布局容器（模型配置弹窗内字段间距）：漏注册时 <el-space> 解析失败，
+// 控制台报 "Failed to resolve component: el-space"，内部子元素退化为无样式裸渲染（2026-11-03 模型配置页实锤）。
+import ElSpace from 'element-plus/es/components/space/index.mjs'
 // 上传（文件列表页上传弹窗）：未注册时 <el-upload> 被当未知元素渲染——
 // 拖拽区塌掉、点击/拖拽全失效、弹窗布局错乱（2026-10-16 虎哥截图实锤）。
 import ElUpload from 'element-plus/es/components/upload/index.mjs'
@@ -237,6 +240,7 @@ app.use(ElScrollbar)
 // 骨架屏（安装向导 / 系统重置页预检加载态）
 app.use(ElSkeleton)
 app.use(ElSkeletonItem)
+app.use(ElSpace)
 app.use(ElUpload)
 app.use(ElDatePicker)
 // 图片预览大图（RichView 富文本图片点击预览）
