@@ -217,3 +217,36 @@ export async function streamChat(message: string, handlers: ChatStreamHandlers):
 export function fetchLatestDraft(convId: number): Promise<string | null> {
   return request.get(`/ai/conversation/${convId}/latest-draft`).then((r) => (r.data.data as string) ?? null)
 }
+
+// ===== AI 提示词管理（【提示词管理】页，ai:prompt:*） =====
+// 与模型配置同构：全局唯一生效（is_active=1），启用哪套哪套在对话中实时生效。
+export interface AiPromptConfig {
+  id?: number
+  name: string
+  content?: string
+  active?: number
+}
+
+export function listPrompts() {
+  return request.get('/ai/prompt-config').then((r) => r.data.data as AiPromptConfig[])
+}
+
+export function createPrompt(payload: AiPromptConfig) {
+  return request.post('/ai/prompt-config', payload).then((r) => r.data.data as number)
+}
+
+export function updatePrompt(payload: AiPromptConfig) {
+  return request.put('/ai/prompt-config', payload).then((r) => r.data.data)
+}
+
+export function deletePrompt(id: number) {
+  return request.delete(`/ai/prompt-config/${id}`).then((r) => r.data.data)
+}
+
+export function activatePrompt(id: number) {
+  return request.post(`/ai/prompt-config/${id}/activate`).then((r) => r.data.data)
+}
+
+export function reloadPrompt() {
+  return request.post('/ai/prompt-config/reload').then((r) => r.data.data)
+}

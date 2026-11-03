@@ -36,7 +36,7 @@
       <el-table :data="list" v-loading="loading" border stripe class="mc-table">
         <el-table-column prop="provider" label="供应商" width="120">
           <template #default="{ row }">
-            <el-tag :type="row.provider === 'coze' ? 'primary' : row.provider === 'openai' ? 'success' : row.provider === 'deepseek' ? 'warning' : 'info'">
+            <el-tag :type="providerTagType(row.provider) || 'info'">
               {{ providerLabel(row.provider) }}
             </el-tag>
           </template>
@@ -85,12 +85,7 @@
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
         <el-form-item label="供应商" prop="provider">
-          <el-select v-model="form.provider" placeholder="选择供应商" style="width: 100%" :disabled="!!form.id">
-            <el-option label="扣子 Coze" value="coze" />
-            <el-option label="OpenAI 兼容" value="openai" />
-            <el-option label="DeepSeek" value="deepseek" />
-            <el-option label="Ollama（占位）" value="ollama" />
-          </el-select>
+          <DictSelect v-model="form.provider" type-code="ai_provider" placeholder="选择供应商" :disabled="!!form.id" :clearable="false" />
         </el-form-item>
         <el-form-item label="Base URL" prop="baseUrl">
           <el-input v-model="form.baseUrl" placeholder="Coze: https://api.coze.cn；DeepSeek/OpenAI 兼容: https://api.deepseek.com（代码自动拼 /chat/completions）" />
@@ -146,6 +141,8 @@ import {
   type ModelConfigMasked,
   type ModelConfigPayload,
 } from '@/api/ai'
+import DictSelect from '@/components/DictSelect.vue'
+import { useDictLabels } from '@/composables/useDict'
 
 const loading = ref(false)
 const reloading = ref(false)
@@ -171,9 +168,8 @@ const rules: FormRules = {
   baseUrl: [{ required: true, message: '请填写 Base URL', trigger: 'blur' }],
 }
 
-function providerLabel(p: string) {
-  return p === 'coze' ? '扣子 Coze' : p === 'openai' ? 'OpenAI 兼容' : p === 'deepseek' ? 'DeepSeek' : p === 'ollama' ? 'Ollama' : p
-}
+// 供应商中文名 / 标签颜色来自字典 ai_provider（替代硬编码 providerLabel）
+const { label: providerLabel, style: providerTagType } = useDictLabels('ai_provider')
 
 // 切走 Coze 时清空 BotId（该字段仅 Coze 使用，避免残留值误提交）
 watch(
