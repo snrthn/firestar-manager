@@ -12,6 +12,7 @@ import RichView from '@/components/RichView.vue'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import AppTabs from '@/components/layout/AppTabs.vue'
+import AiAssistantFab from '@/components/ai/AiAssistantFab.vue'
 
 const appStore = useAppStore()
 const tabsStore = useTabsStore()
@@ -162,6 +163,9 @@ onMounted(() => {
     >
       <AppSidebar :collapsed="false" />
     </aside>
+
+    <!-- 全局 AI 助手悬浮入口（设计 §10）：右下角按钮 + 抽屉；受 ai:assistant:use 权限控制显隐 -->
+    <AiAssistantFab v-has-perm="'ai:assistant:use'" />
 
     <!-- 协议强制确认弹层：不可绕过（modal 遮罩挡内容区，禁止点遮罩/ESC/关闭按钮关） -->
     <el-dialog

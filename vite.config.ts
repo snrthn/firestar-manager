@@ -45,6 +45,9 @@ export default defineConfig({
         ws: true,
         rewrite: (path) => path.replace(/^\/api\/socket/, '/socket'),
       },
+      // AI 助手对话流（SSE）已纳入全站 /api/sse 前缀：前端请求 /api/sse/ai/chat/stream，
+      // 直接命中上方 '/api/sse' 规则（剥离 /api/sse → /sse，并关缓冲）。
+      // 故此处不再为 AI 流单开规则，避免与生产 nginx location /api/sse/ 重复。
       '/api': {
         target: 'http://localhost:2025',
         changeOrigin: true,

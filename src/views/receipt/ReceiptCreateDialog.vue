@@ -76,7 +76,12 @@ const loadingReceivables = ref(false)
  *    核销时 subtract(amount)），本行已存 600 时该单余额只剩 400，金额 ≠ 余额 → 被判成
  *    "手改过" → 换应收单金额永远不刷新。改用显式布尔标记，新增/编辑两态判据统一。
  */
-type AllocationRow = AllocationItem & { autoBal?: number | null; userEdited?: boolean }
+type AllocationRow = AllocationItem & {
+  autoBal?: number | null
+  userEdited?: boolean
+  /** 红冲模式镜像原单时的原始分配金额，作为「只能调减≤原值」上限；普通模式为空 */
+  originalAmount?: number | null
+}
 const allocations = ref<AllocationRow[]>([])
 
 /**
@@ -115,6 +120,7 @@ const addAllocation = () => {
     amount: null as unknown as number,
     autoBal: null,
     userEdited: false,
+    originalAmount: null,
   })
   // 用户主动加行 → 解除「历史单无分配行」保护，之后删光按新增口径清零
   allocLoadedEmpty.value = false
@@ -499,6 +505,7 @@ const loadForEdit = async (id: number, asRedFlush = false) => {
       amount: a.amount,
       autoBal: balanceOfReceivable(a.receivableId),
       userEdited: false,
+      originalAmount: a.amount,
     }))
     // V65 之前的历史单本来就没有分配行：置保护位，避免金额联动把它清零
     allocLoadedEmpty.value = loaded.length === 0
@@ -683,12 +690,11 @@ watch(
               <el-input-number
                 v-model="a.amount"
                 :min="0"
-                :max="isRedFlush() ? (a.amount ?? 0) : (isRedType() ? undefined : allocMaxAmount(idx))"
+                :max="isRedFlush() ? (a.originalAmount ?? a.amount ?? 0) : (isRedType() ? undefined : allocMaxAmount(idx))"
                 :precision="2"
                 controls-position="right"
                 placeholder="金额"
                 style="width: 150px"
-                :disabled="isRedFlush() && (a.amount ?? 0) <= 0"
                 @change="onAllocationAmountChange(idx)"
               />
               <el-button v-if="!isRedFlush()" link type="danger" size="small" @click="removeAllocation(idx)">
