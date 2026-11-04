@@ -262,10 +262,16 @@ onMounted(() => {
 
 <template>
   <div class="home">
-    <!-- 系统公告（全员弱提示，置顶 warning 样式，有内容才展示，长文内部滚动） -->
-    <div v-if="announcement" class="announce-bar">
-      <el-icon class="announce-icon"><WarningFilled /></el-icon>
-      <div class="announce-text">{{ announcement }}</div>
+    <!-- 系统公告（全员弱提示，置顶 warning 样式，有内容才展示，长文内部滚动）。
+         外层 .announce-outer 用 grid 0fr→1fr 平滑展开：公告出现时高度从 0 撑到内容真实高度，
+         下方内容随高度增长自然下移（不再硬挤）。用 class 切换而非 v-if，过渡才播得出来。 -->
+    <div class="announce-outer" :class="{ 'is-open': !!announcement }">
+      <div class="announce-clip">
+        <div class="announce-bar">
+          <el-icon class="announce-icon"><WarningFilled /></el-icon>
+          <div class="announce-text">{{ announcement }}</div>
+        </div>
+      </div>
     </div>
 
     <!-- 欢迎横幅 -->
@@ -479,8 +485,27 @@ onMounted(() => {
 }
 
 /* 系统公告（全员弱提示条，置顶 warning 样式） */
-.announce-bar {
+/* 系统公告：外层 grid 0fr→1fr 平滑展开，下方内容随高度增长自然下移（不再硬挤） */
+.announce-outer {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-bottom: 0;
+  transition:
+    grid-template-rows 0.38s cubic-bezier(0.22, 0.61, 0.36, 1),
+    margin-bottom 0.38s cubic-bezier(0.22, 0.61, 0.36, 1),
+    opacity 0.3s ease;
+}
+.announce-outer.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
   margin-bottom: 16px;
+}
+.announce-clip {
+  overflow: hidden;
+  min-height: 0;
+}
+.announce-bar {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -640,4 +665,6 @@ onMounted(() => {
 .err-text {
   color: #f56c6c;
 }
+/* announceIn 关键帧已移除：公告条进场改为 grid 0fr→1fr 平滑展开（见 .announce-outer），
+   下方内容随高度增长自然下移，不再依赖 opacity/translateY 的伪动画。 */
 </style>

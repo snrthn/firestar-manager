@@ -484,6 +484,8 @@ async function openAbout() {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
   z-index: 30;
   overflow: hidden;
+  /* 进场淡入 + 轻微下滑：消除点开铃铛时面板硬闪 */
+  animation: notifyPanelIn 0.22s ease both;
 }
 .notify-panel-head {
   display: flex;
@@ -590,5 +592,16 @@ async function openAbout() {
   font-size: 13px;
   color: #909399;
   line-height: 1.7;
+}
+/* 通知面板进场动画（淡入 + 下滑） */
+@keyframes notifyPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>
