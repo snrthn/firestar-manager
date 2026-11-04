@@ -195,7 +195,7 @@ async function confirmDraft() {
     v-model="visible"
     title="AI 助手"
     direction="rtl"
-    size="420px"
+    size="600px"
     :append-to-body="true"
     class="ai-drawer"
   >
