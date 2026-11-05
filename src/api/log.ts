@@ -31,3 +31,10 @@ export function listOperationLogs(
     .get<ApiResult<AuditLogPageVO>>('/logs/operation', { params: { pageNum, pageSize, ...params } })
     .then((r) => r.data.data!)
 }
+
+/** 解锁账号（爆破防护：管理员手动解除账号锁定）。权限 log:unlock，后端 /system/security/unlock。 */
+export function unlockAccount(username: string) {
+  return request
+    .post<ApiResult<void>>('/system/security/unlock', {}, { params: { username } })
+    .then((r) => r.data)
+}

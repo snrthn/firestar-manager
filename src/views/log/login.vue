@@ -3,7 +3,8 @@ import { onMounted, reactive, ref } from 'vue'
 import EmptyState from '@/components/EmptyState.vue'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import ElMessage from 'element-plus/es/components/message/index.mjs'
-import { listLoginLogs } from '@/api/log'
+import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
+import { listLoginLogs, unlockAccount } from '@/api/log'
 import { formatDateTime } from '@/utils/datetime'
 import type { LoginLogVO } from '@/types/log'
 import DictSelect from '@/components/DictSelect.vue'
@@ -55,6 +56,35 @@ const loadLogs = async () => {
 const handleSizeChange = () => {
   pageNum.value = 1
   loadLogs()
+}
+
+// 详情弹窗 + 解锁（爆破防护闭环的「恢复」入口，权限 log:unlock）
+// 弹窗形态对齐操作日志页（views/log/operation.vue）：el-dialog + footer 关闭按钮
+const detailVisible = ref(false)
+const currentRow = ref<LoginLogVO | null>(null)
+
+function openDetail(row: LoginLogVO) {
+  currentRow.value = row
+  detailVisible.value = true
+}
+
+async function handleUnlock() {
+  const row = currentRow.value
+  if (!row || !row.username) return
+  const confirmed = await ElMessageBox.confirm(
+    `确定要解锁账号「${row.username}」吗？解锁后该账号可正常登录。`,
+    '解锁确认',
+    { type: 'warning', confirmButtonText: '确定解锁', cancelButtonText: '取消' },
+  ).then(() => true).catch(() => false)
+  if (!confirmed) return
+  try {
+    await unlockAccount(row.username)
+    ElMessage.success(`账号 ${row.username} 已解锁`)
+    detailVisible.value = false
+    loadLogs()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  }
 }
 
 // 结果标签：字典 login_status 消费（下拉与表格同源，字典页维护即生效）。
@@ -118,10 +148,43 @@ onMounted(loadLogs)
       <el-table-column prop="loginAt" label="时间" width="170" align="center">
         <template #default="{ row }">{{ formatDateTime(row.loginAt) }}</template>
       </el-table-column>
+      <el-table-column label="操作" width="90" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
+        </template>
+      </el-table-column>
     <template #empty>
       <EmptyState description="暂无登录日志" />
     </template>
     </el-table>
+
+    <!-- 详情弹窗：展示该条登录日志明细；账号被锁定时可在此手动解锁（二次确认）。
+         形态对齐操作日志页（operation.vue）：el-dialog + footer 关闭按钮 -->
+    <el-dialog v-model="detailVisible" title="登录日志详情" width="520px" append-to-body>
+      <el-descriptions :column="1" border label-width="110px" v-if="currentRow">
+        <el-descriptions-item label="登录账号">{{ currentRow.username || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="结果">
+          <el-tag :type="statusTagType(currentRow.loginStatus)" size="small">
+            {{ statusLabel(currentRow.loginStatus) }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="IP">{{ currentRow.ipAddress || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="浏览器 UA">{{ currentRow.userAgent || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="失败原因">{{ currentRow.failReason || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="时间">{{ formatDateTime(currentRow.loginAt) }}</el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button
+          type="warning"
+          v-has-perm="'log:unlock'"
+          v-if="currentRow && currentRow.loginStatus === 'LOCKED'"
+          @click="handleUnlock"
+        >
+          解锁该账号
+        </el-button>
+        <el-button @click="detailVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
 
     <div class="pagination-bar">
       <el-pagination
