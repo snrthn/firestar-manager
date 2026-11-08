@@ -104,8 +104,9 @@ const uploading = ref(false)
 const uploadForm = reactive({ bizType: '', fileType: '', alias: '' })
 const uploadFileList = ref<UploadUserFile[]>([])
 
-// 业务类型 / 文件类型：字典驱动（useDict 消费样板，同 menu.vue 菜单类型）。
-// 字典不可用时回退内置最小集，保证弹窗永远可传；「不选」即后端默认（common / ATTACHMENT）。
+// 业务归属 / 媒体类型：字典驱动（useDict 消费样板，同 menu.vue 菜单类型）。
+// 字典不可用时回退内置最小集，保证弹窗永远可传；「不选」由服务端按扩展名推导，
+// 而非旧的「默认 ATTACHMENT」——本页提交时固定带 classify=true（见 submitUpload）。
 const bizTypeOptions = ref<DictOption[]>([])
 const fileTypeOptions = ref<DictOption[]>([])
 
@@ -143,6 +144,9 @@ const submitUpload = async () => {
   }
   const form = new FormData()
   form.append('file', picked.raw)
+  // V206：本页是唯一可指定文件类型的入口，固定声明 classify=true；
+  // 不选 fileType 时由服务端按扩展名推导，其它业务上传组件不带该字段（一律 ATTACHMENT）。
+  form.append('classify', 'true')
   if (uploadForm.bizType) form.append('bizType', uploadForm.bizType)
   if (uploadForm.fileType) form.append('fileType', uploadForm.fileType)
   if (uploadForm.alias.trim()) form.append('alias', uploadForm.alias.trim())
@@ -330,7 +334,7 @@ onMounted(loadFiles)
         </el-select>
       </el-form-item>
       <el-form-item label="文件类型">
-        <el-select v-model="uploadForm.fileType" placeholder="默认 ATTACHMENT（附件）" clearable class="w-full">
+        <el-select v-model="uploadForm.fileType" placeholder="不选择则由服务端按格式自动识别" clearable class="w-full">
           <el-option v-for="o in fileTypeOptions" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
       </el-form-item>

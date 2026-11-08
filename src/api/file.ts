@@ -18,7 +18,12 @@ export function listFiles(
     .then((r) => r.data.data!)
 }
 
-/** 上传文件（multipart/form-data；bizType/bizId/fileType 可选，预置阶段仅传文件） */
+/**
+ * 上传文件（multipart/form-data）。
+ * V206 classify 契约：仅文件管理页的上传弹窗在 FormData 里附 classify=true
+ * （可手选文件类型，不选则后端按扩展名自动推导）；其它业务场景不要带这个字段，
+ * 后端一律落 ATTACHMENT。见后端 FileService#upload。
+ */
 export function uploadFile(form: FormData) {
   return request
     .post<ApiResult<FileVO>>('/files/upload', form, {
