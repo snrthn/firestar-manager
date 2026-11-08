@@ -2,13 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // 验证 SSE 实时客户端：① 代际守卫（同 token 不重建连接，避免每次路由切换断流重连）；
 // ② 僵尸连接判定（旧 SSE 绑 OLD token，期间新登录改 NEW，401/顶号时静默断流，不弹窗误踢）。
-const expiredMock = vi.fn()
+// vi.mock 工厂会被提升，普通 const 未初始化即被引用 → 同 finance/sessionGuard，用 vi.hoisted。
+const mocks = vi.hoisted(() => ({ expired: vi.fn(), dispatch: vi.fn() }))
+const expiredMock = mocks.expired
+const dispatchMock = mocks.dispatch
+
 vi.mock('@/api/sessionGuard', () => ({
-  handleSessionExpired: expiredMock,
+  handleSessionExpired: mocks.expired,
   hangSilently: vi.fn(),
 }))
-const dispatchMock = vi.fn()
-vi.mock('./realtimeDispatch', () => ({ dispatchRealtime: dispatchMock }))
+vi.mock('./realtimeDispatch', () => ({ dispatchRealtime: mocks.dispatch }))
 
 import { startRealtime, stopRealtime } from './realtimeClient'
 
@@ -24,7 +27,20 @@ function fetchFactory(status: number, body: Record<string, unknown> = {}) {
           res({
             status,
             ok: status >= 200 && status < 300,
-            body: status === 200 ? {} : undefined,
+            // 200 且 content-type 是 SSE 时客户端立刻 readStream(res.body)，
+            // mock 必须实现 getReader，否则异步抛 "body.getReader is not a function"
+            // （unhandled rejection）。返回永远 pending 的 read = 真实 SSE「流保持打开」，
+            // 不产生事件、不结束、不触发 scheduleReconnect，也不会干扰其它用例。
+            body:
+              status === 200
+                ? {
+                    getReader: () => ({
+                      read: () => new Promise<never>(() => {}),
+                      cancel: async () => {},
+                      releaseLock: () => {},
+                    }),
+                  }
+                : undefined,
             json: async () => body,
             headers: { get: () => (status === 200 ? 'text/event-stream' : '') },
           })
@@ -36,6 +52,10 @@ function fetchFactory(status: number, body: Record<string, unknown> = {}) {
 const flush = () => new Promise((r) => setTimeout(r, 0))
 
 beforeEach(() => {
+  // startRealtime 有代际守卫：running && boundToken === current 会直接 return。
+  // 上个用例遗留的 T1 连接会让「401 非僵尸」用例根本不发请求（expiredMock 恒 0 次）。
+  // 每个用例前先停干净，保证测试隔离。
+  stopRealtime()
   localStorage.clear()
   expiredMock.mockClear()
   dispatchMock.mockClear()
@@ -66,8 +86,9 @@ describe('realtimeClient · 代际守卫 + 僵尸判定（P0）', () => {
     localStorage.setItem('token', 'T1')
     vi.stubGlobal('fetch', fetchFactory(401, { message: 'kicked' }))
     startRealtime()
-    await flush()
-    expect(expiredMock).toHaveBeenCalledWith('kicked', 'T1')
+    // handleSessionExpired 经动态 import() 异步调用，单次 setTimeout(0) 不保证赶上
+    // （间歇性 Number of calls: 0）。用 waitFor 轮询，消除这个既有 flaky 用例。
+    await vi.waitFor(() => expect(expiredMock).toHaveBeenCalledWith('kicked', 'T1'))
   })
 
   it('401 握手僵尸：旧连接绑 OLD，期间新登录改 NEW → 静默 stopRealtime，不弹窗', async () => {

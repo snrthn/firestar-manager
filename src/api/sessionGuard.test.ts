@@ -3,16 +3,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // 隔离 router 与 Element Plus 弹框，聚焦 handleSessionExpired 的「僵尸 token」分支判断。
 // 这是 P0 登录流竞态修复的核心：旧 SSE/旧请求 401 若携带的是旧 token，必须静默忽略，
 // 否则会出现「刚登录就被踢」。
-const pushMock = vi.fn()
-vi.mock('@/router', () => ({
-  default: { currentRoute: { value: { path: '/dashboard' } }, push: pushMock },
-}))
+// vi.mock 工厂被提升到 import 之前，普通 const 变量此时尚未初始化
+// （ReferenceError: Cannot access 'pushMock' before initialization）→ 用 vi.hoisted。
+const mocks = vi.hoisted(() => ({ push: vi.fn(), alert: vi.fn() }))
+const pushMock = mocks.push
+const alertMock = mocks.alert
 
-const alertMock = vi.fn()
+vi.mock('@/router', () => ({
+  default: { currentRoute: { value: { path: '/dashboard' } }, push: mocks.push },
+}))
 vi.mock('element-plus/es/components/message-box/index.mjs', () => ({
   default: {
     alert: (...args: unknown[]) => {
-      alertMock(...args)
+      mocks.alert(...args)
       // 模拟 ElMessageBox.alert 返回的 thenable：catch/finally 链，finally 同步执行
       const chain = {
         catch: () => chain,

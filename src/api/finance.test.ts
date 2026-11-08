@@ -2,13 +2,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // 财务 api 层「创建成功路径」：验证各 create 函数确实向正确端点发请求并透传请求体。
 // mock 掉 '@/api/request'（axios 实例），不真正发网络请求。
-const post = vi.fn(() => Promise.resolve({ data: { code: 0, data: null, message: 'ok' } }))
-const get = vi.fn(() => Promise.resolve({ data: { code: 0, data: null } }))
-const put = vi.fn(() => Promise.resolve({ data: { code: 0, data: null } }))
-const del = vi.fn(() => Promise.resolve({ data: { code: 0, data: null } }))
+// ⚠️ 两个既有坑一起修：
+//  ① vi.mock 工厂被提升到文件顶部，普通 const 此时尚未初始化 →
+//     ReferenceError: Cannot access 'post' before initialization（套件收集失败）。
+//     用 vi.hoisted 建同一批 mock，工厂与断言引用同一个实例。
+//  ② vi.fn 的实现若不声明形参，TS 会把 mock.calls 推成空元组 []，
+//     于是下面所有 c[0]/c[1] 都报 TS2493。显式声明 axios 风格签名，
+//     四个 mock 的 calls 元组也保持一致，便于合并断言。
+const mocks = vi.hoisted(() => {
+  const ok = { data: { code: 0, data: null, message: 'ok' } }
+  const reply = () => Promise.resolve(ok)
+  return {
+    post: vi.fn((_url: string, _data?: unknown, _config?: unknown) => reply()),
+    get: vi.fn((_url: string, _data?: unknown, _config?: unknown) => reply()),
+    put: vi.fn((_url: string, _data?: unknown, _config?: unknown) => reply()),
+    del: vi.fn((_url: string, _data?: unknown, _config?: unknown) => reply()),
+  }
+})
+const { post, get, put, del } = mocks
 
 vi.mock('./request', () => ({
-  default: { post, get, put, delete: del },
+  default: { post: mocks.post, get: mocks.get, put: mocks.put, delete: mocks.del },
 }))
 
 import { createReceipt } from './receipt'

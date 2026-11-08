@@ -1,9 +1,16 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig, mergeConfig } from 'vitest/config'
+import viteConfig from './vite.config'
 
-export default defineConfig({
+// ⚠️ 必须继承主 vite 配置：此前本文件独立 defineConfig，丢了 resolve.alias 的 '@'
+//    与 @vitejs/plugin-vue，导致 3 个测试套件（sessionGuard / hasPerm / realtimeClient）
+//    报 Failed to resolve import "@/..."，vitest 一个用例都收集不到。
+//    用 mergeConfig 而非复制一份 alias，避免两处维护漂移。
+export default mergeConfig(viteConfig, defineConfig({
   test: {
-    // 组件/业务流程测试需要 DOM，切 jsdom（happy-dom 提供），并挂 setup 文件补齐 jsdom 缺失 API
-    environment: 'jsdom',
+    // 组件/业务流程测试需要 DOM。devDependencies 只装了 happy-dom，
+    // 此处曾误写 'jsdom' → vitest 报 Cannot find package 'jsdom'、一个用例都收集不到。
+    // 与 src/test/setup.ts（明确为 happy-dom 补齐浏览器 API）保持同一环境。
+    environment: 'happy-dom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.ts'],
@@ -24,4 +31,4 @@ export default defineConfig({
       ],
     },
   },
-})
+}))

@@ -3,7 +3,7 @@ import { flattenMenus, routeNameFor } from './menuRoute'
 
 // MenuVO 字段繁多，这里只构造测试所需最小形状
 const mk = (over: Record<string, unknown>): any => ({
-  menuId: 1,
+  id: 1,
   menuName: 'x',
   menuType: 'MENU',
   routePath: '/x',
@@ -17,11 +17,11 @@ const mk = (over: Record<string, unknown>): any => ({
 describe('menuRoute 工具（P1 RBAC）', () => {
   it('flattenMenus 拍平多层嵌套菜单树', () => {
     const tree = [
-      mk({ menuId: 1, children: [mk({ menuId: 2, children: [mk({ menuId: 3 })] })] }),
-      mk({ menuId: 4 }),
+      mk({ id: 1, children: [mk({ id: 2, children: [mk({ id: 3 })] })] }),
+      mk({ id: 4 }),
     ]
     const flat = flattenMenus(tree)
-    expect(flat.map((m) => m.menuId)).toEqual([1, 2, 3, 4])
+    expect(flat.map((m) => m.id)).toEqual([1, 2, 3, 4])
   })
 
   it('routeNameFor 把 path 转成合法路由名（去斜杠/特殊字符）', () => {
