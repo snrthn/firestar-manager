@@ -29,6 +29,8 @@ const props = defineProps<{
   modelValue: string
   /** 已保存文档的 id；新建为空（保存后由后端按正文 file: 引用回填附件关系） */
   docId?: number | null
+  /** 撑满父容器（知识库页两栏等高时使用）；不传则保持固定 460px，兼容其它场景 */
+  fill?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -63,7 +65,7 @@ async function handleUploadImg(files: File[], callback: (urls: UploadImgCallBack
 </script>
 
 <template>
-  <div class="kb-md-editor">
+  <div class="kb-md-editor" :class="{ 'is-fill': props.fill }">
     <MdEditor
       :model-value="modelValue"
       :onUploadImg="handleUploadImg"
@@ -82,8 +84,18 @@ async function handleUploadImg(files: File[], callback: (urls: UploadImgCallBack
   border-radius: 4px;
   overflow: hidden;
 }
-/* Element Plus 弹窗内编辑器高度收敛，避免撑出视口 */
+/* 默认：固定高度，避免弹窗等场景撑出视口 */
 .kb-md-editor :deep(.md-editor) {
   height: 460px;
+}
+/* fill：由父级 flex 分配高度（父需给 flex:1 + min-height:0），编辑器内部自行滚动。
+   选择器多一个 .is-fill，优先级高于上面的固定高度，无需 !important。 */
+.kb-md-editor.is-fill {
+  display: flex;
+}
+.kb-md-editor.is-fill :deep(.md-editor) {
+  height: auto;
+  flex: 1;
+  min-height: 0;
 }
 </style>
