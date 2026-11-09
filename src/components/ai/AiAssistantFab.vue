@@ -185,11 +185,11 @@ async function confirmDraft() {
 </script>
 
 <template>
-  <!-- 悬浮入口：右下角固定按钮 -->
-  <button class="ai-fab" :title="'AI 助手'" @click="openDrawer">
-    <el-icon :size="22"><ChatDotRound /></el-icon>
+  <!-- 吸边入口：默认贴右边缘只露图标触发区，鼠标划过滑出（不挡页面元素） -->
+  <div class="ai-fab-dock" :title="'AI 助手'" @click="openDrawer">
+    <el-icon :size="22" class="ai-fab__icon"><ChatDotRound /></el-icon>
     <span class="ai-fab__label">AI 助手</span>
-  </button>
+  </div>
 
   <el-drawer
     v-model="visible"
@@ -304,27 +304,38 @@ async function confirmDraft() {
 </template>
 
 <style scoped>
-.ai-fab {
+/* 吸边式入口：默认贴右边缘、只露 40px 圆角触发区，不悬浮占内容区；
+   鼠标划过滑出整条「AI 助手」标签（参考成熟 SaaS 右侧 dock 交互）。 */
+.ai-fab-dock {
   position: fixed;
-  right: 20px;
+  right: 0;
   bottom: 32px;
   z-index: 50;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 16px;
+  gap: 8px;
+  padding: 11px 16px;
   border: none;
-  border-radius: 999px;
+  border-radius: 999px 0 0 999px;
   background: linear-gradient(135deg, #409eff, #6a5acd);
   color: #fff;
   font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(64, 158, 255, 0.4);
-  transition: transform 0.15s ease;
+  box-shadow: -4px 4px 16px rgba(64, 158, 255, 0.35);
+  /* 默认只露左侧 40px（图标）：translateX 把整块右移（自身宽 - 40px），
+     仅留圆角端在屏内；hover 时回到 translateX(0) 完整滑出。
+     垂直位置与原悬浮按钮一致（贴底 bottom:32px），不居中。 */
+  transform: translateX(calc(100% - 40px));
+  transition: transform 0.22s ease;
 }
-.ai-fab:hover {
-  transform: translateY(-2px);
+.ai-fab-dock:hover {
+  transform: translateX(0);
+}
+.ai-fab__icon {
+  display: inline-flex;
+  flex: none;
 }
 .ai-fab__label {
   line-height: 1;

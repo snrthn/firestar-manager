@@ -142,3 +142,42 @@ export function deleteKbNode(id: number) {
 export function publishKbDoc(id: number) {
   return request.post(`/ai/kb/docs/${id}/publish`).then((r) => r.data.data)
 }
+
+/**
+ * REFERENCE 附件（补充材料）接口（步骤 5 扩展）。
+ * 附件只登记关系 + 原文件走通用上传（bizType=kb_doc），发布时后端解析文本切片纳入检索。
+ * 权限：列表 ai:kb:view；增删 / 切检索开关 ai:kb:edit。
+ */
+export interface KbAttachment {
+  id: number
+  docId: number
+  /** sys_file_storage.id，拼下载/预览链接用 */
+  fileId: number
+  /** 原文件名（展示 + 下载命名） */
+  originalName: string | null
+  /** 1=纳入检索（下次发布切片）；0=仅挂接不检索 */
+  indexable: number
+  egressAllowed: number
+  sortNo: number
+  createdAt?: string
+}
+
+export function listKbAttachments(docId: number) {
+  return request.get(`/ai/kb/docs/${docId}/attachments`).then((r) => r.data.data as KbAttachment[])
+}
+
+export function addKbAttachment(docId: number, fileId: number) {
+  return request
+    .post(`/ai/kb/docs/${docId}/attachments`, { fileId })
+    .then((r) => r.data.data as number)
+}
+
+export function removeKbAttachment(attId: number) {
+  return request.delete(`/ai/kb/attachments/${attId}`).then((r) => r.data.data)
+}
+
+export function setKbAttachmentIndexable(attId: number, indexable: number) {
+  return request
+    .put(`/ai/kb/attachments/${attId}/indexable`, { indexable })
+    .then((r) => r.data.data)
+}

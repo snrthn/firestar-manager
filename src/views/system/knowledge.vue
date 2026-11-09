@@ -54,17 +54,22 @@ import { computed, defineAsyncComponent, nextTick, onMounted, reactive, ref } fr
 import { Plus, Delete, EditPen, Folder, Document, Search, MoreFilled, Rank, ArrowUp, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
-import type { KbDocDetail, KbDocStatus, KbNode, KbNodeMove, KbNodeType } from '@/api/kb'
+import type { KbAttachment, KbDocDetail, KbDocStatus, KbNode, KbNodeMove, KbNodeType } from '@/api/kb'
 import {
+  addKbAttachment,
   createKbNode,
   deleteKbNode,
   getKbDoc,
+  listKbAttachments,
   listKbNodes,
   moveKbNode,
   publishKbDoc,
+  removeKbAttachment,
   renameKbNode,
+  setKbAttachmentIndexable,
   updateKbDoc,
 } from '@/api/kb'
+import { uploadFile, downloadFileUrl, fetchFileBlob } from '@/api/file'
 import {
   buildKbMoveTargets,
   buildKbTree,
@@ -99,6 +104,10 @@ const currentDetail = ref<KbDocDetail | null>(null)
 const currentId = ref(0)
 const mode = ref<'edit' | 'preview'>('edit')
 const form = reactive({ title: '', summary: '', contentMd: '' })
+// REFERENCE 附件（补充材料）：发布时解析切片纳入 AI 检索
+const attachments = ref<KbAttachment[]>([])
+const uploadingAtt = ref(false)
+const attFileInput = ref<HTMLInputElement | null>(null)
 const treeKeyword = ref('')
 const expandedKeys = ref<number[]>([])
 const treeRef = ref<TreeExpose | null>(null)
@@ -264,6 +273,7 @@ async function loadDoc(node: KbNode) {
     form.summary = d.summary ?? ''
     form.contentMd = d.contentMd ?? ''
     mode.value = 'edit'
+    void loadAttachments(node.id)
   } catch (e) {
     // 详情拉取失败必须连 currentId 一起归零，否则会出现「有 id 但无详情」的半选中态
     clearForm()
@@ -564,9 +574,101 @@ async function publish() {
       node.status = 'PUBLISHED'
       node.version = (node.version ?? 1) + 1
     }
-    ElMessage.success('已发布（切片生成属步骤 5，暂未产出）')
+    ElMessage.success('已发布（正文与 REFERENCE 附件已重新切片并纳入检索）')
   } catch (e) {
     ElMessage.error(errMsg(e, '发布失败'))
+  }
+}
+
+// ==================== REFERENCE 附件（补充材料） ====================
+
+/** 拉取当前文档的 REFERENCE 附件列表（含原文件名，后端已拼好） */
+async function loadAttachments(docId: number) {
+  if (!docId) {
+    attachments.value = []
+    return
+  }
+  try {
+    attachments.value = await listKbAttachments(docId)
+  } catch {
+    // 列表失败不影响正文编辑，静默留空，避免误伤主流程
+    attachments.value = []
+  }
+}
+
+/** 触发隐藏文件框（仅已保存文档可挂附件，需 docId） */
+function pickAttFile() {
+  if (!currentId.value) {
+    ElMessage.warning('请先保存文档，再添加附件')
+    return
+  }
+  attFileInput.value?.click()
+}
+
+/** 选文件 → 上传 → 登记 REFERENCE 关系 → 刷新（发布时才切片） */
+async function onAttFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // 允许重复选同一文件
+  if (!file || !currentId.value) return
+  uploadingAtt.value = true
+  try {
+    const f = new FormData()
+    f.append('file', file)
+    f.append('bizType', 'kb_doc')
+    f.append('bizId', String(currentId.value))
+    // 不带 classify：后端按 V206 契约落 ATTACHMENT
+    const vo = await uploadFile(f)
+    await addKbAttachment(currentId.value, vo.id)
+    attachments.value = await listKbAttachments(currentId.value)
+    ElMessage.success('附件已添加（发布后纳入检索）')
+  } catch (err) {
+    ElMessage.error(errMsg(err, '附件添加失败'))
+  } finally {
+    uploadingAtt.value = false
+  }
+}
+
+/** 切换是否纳入检索：乐观更新开关，后端改登记层 indexable，下次发布生效 */
+async function setAttIndexable(a: KbAttachment, v: number) {
+  try {
+    await setKbAttachmentIndexable(a.id, v)
+  } catch (err) {
+    a.indexable = v === 1 ? 0 : 1 // 失败回滚
+    ElMessage.error(errMsg(err, '切换检索开关失败'))
+  }
+}
+
+/** 删除附件关系（仅登记层，不删原文件） */
+async function removeAtt(a: KbAttachment) {
+  try {
+    await ElMessageBox.confirm(`移除附件「${a.originalName || ('文件 #' + a.fileId)}」？`, '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await removeKbAttachment(a.id)
+    attachments.value = attachments.value.filter((x) => x.id !== a.id)
+    ElMessage.success('已移除')
+  } catch (err) {
+    ElMessage.error(errMsg(err, '移除失败'))
+  }
+}
+
+/** 下载 / 预览：OSS 绝对签名 URL 直连；本地相对路径带 token 拉 blob 打开 */
+async function downloadAtt(a: KbAttachment) {
+  try {
+    const url = await downloadFileUrl(a.fileId)
+    if (url.startsWith('http')) {
+      window.open(url, '_blank', 'noopener')
+      return
+    }
+    const blob = await fetchFileBlob(url)
+    const obj = URL.createObjectURL(blob)
+    const w = window.open(obj, '_blank', 'noopener')
+    if (!w) ElMessage.warning('浏览器拦截了新标签页，请允许弹窗后重试')
+  } catch (err) {
+    ElMessage.error(errMsg(err, '附件打开失败'))
   }
 }
 </script>
@@ -576,8 +678,8 @@ async function publish() {
     <el-alert type="info" :closable="false" show-icon class="kb-tip">
       <template #title>
         知识库管理端 · <b>树形结构（V208 方案 A）</b>、MD 编辑器、统一渲染管线与
-        <b>后端 KB CRUD 已接入（步骤 4.5）</b>；发布只更新发布态与版本，
-        <b>切片与检索（步骤 5）待实现</b>。
+        <b>后端 KB CRUD 已接入（步骤 4.5）</b>；<b>切片与检索（步骤 5）已接入</b>：
+        发布时正文重新切片，REFERENCE 附件解析后一并纳入 AI 检索。
       </template>
     </el-alert>
     <el-alert v-if="loadError" type="error" :closable="false" show-icon class="kb-tip">
@@ -845,6 +947,58 @@ async function publish() {
         <div v-else class="kb-preview">
           <MarkdownView :content="form.contentMd" />
         </div>
+
+        <!-- REFERENCE 附件（补充材料）：发布时解析切片纳入 AI 检索；置于卡片体底部，
+             固定高度独立区块，不挤占上方编辑器/预览的 flex:1 高度 -->
+        <section class="kb-attachments">
+          <div class="kb-attach-head">
+            <span class="kb-attach-title">附件（补充材料）</span>
+            <span class="kb-attach-tip">发布时解析切片并纳入 AI 检索</span>
+            <span class="kb-attach-spacer" />
+            <el-button
+              v-has-perm="['ai:kb:edit']"
+              size="small"
+              type="primary"
+              :icon="Plus"
+              :loading="uploadingAtt"
+              :disabled="!currentId"
+              @click="pickAttFile"
+            >添加附件</el-button>
+            <input ref="attFileInput" type="file" hidden @change="onAttFileChange" />
+          </div>
+          <div v-if="attachments.length" class="kb-attach-list">
+            <div v-for="a in attachments" :key="a.id" class="kb-attach-item">
+              <el-icon class="kb-attach-icon"><Document /></el-icon>
+              <button type="button" class="kb-attach-name" @click="downloadAtt(a)">
+                {{ a.originalName || ('文件 #' + a.fileId) }}
+              </button>
+              <span class="kb-attach-meta">fileId {{ a.fileId }}</span>
+              <span class="kb-attach-spacer" />
+              <el-switch
+                v-has-perm="['ai:kb:edit']"
+                v-model="a.indexable"
+                :active-value="1"
+                :inactive-value="0"
+                active-text="检索"
+                inactive-text="不检索"
+                size="small"
+                @change="(v: number) => setAttIndexable(a, v)"
+              />
+              <el-button
+                v-has-perm="['ai:kb:edit']"
+                link
+                type="danger"
+                size="small"
+                :icon="Delete"
+                title="移除附件"
+                @click="removeAtt(a)"
+              />
+            </div>
+          </div>
+          <p v-else class="kb-attach-empty">
+            暂无附件。添加 docx / xlsx / pdf / txt 等文件，发布后即可被 AI 检索并引用。
+          </p>
+        </section>
       </el-card>
       <!-- 无选中文档：右侧唯一落地状态。零文档 / 有文档未选中 / 接口异常由 emptyState
            区分；新建入口沿用 openCreate，继承 activeFolderId 记录的「新建位置」。 -->
@@ -1392,6 +1546,15 @@ async function publish() {
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   font-size: 13px;
+  /* 高度上限 + 每列独立滚动：内容多（如长锚点列表）时弹窗不撑爆视口，
+     出滚动条而非溢出（虎哥 2026-11-09：结构检查弹窗加高度/滚动条）。 */
+  max-height: 62vh;
+  overflow: hidden;
+}
+.kb-check-grid > div {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 .kb-check-grid p {
   margin: 4px 0;
@@ -1404,6 +1567,79 @@ async function publish() {
   color: var(--el-color-danger);
 }
 .kb-anchor {
+  color: var(--el-text-color-secondary);
+}
+/* REFERENCE 附件卡片区：卡片体 flex 列内固定高度、独立滚动，不挤占编辑器/预览 */
+.kb-attachments {
+  flex: none;
+  border-top: 1px solid var(--el-border-color-lighter);
+  margin-top: 12px;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.kb-attach-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.kb-attach-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+.kb-attach-tip {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.kb-attach-spacer {
+  flex: 1;
+}
+.kb-attach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow: auto;
+}
+.kb-attach-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: var(--el-bg-color-page);
+}
+.kb-attach-icon {
+  color: var(--el-color-primary);
+  flex: none;
+}
+.kb-attach-name {
+  flex: none;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--el-color-primary);
+  cursor: pointer;
+  font-size: 13px;
+}
+.kb-attach-name:hover {
+  text-decoration: underline;
+}
+.kb-attach-meta {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  flex: none;
+}
+.kb-attach-empty {
+  margin: 0;
+  font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 </style>
