@@ -83,13 +83,44 @@ export function findKbNode(nodes: readonly KbNode[], id: number): KbNode | undef
   return nodes.find((n) => n.id === id)
 }
 
-/** 同级下一个排序号，留 10 的间隙便于后续插入 */
+/**
+ * @deprecated 旧移动契约的兜底函数（§21 起前端不再计算排序号，顺序一律由服务端
+ *    按相对位置整组重排）。保留仅为兼容与既有单测，新代码禁止调用。
+ */
 export function nextSortNo(nodes: readonly KbNode[], parentId: number): number {
   let max = 0
   for (const n of nodes) {
     if (n.parentId === parentId && (n.sortNo ?? 0) > max) max = n.sortNo ?? 0
   }
   return max + 10
+}
+
+/**
+ * 同父「同级组」：按 sortNo、id 升序，<b>含自身</b>；目录(FOLDER)与文档(DOC)混排、不按类型分组。
+ * 口径与后端 KbDocService.nodes() / KbTreeRules.resolveSiblingOrder 逐项一致，
+ * 是根目录混排拖拽能得到确定顺序的前提。
+ */
+export function getKbSiblingOrder(nodes: readonly KbNode[], id: number): KbNode[] {
+  const self = findKbNode(nodes, id)
+  if (!self) return []
+  return nodes
+    .filter((n) => n.parentId === self.parentId)
+    .sort((a, b) => (a.sortNo ?? 0) - (b.sortNo ?? 0) || a.id - b.id)
+}
+
+/**
+ * 上移 / 下移的锚点兄弟：up → 前一个（发 BEFORE），down → 后一个（发 AFTER）。
+ * 首尾边界返回 null，前端据此禁用菜单项；节点不存在也返回 null。
+ */
+export function getKbMoveNeighbor(
+  nodes: readonly KbNode[],
+  id: number,
+  direction: 'up' | 'down',
+): KbNode | null {
+  const group = getKbSiblingOrder(nodes, id)
+  const index = group.findIndex((n) => n.id === id)
+  if (index < 0) return null
+  return (direction === 'up' ? group[index - 1] : group[index + 1]) ?? null
 }
 
 /** 物化路径 /1/3/7/；父节点 path 缺失时按根处理 */
@@ -120,6 +151,94 @@ export function canMoveKbNode(
   }
   // seen 非空 = 目标节点确实存在且整条祖先链里没有 id；目标不存在时 while 一次未进
   return seen.size > 0
+}
+
+/** 「移动到」弹窗的候选目录：id=0 为虚拟根目录，其余均为 FOLDER */
+export interface KbMoveTarget {
+  id: number
+  label: string
+  children: KbMoveTarget[]
+  /** 是否就是待移动节点当前所在位置（选中它无需发请求） */
+  isCurrentParent: boolean
+}
+
+/**
+ * 构造「移动到」弹窗的目标目录树（纯函数，与后端 move 校验同口径）。
+ *
+ * ① 首项固定为虚拟根「根目录」id=0，后端 parentId=0 合法，永远可选；
+ * ② 排除 movingId 自身及整棵后代子树 —— 移进自己/后代必成环，不展示比禁用更直观；
+ * ③ 只保留 FOLDER：`KbDocService.move` 明确要求目标父节点必须是文件夹；
+ * ④ 父被排除 / 被 ACL 过滤 / 祖先链成脏环时挂根，不丢可选目录（与 buildKbTree 同口径）；
+ * ⑤ 同级按 sortNo、id 升序，标出当前父节点供 UI 禁用「无变化的提交」。
+ */
+export function buildKbMoveTargets(
+  nodes: readonly KbNode[],
+  movingId: number,
+): KbMoveTarget[] {
+  const source = new Map<number, KbNode>()
+  for (const n of nodes) source.set(n.id, n)
+  const currentParentId = source.get(movingId)?.parentId ?? 0
+
+  // 迭代求后代闭包：脏数据存在环时也能收敛（seen 语义由 excluded 承担）
+  const excluded = new Set<number>([movingId])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const n of nodes) {
+      if (!excluded.has(n.id) && excluded.has(n.parentId)) {
+        excluded.add(n.id)
+        changed = true
+      }
+    }
+  }
+
+  const folders = nodes.filter((n) => n.nodeType === 'FOLDER' && !excluded.has(n.id))
+  const targets = new Map<number, KbMoveTarget>()
+  for (const f of folders) {
+    targets.set(f.id, {
+      id: f.id,
+      label: f.title,
+      children: [],
+      isCurrentParent: f.id === currentParentId,
+    })
+  }
+
+  const roots: KbMoveTarget[] = []
+  for (const f of folders) {
+    const self = targets.get(f.id)!
+    const parent = f.parentId === 0 ? undefined : targets.get(f.parentId)
+    const usable = parent && parent !== self && !inCycle(f, source)
+    if (usable) parent!.children.push(self)
+    else roots.push(self)
+  }
+
+  const sortRec = (list: KbMoveTarget[]) => {
+    list.sort((a, b) =>
+      (source.get(a.id)?.sortNo ?? 0) - (source.get(b.id)?.sortNo ?? 0) || a.id - b.id,
+    )
+    for (const item of list) sortRec(item.children)
+  }
+  sortRec(roots)
+
+  return [{
+    id: 0,
+    label: '根目录',
+    children: roots,
+    isCurrentParent: currentParentId === 0,
+  }]
+}
+
+/** 在候选目录树里按 id 找目标（弹窗「目标位置」回显用） */
+export function findKbMoveTarget(
+  targets: readonly KbMoveTarget[],
+  id: number,
+): KbMoveTarget | undefined {
+  for (const t of targets) {
+    if (t.id === id) return t
+    const hit = findKbMoveTarget(t.children, id)
+    if (hit) return hit
+  }
+  return undefined
 }
 
 /** 面包屑：从根到该节点（含自身）的标题链 */

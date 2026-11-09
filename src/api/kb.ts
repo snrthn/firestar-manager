@@ -1,18 +1,18 @@
 /**
- * 知识库节点 / 文档接口契约（V208 树形结构，方案 A）
+ * 知识库节点 / 文档接口契约（V208 树形结构 + 步骤 4.5 后端 CRUD）
  *
- * ⚠️ 后端 KbNodeController 属于步骤 4.5，本轮**尚未实现**，页面当前使用本地骨架数据
- *    （见 views/system/knowledge.vue 的 MOCK_NODES）。这里先把契约钉死：
- *    前端只依赖本文件的类型与函数签名，后端实现照此对齐，接真实接口时
- *    把页面的 loadNodes() 从 mock 换成 listKbNodes() 即可，不用改组件。
+ * ✅ 后端 KbNodeController 已于 2026-11-09 落码（8 个端点），页面已接真接口，
+ *    不再使用本地 MOCK_NODES。需目标库已执行 V206~V209 且后端服务在运行。
  *
  * 路径沿用 AI 中心其它接口的前缀（/ai/prompt-config、/ai/model-config）：
  *    GET    /ai/kb/nodes                 节点骨架（轻量元数据，不含正文）
  *    GET    /ai/kb/docs/{id}            文档正文
  *    POST   /ai/kb/nodes                新建文档 / 文件夹
+ *    PUT    /ai/kb/nodes/{id}           重命名节点（§13.4 契约表漏项，步骤 4.5 补齐）
  *    PUT    /ai/kb/docs/{id}            保存正文与标题
- *    PUT    /ai/kb/nodes/{id}/move      移动节点（后端防环 + 重算 path）
- *    DELETE /ai/kb/nodes/{id}           删除节点（文件夹含子节点时后端拒绝或级联）
+ *    PUT    /ai/kb/nodes/{id}/move      相对位置移动（BEFORE/AFTER/APPEND + targetId，
+ *                                      服务端防环 + 重算 path + 整组重排 sort_no，见 §21）
+ *    DELETE /ai/kb/nodes/{id}           删除节点（有子节点时后端拒绝）
  *    POST   /ai/kb/docs/{id}/publish    发布
  *
  * 权限：类级 ai:kb:view；写操作 ai:kb:edit；发布 ai:kb:publish（V207 已落库）。
@@ -88,7 +88,7 @@ export interface KbDocUpdate {
   title: string
   summary?: string
   contentMd: string
-  /** 正文引用到的 file:<id>，后端据此建 sys_kb_attachment.INLINE 关系 */
+  /** 仅作提示：后端一律从 contentMd 重新提取，不信前端传参（防伪造 fileId） */
   fileRefs?: number[]
 }
 
@@ -104,11 +104,34 @@ export function createKbNode(payload: KbNodeCreate) {
   return request.post('/ai/kb/nodes', payload).then((r) => r.data.data as number)
 }
 
+/** 重命名：树内 inline 编辑提交时调用，DOC / FOLDER 通用 */
+export function renameKbNode(id: number, title: string) {
+  return request.put(`/ai/kb/nodes/${id}`, { title }).then((r) => r.data.data)
+}
+
 export function updateKbDoc(id: number, payload: KbDocUpdate) {
   return request.put(`/ai/kb/docs/${id}`, payload).then((r) => r.data.data)
 }
 
-export function moveKbNode(id: number, payload: { parentId: number; sortNo?: number }) {
+/**
+ * 相对位置契约（步骤 4.6，设计文档 §21）：
+ * 对齐飞书「前端不碰排序号」+ Confluence before/after/append —— 前端只描述
+ * 「相对谁、放在哪」，由服务端在同一事务内整组重排同父 sort_no。
+ *
+ *   BEFORE / AFTER : targetId = 目标兄弟节点 id，移动后成为它的同级并排在它前 / 后
+ *   APPEND         : targetId = 目标父节点 id（0 = 根目录），追加到该父末尾
+ *
+ * ⚠️ 不要再传 parentId + sortNo：前端算绝对排序号正是拖拽顺序漂移的根因。
+ *    后端仍兼容旧 payload 仅为存量客户端兜底，本端类型已不再暴露。
+ */
+export type KbMovePosition = 'BEFORE' | 'AFTER' | 'APPEND'
+
+export interface KbNodeMove {
+  position: KbMovePosition
+  targetId: number
+}
+
+export function moveKbNode(id: number, payload: KbNodeMove) {
   return request.put(`/ai/kb/nodes/${id}/move`, payload).then((r) => r.data.data)
 }
 

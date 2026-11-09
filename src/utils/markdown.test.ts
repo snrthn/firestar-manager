@@ -51,6 +51,28 @@ describe('preprocessImageLinks —— 图片协议白名单', () => {
   it('普通链接里的 [x](file:1) 不误伤（只处理图片语法）', () => {
     expect(preprocessImageLinks('[制度原文](file:1)', API)).toBe('[制度原文](file:1)')
   })
+
+  it('8 种 mermaid 图表源码围栏不被图片预处理改写（§25 图表解析契约）', () => {
+    // md-editor-v3 图表下拉插入的就是这些 ```mermaid 模板；kbPreviewMd 复用本函数，
+    // 若误改围栏内的语法，图表会渲染失败并被当普通代码块（bash）显示。
+    const charts = [
+      'flowchart TD\n  Start --> Stop',
+      'sequenceDiagram\n  A->>B: hello!',
+      'gantt\ntitle Gantt Chart\ndateFormat YYYY-MM-DD',
+      'classDiagram\n  class Animal',
+      'stateDiagram-v2\n  s1 --> s2',
+      'pie\n  "Dogs" : 386',
+      'erDiagram\n  CAR ||--o{ NAMED-DRIVER : allows',
+      'journey\n  title My Journey',
+    ]
+    for (const body of charts) {
+      const md = `\`\`\`mermaid\n${body}\n\`\`\`\n\n![封面](file:7)`
+      const out = preprocessImageLinks(md, API)
+      expect(out).toContain('```mermaid')
+      expect(out).toContain(body)
+      expect(out).toContain('![封面](/api/files/7/raw)')
+    }
+  })
 })
 
 describe('renderMarkdown —— XSS 红线', () => {

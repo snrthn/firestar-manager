@@ -35,6 +35,10 @@ import ElTimeline, { ElTimelineItem } from 'element-plus/es/components/timeline/
 // 从 descriptions / form 的入口具名 import；该入口是叶节点，只拉自身 src 依赖。
 import ElDescriptions, { ElDescriptionsItem } from 'element-plus/es/components/descriptions/index.mjs'
 import ElDialog from 'element-plus/es/components/dialog/index.mjs'
+// 知识库树节点「更多操作」三点菜单：ElDropdownMenu / ElDropdownItem 没有独立包目录，
+// 从 dropdown 入口具名导出（同 collapse-item / table-column 套路）。漏注册时
+// <el-dropdown> 被当未解析组件，整块菜单渲染成注释节点（同 el-badge 族坑）。
+import ElDropdown, { ElDropdownMenu, ElDropdownItem } from 'element-plus/es/components/dropdown/index.mjs'
 import ElEmpty from 'element-plus/es/components/empty/index.mjs'
 import ElForm, { ElFormItem } from 'element-plus/es/components/form/index.mjs'
 import ElIcon from 'element-plus/es/components/icon/index.mjs'
@@ -122,6 +126,11 @@ import 'element-plus/es/components/card/style/css'
 import 'element-plus/es/components/descriptions/style/css'
 import 'element-plus/es/components/descriptions-item/style/css'
 import 'element-plus/es/components/dialog/style/css'
+// 三点菜单：dropdown 负责触发与浮层定位（复用已引入的 tooltip/popper 样式），
+// menu/item 各自的边框、分割线、hover 态样式在独立 style 包内，缺则菜单是裸文字。
+import 'element-plus/es/components/dropdown/style/css'
+import 'element-plus/es/components/dropdown-menu/style/css'
+import 'element-plus/es/components/dropdown-item/style/css'
 // el-dialog 的遮罩由 overlay 组件渲染（dialog.vue: import { ElOverlay } → <el-overlay :mask>），
 // .el-overlay 的样式独立在 overlay 包内，dialog/style/css 不含它——
 // 不引这一行，弹窗遮罩透明：没有暗背景、点不穿、z-index 缺失。
@@ -203,6 +212,9 @@ app.use(ElTimelineItem)
 app.use(ElDescriptions)
 app.use(ElDescriptionsItem)
 app.use(ElDialog)
+app.use(ElDropdown)
+app.use(ElDropdownMenu)
+app.use(ElDropdownItem)
 app.use(ElEmpty)
 app.use(ElForm)
 app.use(ElFormItem)

@@ -15,15 +15,24 @@
  * 正文只回写 ![name](file:<fileId>)；保存时由 collectFileRefs 交给后端建立
  * sys_kb_attachment 的 INLINE 关系（新建文档也能补关联）。
  *
- * ⚠️ 编辑器内置预览会把 file:<id> 当相对路径（编辑态破图），这是预期：
- *    页面提供「预览」tab 走 MarkdownView 统一渲染管线，那里才换签名 URL。
+ * ✅ 设计文档 §25（撤销 §24 的 A 方案）：编辑器**默认双栏预览必须保留**。
+ *    顶部「预览」tab 改为复用同一个渲染器 MdPreview，因此两边对 mermaid 图表
+ *    （流程图/时序图/甘特图/类图/状态图/饼图/关系图/旅程图）表现完全一致，
+ *    不再是「系统预览一套 markdown-it、默认预览另一套」。
+ *    mermaid 运行时由 @/utils/kbMarkdown 注入本地实例（默认 unpkg CDN 不可达），
+ *    本组件只需 import 该模块触发 config，并去掉 noMermaid 开关。
+ *
+ * 工具栏「保存」按钮：md-editor-v3 的 save 只往外抛 onSave，不自带任何保存动作，
+ *    不监听就是「点了没反应」。这里转成 save 事件交给页面，与顶部「保存草稿」
+ *    共用同一个 save()，避免两套口径 / 误以为已保存。
  */
 import { MdEditor } from 'md-editor-v3'
 import type { UploadImgCallBackParam } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
-import DOMPurify from 'dompurify'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import { uploadFile } from '@/api/file'
+// 副作用：注入本地 mermaid 实例（跳过 unpkg CDN），并共享 sanitize / noKatex 口径
+import { kbSanitize, KB_NO_KATEX } from '@/utils/kbMarkdown'
 
 const props = defineProps<{
   modelValue: string
@@ -35,16 +44,17 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
+  /** 工具栏「保存」按钮 → 页面真实保存（与顶部「保存草稿」共用同一逻辑） */
+  save: []
 }>()
 
-/** 编辑器预览端也过一遍 DOMPurify：原生 HTML 默认关闭，这里再加一道兜底 */
-function sanitizePreview(html: string): string {
-  return DOMPurify.sanitize(html, {
-    FORBID_TAGS: ['style', 'script', 'iframe', 'form', 'object', 'embed', 'link', 'meta', 'base'],
-    FORBID_ATTR: ['srcset', 'style'],
-  }) as string
+/** onSave 是 prop 型回调（(v: string, html: Promise<string>) => void），
+ *  与 :onUploadImg 同样用 :onSave 传入；不消费 html，避免引入第二套渲染结果。 */
+function handleSave() {
+  emit('save')
 }
 
+/** sanitize 与顶部「预览」tab 共用 kbSanitize，保证两端安全口径一致 */
 async function handleUploadImg(files: File[], callback: (urls: UploadImgCallBackParam) => void) {
   const uploaded: Array<{ url: string; alt: string; title: string }> = []
   for (const f of files) {
@@ -69,9 +79,9 @@ async function handleUploadImg(files: File[], callback: (urls: UploadImgCallBack
     <MdEditor
       :model-value="modelValue"
       :onUploadImg="handleUploadImg"
-      :sanitize="sanitizePreview"
-      :noMermaid="true"
-      :noKatex="true"
+      :onSave="handleSave"
+      :sanitize="kbSanitize"
+      :noKatex="KB_NO_KATEX"
       @update:model-value="emit('update:modelValue', $event)"
     />
   </div>
