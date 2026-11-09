@@ -240,10 +240,8 @@ async function refreshNodes() {
     const page = await listKbNodes()
     nodes.value = page.items
     serverLazy.value = Boolean(page.lazyRequired)
-    // 只在首次加载时铺开文件夹，后续刷新保留用户的折叠状态
-    if (!expandedKeys.value.length) {
-      expandedKeys.value = page.items.filter((n) => n.nodeType === 'FOLDER').map((n) => n.id)
-    }
+    // 默认折叠：不自动铺开文件夹（expandedKeys 初始为空即全折叠）；
+    // 用户手动展开某个文件夹后，刷新仍保留其展开/折叠状态
     loadError.value = ''
     if (page.lazyRequired) {
       ElMessage.warning('节点数超过阈值，建议切换为按父节点懒加载')
