@@ -526,10 +526,6 @@ async function save() {
     ElMessage.warning('请先在左侧选择或新建一篇文档')
     return
   }
-  if (issues.value.length) {
-    ElMessage.warning(`MD 规范未通过：${issues.value[0].message}`)
-    return
-  }
   if (!form.title.trim()) {
     ElMessage.warning('标题不能为空')
     return
