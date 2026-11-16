@@ -61,6 +61,7 @@
 
       <!-- 键值管理：查询条件 + 列表 + 分页器标准布局 -->
       <el-tab-pane label="键值管理" name="adv">
+        <el-card shadow="never" class="pt-card">
         <div class="pt-adv-tip">
           系统级原始键值（基本信息 / 关于我们 Tab 中维护的项已不在此表，请到对应 Tab 修改）。
         </div>
@@ -125,6 +126,7 @@
             background
           />
         </div>
+        </el-card>
       </el-tab-pane>
     </el-tabs>
 
@@ -384,6 +386,10 @@ onMounted(loadGroup)
   display: flex;
   flex-direction: column;
   padding: 8px 4px;
+  /* 整块白底兜住 tab 标签栏 + 内容区 + 空白区，避免 body 的 #f5f7fa 灰底漏出 */
+  background: #fff;
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 4px;
 }
 .pt-tabs {
   flex: 1;
@@ -403,9 +409,12 @@ onMounted(loadGroup)
 .pt-tabs :deep(.el-tab-pane) {
   height: 100%;
 }
-/* 白底卡片（与协议页 RichView 卡片一致：shadow=never 即白底） */
+/* 内容区：白底已由最外层 .param-setting 统一兜住（含 tab 标签栏），
+ * 这里去掉自身边框，避免白底上再套一个带框白卡（白卡套白卡）。
+ * min-height 撑满内容区；内容多时自然增高，外层 tabs__content 已有 overflow 兜底。 */
 .pt-card {
-  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  min-height: 100%;
+  box-sizing: border-box;
 }
 .pt-form {
   max-width: 640px;
