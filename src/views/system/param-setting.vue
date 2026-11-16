@@ -1,9 +1,9 @@
 <template>
-  <div class="param-setting">
+  <el-card shadow="never" class="param-setting">
     <el-tabs v-model="activeTab" class="pt-tabs">
       <!-- 基本信息 -->
       <el-tab-pane label="基本信息" name="basic">
-        <el-card shadow="never" class="pt-card">
+        <div class="pt-pane">
           <el-form :model="basicForm" label-width="150px" class="pt-form">
             <el-form-item label="系统名称">
               <el-input v-model="basicForm.system_name" placeholder="如：火星财务" />
@@ -33,7 +33,7 @@
               <el-button type="primary" :loading="savingBasic" v-has-perm="'config:create'" @click="saveBasic">保存</el-button>
             </el-form-item>
           </el-form>
-        </el-card>
+        </div>
       </el-tab-pane>
 
       <!-- 用户协议 -->
@@ -48,7 +48,7 @@
 
       <!-- 关于我们：卡片容器 + 富文本（无 label 展示） -->
       <el-tab-pane label="关于我们" name="about">
-        <el-card shadow="never" class="pt-card">
+        <div class="pt-pane">
           <RichEditor
             v-model="aboutForm.about_us"
             placeholder="支持富文本（标题 / 列表 / 链接 / 图片）"
@@ -56,12 +56,12 @@
           <div class="pt-card-actions">
             <el-button type="primary" :loading="savingAbout" v-has-perm="'config:create'" @click="saveAbout">保存</el-button>
           </div>
-        </el-card>
+        </div>
       </el-tab-pane>
 
       <!-- 键值管理：查询条件 + 列表 + 分页器标准布局 -->
       <el-tab-pane label="键值管理" name="adv">
-        <el-card shadow="never" class="pt-card">
+        <div class="pt-pane">
         <div class="pt-adv-tip">
           系统级原始键值（基本信息 / 关于我们 Tab 中维护的项已不在此表，请到对应 Tab 修改）。
         </div>
@@ -126,7 +126,7 @@
             background
           />
         </div>
-        </el-card>
+        </div>
       </el-tab-pane>
     </el-tabs>
 
@@ -162,7 +162,7 @@
         <el-button type="primary" :loading="dialogSubmitting" v-has-perm="'config:create'" @click="submitDialog">确定</el-button>
       </template>
     </el-dialog>
-  </div>
+  </el-card>
 </template>
 
 <script setup lang="ts">
@@ -380,16 +380,20 @@ onMounted(loadGroup)
 
 <style scoped>
 /* 撑满内容区剩余高度，使协议/隐私卡片可内部滚动充满屏；其余 tab 内容超出时退回外层滚动 */
+/* 外层统一用 el-card（与 user/approval 等列表页一致）：card 自带白底+边框，
+ * body 的 20px padding 让 tab 两端与表单都不顶边；不再手搓 div+边框+4px padding。 */
 .param-setting {
   height: 100%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  padding: 8px 4px;
-  /* 整块白底兜住 tab 标签栏 + 内容区 + 空白区，避免 body 的 #f5f7fa 灰底漏出 */
-  background: #fff;
-  border: 1px solid var(--el-border-color-lighter, #ebeef5);
-  border-radius: 4px;
+}
+.param-setting :deep(.el-card__body) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
 }
 .pt-tabs {
   flex: 1;
@@ -409,10 +413,9 @@ onMounted(loadGroup)
 .pt-tabs :deep(.el-tab-pane) {
   height: 100%;
 }
-/* 内容区：白底已由最外层 .param-setting 统一兜住（含 tab 标签栏），
- * 这里去掉自身边框，避免白底上再套一个带框白卡（白卡套白卡）。
+/* 内容区：外层 el-card 已统一兜白，这里不再套 card（避免 card 套 card），只撑满高度。
  * min-height 撑满内容区；内容多时自然增高，外层 tabs__content 已有 overflow 兜底。 */
-.pt-card {
+.pt-pane {
   min-height: 100%;
   box-sizing: border-box;
 }
