@@ -557,7 +557,7 @@ onMounted(loadRoles)
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="remark" label="备注" min-width="180">
+      <el-table-column prop="remark" label="备注" min-width="260">
         <template #default="{ row }">{{ row.remark || '—' }}</template>
       </el-table-column>
       <el-table-column label="操作" width="220" fixed="right" align="center" v-if="opVisible">
