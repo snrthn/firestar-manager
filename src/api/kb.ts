@@ -181,3 +181,37 @@ export function setKbAttachmentIndexable(attId: number, indexable: number) {
     .put(`/ai/kb/attachments/${attId}/indexable`, { indexable })
     .then((r) => r.data.data)
 }
+
+// ============ 检索可观测（P0-2）============
+// 复用线上同一个 KbRetriever，调试看到的 = 模型实际拿到的。
+// 后端：GET /ai/kb/retrieve?query=...&topK=...（KbRetrievalDebugController）
+
+/** 单条命中明细，对齐后端 KbRetrieveHitVO */
+export interface KbRetrieveHit {
+  docId: number
+  version: number
+  sourceType: string
+  title: string | null
+  headingPath: string | null
+  anchor: string | null
+  content: string
+  sourceRef: string | null
+  score: number
+  fileId: number | null
+}
+
+/** 检索结果，对齐后端 KbRetrieveVO */
+export interface KbRetrieveResult {
+  query: string
+  topK: number
+  total: number
+  elapsedMs: number
+  hits: KbRetrieveHit[]
+}
+
+/** 只读检索：输入问题，返回召回明细（ACL + 出域策略已过滤） */
+export function retrieveKb(query: string, topK = 4) {
+  return request
+    .get('/ai/kb/retrieve', { params: { query, topK } })
+    .then((r) => r.data.data as KbRetrieveResult)
+}

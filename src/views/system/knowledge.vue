@@ -54,7 +54,7 @@ import { computed, defineAsyncComponent, nextTick, onMounted, reactive, ref } fr
 import { Plus, Delete, EditPen, Folder, Document, Search, MoreFilled, Rank, ArrowUp, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
-import type { KbAttachment, KbDocDetail, KbDocStatus, KbNode, KbNodeMove, KbNodeType } from '@/api/kb'
+import type { KbAttachment, KbDocDetail, KbDocStatus, KbNode, KbNodeMove, KbNodeType, KbRetrieveResult } from '@/api/kb'
 import {
   addKbAttachment,
   createKbNode,
@@ -66,6 +66,7 @@ import {
   publishKbDoc,
   removeKbAttachment,
   renameKbNode,
+  retrieveKb,
   setKbAttachmentIndexable,
   updateKbDoc,
 } from '@/api/kb'
@@ -119,6 +120,38 @@ const serverLazy = ref(false)
 const showProps = ref(false)
 /** DEBUG-ONLY：结构检查调试面板，后期整体删除不影响布局 */
 const showCheck = ref(false)
+
+/** 检索可观测（P0-2）：输入问题直查召回明细，调试看到的 = 模型拿到的 */
+const showRetrieve = ref(false)
+const retrieveQuery = ref('')
+const retrieveTopK = ref(4)
+const retrieveLoading = ref(false)
+const retrieveResult = ref<KbRetrieveResult | null>(null)
+
+/** 执行只读检索（复用线上 KbRetriever，带当前登录人 ACL） */
+async function runRetrieve() {
+  const q = retrieveQuery.value.trim()
+  if (!q) {
+    ElMessage.warning('请输入要检索的问题或关键词')
+    return
+  }
+  retrieveLoading.value = true
+  try {
+    retrieveResult.value = await retrieveKb(q, retrieveTopK.value)
+  } catch (err) {
+    retrieveResult.value = null
+    ElMessage.error(errMsg(err, '检索失败'))
+  } finally {
+    retrieveLoading.value = false
+  }
+}
+
+/** 相关度分档着色：高分绿、中黄、低灰（越大越相关） */
+function scoreTagType(score: number): 'success' | 'warning' | 'info' {
+  if (score >= 6) return 'success'
+  if (score >= 3) return 'warning'
+  return 'info'
+}
 
 /** 树内 inline 重命名：新建节点后自动进入，hover 菜单 / 双击已有节点也可改名 */
 const editingId = ref<number | null>(null)
@@ -678,6 +711,9 @@ async function downloadAtt(a: KbAttachment) {
         知识库管理端 · <b>树形结构（V208 方案 A）</b>、MD 编辑器、统一渲染管线与
         <b>后端 KB CRUD 已接入（步骤 4.5）</b>；<b>切片与检索（步骤 5）已接入</b>：
         发布时正文重新切片，REFERENCE 附件解析后一并纳入 AI 检索。
+        <el-button link type="primary" size="small" style="margin-left: 8px" @click="showRetrieve = true">
+          检索测试
+        </el-button>
       </template>
     </el-alert>
     <el-alert v-if="loadError" type="error" :closable="false" show-icon class="kb-tip">
@@ -1110,6 +1146,77 @@ async function downloadAtt(a: KbAttachment) {
       </template>
     </el-dialog>
     <!-- DEBUG-ONLY END -->
+
+    <!-- 检索测试（P0-2）：复用线上 KbRetriever，直观看召回了哪些片段/相关度/出处 -->
+    <el-dialog
+      v-model="showRetrieve"
+      title="检索测试 · 召回明细"
+      width="920px"
+      append-to-body
+    >
+      <el-alert type="info" :closable="false" show-icon class="kb-retrieve-tip">
+        <template #title>
+          以当前登录人身份检索，结果已经过 ACL + 出域策略过滤 —— 调试看到的 = AI 助手实际拿到的。
+        </template>
+      </el-alert>
+      <el-form :inline="true" @submit.prevent>
+        <el-form-item label="问题 / 关键词">
+          <el-input
+            v-model="retrieveQuery"
+            placeholder="如：飞星报销怎么走"
+            clearable
+            style="width: 360px"
+            @keyup.enter="runRetrieve"
+          />
+        </el-form-item>
+        <el-form-item label="召回条数">
+          <el-input-number v-model="retrieveTopK" :min="1" :max="8" size="small" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" :icon="Search" :loading="retrieveLoading" @click="runRetrieve">
+            检索
+          </el-button>
+        </el-form-item>
+      </el-form>
+
+      <div v-if="retrieveResult" class="kb-retrieve-meta">
+        命中 <b>{{ retrieveResult.total }}</b> 条 · 耗时 {{ retrieveResult.elapsedMs }}ms ·
+        topK={{ retrieveResult.topK }}
+      </div>
+      <el-table v-loading="retrieveLoading" :data="retrieveResult?.hits ?? []" border size="small" max-height="420">
+        <el-table-column prop="score" label="相关度" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="scoreTagType(row.score)" size="small">{{ row.score.toFixed(2) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="文档 / 章节" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span class="kb-retrieve-title">{{ row.title || ('文档 #' + row.docId) }}</span>
+            <span v-if="row.headingPath" class="kb-retrieve-heading"> › {{ row.headingPath }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="content" label="命中片段" min-width="300" show-overflow-tooltip />
+        <el-table-column label="出处 sourceRef" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            <code class="kb-retrieve-ref">{{ row.sourceRef || '—' }}</code>
+          </template>
+        </el-table-column>
+        <el-table-column prop="sourceType" label="来源" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" type="info">{{ row.sourceType }}</el-tag>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <div class="kb-retrieve-empty">
+            {{ retrieveResult ? '本次检索无命中（检查查询词是否与文档原文重合，或文档是否已发布）' : '输入问题后点「检索」查看召回明细' }}
+          </div>
+        </template>
+      </el-table>
+
+      <template #footer>
+        <el-button @click="showRetrieve = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1566,6 +1673,36 @@ async function downloadAtt(a: KbAttachment) {
 }
 .kb-anchor {
   color: var(--el-text-color-secondary);
+}
+/* ===== 检索测试（P0-2）===== */
+.kb-retrieve-tip {
+  margin-bottom: 14px;
+}
+.kb-retrieve-meta {
+  margin: 4px 0 10px;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+}
+.kb-retrieve-meta b {
+  color: var(--el-color-primary);
+}
+.kb-retrieve-title {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.kb-retrieve-heading {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.kb-retrieve-ref {
+  font-size: 12px;
+  color: var(--el-color-primary);
+  word-break: break-all;
+}
+.kb-retrieve-empty {
+  padding: 24px 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 /* REFERENCE 附件卡片区：卡片体 flex 列内固定高度、独立滚动，不挤占编辑器/预览 */
 .kb-attachments {
