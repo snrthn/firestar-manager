@@ -207,6 +207,19 @@
             </el-form-item>
           </el-collapse-item>
         </el-collapse>
+        <!-- 排序号（V215）：表单可直填。留空 = 新增自动排到末尾 / 编辑保持原值 -->
+        <el-form-item label="排序号" prop="sortNo">
+          <el-input-number
+            v-model="form.sortNo"
+            :min="1"
+            :precision="0"
+            :step="1"
+            controls-position="right"
+            placeholder="留空 = 排到最后"
+            style="width: 200px"
+          />
+          <span class="mc-hint">数值越小越靠前；也可以直接用列表里的「上移 / 下移」调</span>
+        </el-form-item>
         <el-form-item label="设为启用">
           <el-switch v-model="form.activeBool" />
           <span class="mc-hint">启用后成为该类型下的运行期生效配置（每类型唯一）</span>
@@ -276,6 +289,7 @@ const form = reactive<ModelConfigPayload & { activeBool: boolean }>({
   extraJson: '',
   active: 0,
   activeBool: false,
+  sortNo: undefined,
 })
 
 const rules: FormRules = {
@@ -404,8 +418,8 @@ function canMove(row: ModelConfigMasked, dir: -1 | 1): boolean {
  * 库里的顺序是整表的——在整表里互换这两行，视觉上就是筛选视图里换了个位置，
  * 而且不会打乱其它类型的行。</p>
  *
- * <p>提交后按后端同一算法（(index+1)*10）本地预演 sort_no，省一次刷新请求，
- * 也保证「界面上显示的序号」和库里落的一致；失败则回滚并重新拉取。</p>
+ * <p>提交后按后端同一算法（index+1，1..N 连续）本地预演 sort_no，省一次刷新请求，
+ * 也保证「界面上显示的序号」和库里落的一致；失败则重新拉取。</p>
  */
 async function move(row: ModelConfigMasked, dir: -1 | 1) {
   const view = filteredList.value
@@ -417,7 +431,7 @@ async function move(row: ModelConfigMasked, dir: -1 | 1) {
   const i = next.findIndex((r) => r.id === row.id)
   const j = next.findIndex((r) => r.id === neighbor.id)
   ;[next[i], next[j]] = [next[j], next[i]]
-  next.forEach((r, k) => { r.sortNo = (k + 1) * 10 })
+  next.forEach((r, k) => { r.sortNo = k + 1 })
   list.value = next
 
   sorting.value = true
@@ -526,6 +540,7 @@ function resetForm() {
   form.extraJson = ''
   form.active = 0
   form.activeBool = false
+  form.sortNo = undefined
   ttsForm.voice = 'longanyang'
   ttsForm.format = 'mp3'
   ttsForm.sampleRate = '22050'
@@ -549,6 +564,8 @@ function openEdit(row: ModelConfigMasked) {
   form.model = row.model || ''
   form.activeBool = row.active === 1
   form.active = row.active
+  // 排序号回显：编辑时可改；清空提交 = 保持原值
+  form.sortNo = row.sortNo
   // extra 回显明文（配置参数非密钥）：结构化表单需要原值才能正确回填并 merge
   form.extraJson = row.extraJson || ''
   applyExtra(row.extraJson)
@@ -571,6 +588,7 @@ async function submit() {
       apiKey: form.apiKey || undefined,
       extraJson: form.extraJson || undefined,
       active: form.activeBool ? 1 : 0,
+      sortNo: form.sortNo ?? undefined,
     }
     try {
       if (form.id) {
@@ -668,7 +686,7 @@ onMounted(load)
 }
 /* 高级 JSON 折叠区：默认收起，不喧宾夺主 */
 .mc-advanced {
-  margin-top: 4px;
+  margin: 8px 0;
 }
 .mc-advanced :deep(.el-collapse-item__header) {
   font-size: 13px;

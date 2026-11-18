@@ -31,6 +31,8 @@ export interface ModelConfigPayload {
   apiKey?: string
   extraJson?: string
   active?: number
+  /** 列表排序号（升序，1..N 连续）；不传 = 新增排到末尾 / 编辑保持原值 */
+  sortNo?: number
 }
 
 export function listModelConfigs() {
@@ -55,7 +57,7 @@ export function reloadModelConfig() {
 
 /**
  * 整表重排：提交页面当前展示的完整 id 顺序（从上到下）。
- * 后端按 (index+1)*10 回写 sort_no；ids 必须与库内行集合一致，否则报错要求刷新。
+ * 后端按 (index+1) 回写 sort_no（1..N 连续）；ids 必须与库内行集合一致，否则报错要求刷新。
  */
 export function reorderModelConfigs(ids: number[]) {
   return request.put('/ai/model-config/sort', { ids }).then((r) => r.data.data)
