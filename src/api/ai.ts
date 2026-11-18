@@ -315,6 +315,8 @@ export interface ConversationMessage {
   /** user | assistant | tool */
   role: string
   content?: string | null
+  /** assistant 行的思考过程文本（V216 落库；无则 null），回放时折叠展示 */
+  reasoningText?: string | null
   /** tool 行的工具名（draft_shipment_create → 前端渲染发货单草稿卡） */
   toolName?: string | null
   modelVersion?: string | null

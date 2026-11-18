@@ -177,7 +177,16 @@ async function switchToServer(conv: ConversationSummary) {
     if (m.role === 'user' && m.content) {
       items.push({ id: `srv${m.id}`, role: 'user', placement: 'end', content: m.content })
     } else if (m.role === 'assistant' && m.content) {
-      items.push({ id: `srv${m.id}`, role: 'assistant', placement: 'start', content: m.content, noStyle: true })
+      items.push({
+        id: `srv${m.id}`,
+        role: 'assistant',
+        placement: 'start',
+        content: m.content,
+        noStyle: true,
+        // 思考过程回放（V216 落库）：AiThinking 直接折叠展示（end 状态不显示用时）
+        reasoning: m.reasoningText || undefined,
+        reasoningStatus: 'end',
+      })
     } else if (m.role === 'tool' && m.toolName && m.content) {
       // 业务自定义渲染回放：draft_* 工具结果 JSON → 对应业务卡（历史卡只读，防重复创建）
       if (m.toolName === 'draft_shipment_create') {
