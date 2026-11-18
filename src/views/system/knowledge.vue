@@ -84,10 +84,10 @@ import {
 import type { KbMoveTarget } from '@/utils/kbTree'
 import { validateMarkdown, collectFileRefs, extractHeadings } from '@/utils/markdown'
 
-// ⚠️ 编辑器与预览都必须异步加载：md-editor-v3 把 CodeMirror / 本地 mermaid 实例
-//    带进异步 chunk（noMermaid/noKatex 只是运行时开关，tree-shake 不掉），静态引入
-//    会把 3MB+ 图表运行时塞进 knowledge 首屏。两个组件共享 kbMarkdown 里的 mermaid
-//    实例，Vite 会拆成同一份共享异步 chunk。runtime-only Vue 不能用 template 选项。
+// ⚠️ 编辑器与预览都必须异步加载：编辑器把 CodeMirror / 本地 mermaid 实例、
+//    预览把 x-markdown-vue（Shiki）带进异步 chunk，静态引入会把 3MB+ 运行时
+//    塞进 knowledge 首屏。编辑器共享 kbMarkdown 里的 mermaid 实例；预览走
+//    x-markdown-vue（动态 import npm 里的 mermaid，零 CDN 依赖），Vite 各自拆 chunk。
 const MarkdownEditor = defineAsyncComponent(() => import('@/components/MarkdownEditor.vue'))
 const MarkdownView = defineAsyncComponent(() => import('@/components/MarkdownView.vue'))
 
@@ -977,7 +977,8 @@ async function downloadAtt(a: KbAttachment) {
         <!-- 滚动容器必须是本页原生 div：scoped 样式 100% 命中，flex:1 + min-height:0
              的高度链才闭合。旧写法把 class 传给 MarkdownView → RichView 手动 v-bind
              到跨组件内部节点（Fragment 双根），scoped 与高度链都不稳 → 预览没有滚动条。
-             现在 MarkdownView 内部是 MdPreview（继承编辑器默认渲染器），同样不承载滚动。 -->
+             MarkdownView 内部已换成 x-markdown-vue 渲染器（与 AI 助手同一渲染出口），
+             同样不承载滚动。 -->
         <div v-else class="kb-preview">
           <MarkdownView :content="form.contentMd" />
         </div>

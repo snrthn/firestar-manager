@@ -1,27 +1,32 @@
 <script setup lang="ts">
 /**
- * 统一 Markdown 渲染出口：知识库顶部「预览」tab（AI 助手消费端后续复用）。
+ * 知识库「预览」tab 的 Markdown 渲染出口（懒加载，不进 knowledge 首屏）。
  *
- * ✅ 设计文档 §25（撤销 §24 的 A 方案）：本组件不再自己用 markdown-it 渲染，
- *    而是直接继承 md-editor-v3 的默认预览组件 MdPreview —— 与编辑器内置预览
- *    **同一个渲染器、同一套 mermaid 图表解析、同一套代码块/表格样式**，
- *    从根上消除「系统预览 vs 默认预览」表现不一致（图表显示为 bash 代码块等）。
+ * 2026-11-18：渲染核心从 md-editor-v3 的 MdPreview 迁移到 x-markdown-vue
+ * （与 AI 助手气泡同一个渲染器），兑现设计文档「知识库预览与 AI 回答共用渲染器」的约定。
+ * 迁移动机：md-editor-v3 的预览走 CDN 加载 mermaid（内网不可达，靠注入本地实例绕过），
+ * 且两套渲染器的代码块/表格样式细节对不齐；x-markdown-vue 动态 import 本地 mermaid 包，
+ * 零 CDN 依赖，知识库与 AI 助手从此真正共用同一条渲染管线。
  *
- * 继承默认渲染器后，项目侧的三条既有契约仍需保住：
- *   1. 安全：kbSanitize（DOMPurify）作为项目侧第二层，md-editor-v3 自带 XSS 插件为第一层；
- *   2. 图片：kbPreviewMd 把 ![alt](file:<id>) 换成内网字节接口相对路径、
- *      非法外链替换为可见占位文本；resolveImagesIn/observeImages 带 JWT 拉 blob；
- *      事件委托点击图片弹 ElImageViewer（动态 DOM 也能命中）。
- *   3. 图表：mermaid 实例由 @/utils/kbMarkdown 全局注入（默认 unpkg CDN 不可达），
- *      本组件不传 noMermaid，8 种图表（流程/时序/甘特/类/状态/饼/关系/旅程）全部可解析。
+ * 三条既有契约全部保住：
+ *  1. 安全：allowHtml=false（raw HTML 根本不进渲染管线）+ sanitize=true（rehype-sanitize
+ *     + DOMPurify）。知识库正文属于不可信文本，这条红线不放松。
+ *  2. 图片：kbPreviewMd 把 ![alt](file:<id>) 换成内网字节接口相对路径、非法外链替换为
+ *     可见占位文本；渲染后的 img 由 resolveImagesIn/observeImages 带 JWT 拉 blob；
+ *     事件委托点击图片弹 ElImageViewer（动态 DOM 也能命中）。
+ *  3. 图表：enable-mermaid=true，mermaid 11.x 走 npm 包（已在依赖里，md-editor-v3
+ *     编辑器同版本），构建时拆独立 chunk 懒加载，不进首屏。
  *
- * ⚠️ 排版样式刻意交给 md-editor-v3 的 preview.css 接管，不再自定义 h1/p/table 等，
- *    否则同优先级 CSS 会因加载顺序不同，让两个预览看起来又「差一点」。
+ * ⚠️ 编辑器（MarkdownEditor.vue）仍用 md-editor-v3：x-markdown-vue 只管渲染不管输入，
+ *    编辑与预览是两个职责，预览出口统一到本组件即可。
+ * ⚠️ enable-latex=false 与原 KB_NO_KATEX=true 契约一致：公式渲染原来就不启用，
+ *    两端必须同值，否则「编辑器能渲、系统预览不能渲」的不一致又会回来。
+ * ⚠️ 本组件不承载滚动：滚动容器是 knowledge.vue 的 .kb-preview 原生 div（高度链在那里闭合）。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { MdPreview } from 'md-editor-v3'
-import 'md-editor-v3/lib/preview.css'
-import { kbSanitize, kbPreviewMd, KB_NO_KATEX } from '@/utils/kbMarkdown'
+import { MarkdownRendererAsync } from 'x-markdown-vue'
+import 'x-markdown-vue/style'
+import { kbPreviewMd } from '@/utils/kbMarkdown'
 import { observeImages, resolveImagesIn } from '@/utils/richImage'
 
 const props = defineProps<{
@@ -37,8 +42,8 @@ const tracked: string[] = []
 let stopObserve: (() => void) | null = null
 
 onMounted(async () => {
-  // 首次渲染的 img 主动解析一次；MdPreview 后续异步插入的（含 mermaid 后的重绘）
-  // 交给 MutationObserver 自动兜住
+  // 首次渲染的 img 主动解析一次；渲染器后续异步插入的 img（含 mermaid 渲染后的重绘）
+  // 交给 MutationObserver 自动兜住（x-markdown-vue 是异步渲染器，首帧后仍会持续 patch）
   await resolveImagesIn(rootRef.value, tracked)
   stopObserve = observeImages(rootRef.value, (url) => tracked.push(url))
 })
@@ -67,10 +72,17 @@ function onRootClick(e: MouseEvent) {
 
 <template>
   <div ref="rootRef" class="kb-md-view" @click="onRootClick">
-    <MdPreview
-      :model-value="md"
-      :sanitize="kbSanitize"
-      :noKatex="KB_NO_KATEX"
+    <MarkdownRendererAsync
+      :markdown="md"
+      :allow-html="false"
+      :sanitize="true"
+      :enable-animate="false"
+      :enable-gfm="true"
+      :enable-breaks="false"
+      :enable-latex="false"
+      :enable-shiki="true"
+      :enable-mermaid="true"
+      :show-code-block-header="true"
     />
     <el-image-viewer
       v-if="viewerVisible"
@@ -83,7 +95,7 @@ function onRootClick(e: MouseEvent) {
   </div>
 </template>
 
-<!-- 非 scoped：MdPreview 内部是 v-html 注入节点，scoped 属性不会落到这些节点上 -->
+<!-- 非 scoped：渲染器动态注入节点带不到 scoped 属性 -->
 <style>
 .kb-md-view {
   font-size: 14px;

@@ -31,12 +31,17 @@
     "dompurify": "^3.2.4",
     "echarts": "^5.5.1",
     "element-plus": "^2.14.7",
+    "katex": "^0.19.1",
     "markdown-it": "^15.0.3",
     "md-editor-v3": "^7.1.0",
     "mermaid": "^11.17.2",
     "pinia": "^2.2.6",
+    "shiki": "^3.23.0",
+    "shiki-stream": "^0.1.4",
     "vue": "^3.5.13",
-    "vue-router": "^4.4.5"
+    "vue-element-plus-x": "^2.0.3",
+    "vue-router": "^4.4.5",
+    "x-markdown-vue": "^0.0.204"
   },
   "devDependencies": {
     "@types/cropperjs": "^1.1.5",

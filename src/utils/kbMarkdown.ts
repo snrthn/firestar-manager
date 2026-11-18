@@ -1,9 +1,7 @@
 /**
- * 知识库 MD 渲染共享配置（编辑器内置预览 + 顶部「预览」tab 共用）
- *
- * 设计文档 §25：两个预览必须走**同一个渲染器**（md-editor-v3 MdPreview），
- * 才能彻底消除「系统预览 vs 默认预览」在 mermaid 图表上的表现差异。
- * 本模块是唯一的配置注入点，两个组件都 import 它（ESM 模块单例，只执行一次）。
+ * 知识库 MD 渲染共享配置（md-editor-v3 编辑器专用；2026-11-18 起「预览」tab 已
+ * 迁移到 x-markdown-vue 渲染器（MarkdownView.vue），不再消费本模块的 sanitize/mermaid
+ * 注入，仅共用 kbPreviewMd 图片预处理）
  *
  * ⚠️ 为什么必须本地注入 mermaid 实例：
  *    md-editor-v3 v7 默认走 CDN `https://unpkg.com/mermaid@11.17.2/dist/mermaid.min.js`

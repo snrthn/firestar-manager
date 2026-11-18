@@ -99,6 +99,13 @@ export interface ChatStreamHandlers {
   onMeta?: (conversationId: number) => void
   /** 草稿预览帧：payload={toolName,argsJson,resultJson}，前端据此渲染「待确认表单」卡片 */
   onDraft?: (payload: { toolName: string; argsJson: string; resultJson: string }) => void
+  /**
+   * 思考过程增量帧（推理模型 o1 / deepseek-reasoner / 开启深度思考的 Coze Bot）。
+   * 后端补上 reasoning 通道后即可生效；未下发时前端永远收不到，思考区自然不显示。
+   */
+  onReasoning?: (text: string) => void
+  /** 用户主动中断（AbortController）：与 onDone 区分，前端保留已输出内容并标“已停止” */
+  onStopped?: () => void
 }
 
 interface SseEvent {
@@ -109,11 +116,11 @@ interface SseEvent {
 function parseSseBlock(block: string): SseEvent | null {
   let event = 'message'
   const dataLines: string[] = []
-  for (const line of block.split('\n')) {
+  for (const line of block.split(/\r?\n/)) {
     if (line.startsWith('event:')) {
       event = line.slice(6).trim()
     } else if (line.startsWith('data:')) {
-      dataLines.push(line.slice(5).replace(/^ /, ''))
+      dataLines.push(line.slice(5).replace(/^ /, '').replace(/\r$/, ''))
     } else if (line.startsWith(':')) {
       // 注释行，忽略
     }
@@ -146,7 +153,11 @@ function extractMsg(text: string, fallback: string): string {
  * 发起一次 AI 对话（流式）。返回 Promise 在流结束时 resolve；
  * 中途异常或收到 error/fallback 事件时通过 handlers 回调通知，Promise 仍会 resolve。
  */
-export async function streamChat(message: string, handlers: ChatStreamHandlers): Promise<void> {
+export async function streamChat(
+  message: string,
+  handlers: ChatStreamHandlers,
+  opts: { signal?: AbortSignal } = {},
+): Promise<void> {
   const baseURL = request.defaults.baseURL || ''
   const token = localStorage.getItem('token')
   // 复用全站 SSE 前缀：/api/sse/ai/chat/stream →（vite/nginx 剥离 /api/sse）→ 后端 /sse/ai/chat/stream
@@ -157,6 +168,7 @@ export async function streamChat(message: string, handlers: ChatStreamHandlers):
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ message }),
+    signal: opts.signal,
   })
 
   if (!resp.ok || !resp.body) {
@@ -191,16 +203,21 @@ export async function streamChat(message: string, handlers: ChatStreamHandlers):
       const { value, done } = await reader.read()
       if (done) break
       buffer += decoder.decode(value, { stream: true })
-      let idx: number
-      // SSE 事件以空行(\n\n)分隔
-      while ((idx = buffer.indexOf('\n\n')) !== -1) {
-        const raw = buffer.slice(0, idx)
-        buffer = buffer.slice(idx + 2)
+      // SSE 事件以空行分隔。容忍 CRLF：\r\n\r\n 与 \n\n 都算分帧，
+      // 否则前面挂了会做换行转换的反向代理时，整条流会卡到结束才一次性吐出。
+      const SEP = /\r?\n\r?\n/
+      let m: RegExpMatchArray | null
+      while ((m = buffer.match(SEP)) && m.index !== undefined) {
+        const raw = buffer.slice(0, m.index)
+        buffer = buffer.slice(m.index + m[0].length)
         const ev = parseSseBlock(raw)
         if (!ev) continue
         switch (ev.event) {
           case 'token':
             handlers.onToken(ev.data)
+            break
+          case 'reasoning':
+            handlers.onReasoning?.(ev.data)
             break
           case 'done':
             finish(() => handlers.onDone())
@@ -238,7 +255,12 @@ export async function streamChat(message: string, handlers: ChatStreamHandlers):
       }
     }
   } catch (e: any) {
-    finish(() => handlers.onError(e?.message || '流式读取中断'))
+    if (e?.name === 'AbortError') {
+      // 用户点了“停止生成”：不当作错误，保留已输出内容
+      finish(() => handlers.onStopped?.())
+    } else {
+      finish(() => handlers.onError(e?.message || '流式读取中断'))
+    }
   } finally {
     if (!finished) {
       // 连接正常结束但没收到 done（如服务端异常关闭）：按完成处理

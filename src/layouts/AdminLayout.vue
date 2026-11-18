@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, provide, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useTabsStore } from '@/stores/tabs'
@@ -12,8 +12,10 @@ import RichView from '@/components/RichView.vue'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import AppTabs from '@/components/layout/AppTabs.vue'
-import AiAssistantFab from '@/components/ai/AiAssistantFab.vue'
-
+// AI 助手已改用 vue-element-plus-x（气泡 / 输入框 / 思考链）+ x-markdown-vue（Shiki/Katex），
+// 体量不小。改成异步组件：首屏零成本，只在布局渲染后才拉 AI 的那一个 chunk，
+// 避免把整个组件库塞进 AdminLayout 主 chunk。入口是悬浮按钮，延迟几十毫秒出现无感。
+const AiAssistantFab = defineAsyncComponent(() => import('@/components/ai/AiAssistantFab.vue'))
 const appStore = useAppStore()
 const tabsStore = useTabsStore()
 const userStore = useUserStore()
