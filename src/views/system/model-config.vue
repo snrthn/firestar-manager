@@ -71,6 +71,29 @@
             <el-tag v-else type="info">停用</el-tag>
           </template>
         </el-table-column>
+        <!-- 排序（V215）：与菜单管理页同款交互——显示 sort_no + 上移/下移。
+             顺序只影响本页展示，不影响运行期生效行（is_active 决定）。 -->
+        <el-table-column label="排序" width="150" align="center">
+          <template #default="{ row }">
+            <span class="sort-no">{{ row.sortNo }}</span>
+            <el-button
+              v-has-perm="['sys:modelConfig:edit']"
+              link
+              type="primary"
+              size="small"
+              :disabled="sorting || !canMove(row, -1)"
+              @click="move(row, -1)"
+            >上移</el-button>
+            <el-button
+              v-has-perm="['sys:modelConfig:edit']"
+              link
+              type="primary"
+              size="small"
+              :disabled="sorting || !canMove(row, 1)"
+              @click="move(row, 1)"
+            >下移</el-button>
+          </template>
+        </el-table-column>
         <el-table-column prop="baseUrl" label="Base URL" min-width="200" show-overflow-tooltip />
         <el-table-column prop="model" label="模型 / Bot" min-width="140" show-overflow-tooltip />
         <el-table-column label="凭证状态" min-width="280">
@@ -223,25 +246,29 @@ import {
   updateModelConfig,
   deleteModelConfig,
   reloadModelConfig,
+  reorderModelConfigs,
   synthesizeTts,
   type ModelConfigMasked,
   type ModelConfigPayload,
 } from '@/api/ai'
 import DictSelect from '@/components/DictSelect.vue'
-import { useDictLabels } from '@/composables/useDict'
+import { loadDictDefault, useDictLabels } from '@/composables/useDict'
 
 const loading = ref(false)
 const reloading = ref(false)
 const saving = ref(false)
+/** 排序请求进行中：禁止连点上移/下移（后端按整表顺序重写，连点会互相覆盖） */
+const sorting = ref(false)
 const list = ref<ModelConfigMasked[]>([])
 const typeFilter = ref('')
 
 const dialogVisible = ref(false)
 const formRef = ref<FormInstance>()
+// modelType / provider 的初值由字典默认项回填（见 dictDefaults），这里先留空
 const form = reactive<ModelConfigPayload & { activeBool: boolean }>({
   id: undefined,
-  modelType: 'chat',
-  provider: 'coze',
+  modelType: '',
+  provider: '',
   baseUrl: '',
   model: '',
   botId: '',
@@ -260,6 +287,20 @@ const rules: FormRules = {
 // 供应商中文名 / 标签颜色来自字典（替代硬编码）
 const { label: providerLabel, style: providerTagType } = useDictLabels('ai_provider')
 const { label: modelTypeLabel, style: modelTypeTagType } = useDictLabels('ai_model_type')
+
+// ---------------------------------------------------------------- 新增表单默认值
+// 虎哥 2026-11-18：新增配置的默认供应商不再写死 coze，改为取字典 ai_provider 的
+// 「默认项」（is_default=1）；字典里没勾默认就留空，由管理员自己选。
+// 模型类型同理走 ai_model_type 的默认项（当前种子默认 chat，行为与原来一致）。
+// 运营以后想换默认供应商，只需在【字典管理 → AI供应商】里勾默认，不必改前端代码。
+const dictDefaults = reactive({ modelType: '', provider: '' })
+const dictDefaultsReady = Promise.all([
+  loadDictDefault('ai_model_type'),
+  loadDictDefault('ai_provider'),
+]).then(([modelType, provider]) => {
+  dictDefaults.modelType = modelType ?? ''
+  dictDefaults.provider = provider ?? ''
+})
 
 // ---------------------------------------------------------------- TTS 结构化参数
 // 音色清单取自百炼官方 cosyvoice-v3-flash 音色表（常用中文音色）。
@@ -347,6 +388,50 @@ const filteredList = computed(() =>
   typeFilter.value ? list.value.filter((r) => r.modelType === typeFilter.value) : list.value,
 )
 
+// ---------------------------------------------------------------- 排序（V215）
+/** 相邻关系按「当前视图」判断：筛选后首行不能上移、末行不能下移 */
+function canMove(row: ModelConfigMasked, dir: -1 | 1): boolean {
+  const view = filteredList.value
+  const idx = view.findIndex((r) => r.id === row.id)
+  if (idx < 0) return false
+  return dir < 0 ? idx > 0 : idx < view.length - 1
+}
+
+/**
+ * 上移 / 下移。
+ *
+ * <p>交换的是「全量列表」里两行的位置，再提交完整 id 顺序：类型筛选只是隐藏行，
+ * 库里的顺序是整表的——在整表里互换这两行，视觉上就是筛选视图里换了个位置，
+ * 而且不会打乱其它类型的行。</p>
+ *
+ * <p>提交后按后端同一算法（(index+1)*10）本地预演 sort_no，省一次刷新请求，
+ * 也保证「界面上显示的序号」和库里落的一致；失败则回滚并重新拉取。</p>
+ */
+async function move(row: ModelConfigMasked, dir: -1 | 1) {
+  const view = filteredList.value
+  const idx = view.findIndex((r) => r.id === row.id)
+  const neighbor = idx >= 0 ? view[idx + dir] : undefined
+  if (!neighbor) return
+
+  const next = [...list.value]
+  const i = next.findIndex((r) => r.id === row.id)
+  const j = next.findIndex((r) => r.id === neighbor.id)
+  ;[next[i], next[j]] = [next[j], next[i]]
+  next.forEach((r, k) => { r.sortNo = (k + 1) * 10 })
+  list.value = next
+
+  sorting.value = true
+  try {
+    await reorderModelConfigs(next.map((r) => r.id))
+  } catch (e: any) {
+    ElMessage.error(e?.message || '调整顺序失败')
+    // 失败（多半是别人同时增删了配置）：库里顺序未知，直接重拉覆盖本地乐观结果
+    await load()
+  } finally {
+    sorting.value = false
+  }
+}
+
 // TTS 试听：仅当存在启用的 tts 配置行时显示入口
 const ttsEnabled = computed(() =>
   list.value.some((r) => r.modelType === 'tts' && r.active === 1 && r.apiKeySet),
@@ -396,7 +481,8 @@ const baseUrlPlaceholder = computed(() => {
     case 'tts':
       return '百炼 WebSocket: wss://dashscope.aliyuncs.com/api-ws/v1/inference'
     default:
-      return 'Coze: https://api.coze.cn；DeepSeek/OpenAI 兼容: https://api.deepseek.com'
+      // 不把 coze 摆在第一位：默认供应商改成字典驱动后，提示语也按「通用 OpenAI 兼容」写
+      return 'OpenAI 兼容: https://api.openai.com/v1；DeepSeek: https://api.deepseek.com；Ollama: http://127.0.0.1:11434'
   }
 })
 const modelPlaceholder = computed(() => {
@@ -430,8 +516,9 @@ async function load() {
 
 function resetForm() {
   form.id = undefined
-  form.modelType = 'chat'
-  form.provider = 'coze'
+  // 默认值来自字典默认项（见 dictDefaults）；没有默认项 → 空，用户自己选
+  form.modelType = dictDefaults.modelType
+  form.provider = dictDefaults.provider
   form.baseUrl = ''
   form.model = ''
   form.botId = ''
@@ -446,7 +533,9 @@ function resetForm() {
   formRef.value?.clearValidate()
 }
 
-function openCreate() {
+async function openCreate() {
+  // 等字典默认项就绪再开弹窗：否则首屏刚进就点「新增」会拿到空默认值
+  await dictDefaultsReady
   resetForm()
   dialogVisible.value = true
 }
@@ -564,6 +653,13 @@ onMounted(load)
 }
 .mc-table {
   margin-top: 4px;
+}
+/* 排序号：与「上移/下移」文字按钮同行，弱化显示（与菜单管理页 .sort-no 一致） */
+.sort-no {
+  display: inline-block;
+  min-width: 28px;
+  margin-right: 4px;
+  color: #606266;
 }
 .mc-hint {
   margin-left: 8px;

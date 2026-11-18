@@ -16,6 +16,8 @@ export interface ModelConfigMasked {
   extraSet: boolean
   /** extra_json 的明文内容（配置参数，非密钥）：TTS 的 voice/format/sample_rate、embedding 的 dims 等 */
   extraJson?: string | null
+  /** 列表排序号（V215）：升序展示，上移/下移后由后端整表重排回写 */
+  sortNo: number
 }
 
 /** 提交体：敏感字段留空 = 保留库内已有密文，不覆盖 */
@@ -49,6 +51,14 @@ export function deleteModelConfig(id: number) {
 
 export function reloadModelConfig() {
   return request.post('/ai/model-config/reload').then((r) => r.data.data)
+}
+
+/**
+ * 整表重排：提交页面当前展示的完整 id 顺序（从上到下）。
+ * 后端按 (index+1)*10 回写 sort_no；ids 必须与库内行集合一致，否则报错要求刷新。
+ */
+export function reorderModelConfigs(ids: number[]) {
+  return request.put('/ai/model-config/sort', { ids }).then((r) => r.data.data)
 }
 
 // ===== AI 语音合成 TTS（V214，sys:modelConfig:view） =====

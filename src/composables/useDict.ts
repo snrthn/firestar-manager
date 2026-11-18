@@ -21,6 +21,8 @@ import type { DictDataVO } from '@/types/dict'
  *   【约定 5】结果按 typeCode 缓存（种子数据极少变动，避免每个页面
  *             挂载都打一次接口）；字典维护页改完后如要立即生效，
  *             调用 invalidateDictCache(typeCode) 失效对应缓存。
+ *   【约定 6】新增表单的默认值不写死在代码里，走 loadDictDefault(typeCode)：
+ *             取字典里 is_default=1 的项，没有就留空（见 loadDictDefault 注释）。
  *
  * 用法（样板见 views/system/menu.vue 菜单类型单选组）：
  *   const options = ref<DictOption[]>([])
@@ -36,6 +38,13 @@ export interface DictOption {
    * 供 el-tag 等标签组件取色；null = 字典未配置（调用方兜底，如 'info'）。
    */
   style: string | null
+  /**
+   * 是否默认项（sys_dict_data.is_default=1），供 loadDictDefault 预填新增表单。
+   *
+   * <p>标成可选：业务页「字典不可用时回退内置选项」的字面量（menu.vue / file/list.vue）
+   * 是代码兜底值，没有「默认项」概念，不该被迫写 isDefault: false。缺省按「非默认」处理。</p>
+   */
+  isDefault?: boolean
 }
 
 /** typeCode → 已过滤排序的选项；会话级缓存，invalidateDictCache 失效 */
@@ -72,7 +81,12 @@ export async function loadDictOptions(typeCode: string): Promise<DictOption[]> {
       const options: DictOption[] = (page.records || [])
         .filter((item: DictDataVO) => item.status === 'ENABLED')
         .sort((a: DictDataVO, b: DictDataVO) => a.sortNo - b.sortNo || a.id - b.id)
-        .map((item: DictDataVO) => ({ value: item.dictValue, label: item.dictLabel, style: item.style ?? null }))
+        .map((item: DictDataVO) => ({
+          value: item.dictValue,
+          label: item.dictLabel,
+          style: item.style ?? null,
+          isDefault: item.isDefault === 1,
+        }))
       optionCache.set(typeCode, options)
       return options
     } catch (e) {
@@ -85,6 +99,21 @@ export async function loadDictOptions(typeCode: string): Promise<DictOption[]> {
 
   inflight.set(typeCode, task)
   return task
+}
+
+/**
+ * 取字典的「默认项」值（sys_dict_data.is_default=1），供新增表单预填。
+ *
+ * <p>【约定 6】业务页不要再把某个域值写死成新增默认值（典型：模型配置页把供应商
+ * 默认写成 'coze'）。默认值属于运营配置，应该在【字典管理 → 字典数据】里勾选
+ * 「默认」，改字典即生效；字典里没勾默认 → 这里返回 null，表单保持留空，
+ * 由用户自己选，而不是由代码替运营做决定。</p>
+ *
+ * <p>多个默认项时取 sort_no 最小的那个（loadDictOptions 已按 sort_no 升序）。</p>
+ */
+export async function loadDictDefault(typeCode: string): Promise<string | null> {
+  const opts = await loadDictOptions(typeCode)
+  return opts.find((o) => o.isDefault)?.value ?? null
 }
 
 /**
