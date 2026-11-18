@@ -220,6 +220,15 @@ const isDirty = computed(() => !!current.value && (
   form.contentMd !== (current.value.contentMd ?? '')
 ))
 /**
+ * 已发布文档保存了草稿但尚未重新发布：库内保存版本 ≠ 已发布版本（AI 检索的还是旧版）。
+ * 成熟系统（语雀/飞书文档）规则：保存草稿不改发布态，但必须显式提示「有未发布修改」；
+ * 重新发布（先保存后发布的原子语义）后归零。
+ */
+const savedButUnpublished = ref(false)
+/** 发布按钮 loading（发布 = 先保存再发布，两次请求） */
+const publishing = ref(false)
+const hasUnpublishedEdits = computed(() => current.value?.status === 'PUBLISHED' && savedButUnpublished.value)
+/**
  * 「新建位置」上下文（对齐飞书/Confluence 树内 + 号的位置语义）。
  * 与 currentId 刻意分离：currentId 只跟随文档（右侧编辑态），activeFolderId 只跟随文件夹
  * （决定全局「文档 / 新建文件夹」按钮落在哪）。0 = 根目录。
@@ -292,6 +301,7 @@ function clearForm() {
   form.title = ''
   form.summary = ''
   form.contentMd = ''
+  savedButUnpublished.value = false
 }
 
 async function loadDoc(node: KbNode) {
@@ -303,6 +313,8 @@ async function loadDoc(node: KbNode) {
     form.title = d.title
     form.summary = d.summary ?? ''
     form.contentMd = d.contentMd ?? ''
+    // 库内保存版本与发布版本的差异标记：打开新文档时以库内为准重新计算
+    savedButUnpublished.value = false
     mode.value = 'edit'
     void loadAttachments(node.id)
   } catch (e) {
@@ -561,15 +573,19 @@ async function submitMove() {
   if (ok) showMove.value = false
 }
 
-async function save() {
+/**
+ * 把当前表单内容落库（保存草稿）。成功返回 true，供「发布」前置保存静默复用。
+ * 已发布文档保存草稿后置 savedButUnpublished：库内保存版本 ≠ 已发布版本。
+ */
+async function persist(): Promise<boolean> {
   // 防御：顶部按钮已 disabled，但编辑器工具栏「保存」等入口仍可能触发（§26）
   if (!currentId.value || !current.value) {
     ElMessage.warning('请先在左侧选择或新建一篇文档')
-    return
+    return false
   }
   if (!form.title.trim()) {
     ElMessage.warning('标题不能为空')
-    return
+    return false
   }
   try {
     await updateKbDoc(currentId.value, {
@@ -583,18 +599,29 @@ async function save() {
       currentDetail.value.title = form.title.trim()
       currentDetail.value.summary = form.summary.trim()
       currentDetail.value.contentMd = form.contentMd
+      if (currentDetail.value.status === 'PUBLISHED') savedButUnpublished.value = true
     }
     const node = currentNode.value
     if (node) node.title = form.title.trim()
-    ElMessage.success('草稿已保存')
+    return true
   } catch (e) {
     ElMessage.error(errMsg(e, '保存失败'))
+    return false
   }
+}
+
+async function save() {
+  if (await persist()) ElMessage.success('草稿已保存')
 }
 
 async function publish() {
   if (!currentId.value) return
+  publishing.value = true
   try {
+    // 成熟系统语义：发布 = 「保存当前编辑内容」+「发布该版本」原子操作。
+    // 直接发布旧版（虎哥指出的歧义①）：编辑器里改了但不落库就发布，前端会同时显示
+    // 「已发布 · 未保存」，且 AI 检索到的仍是旧内容——这里先静默保存，二者必须同步。
+    if (!(await persist())) return
     await publishKbDoc(currentId.value)
     if (currentDetail.value) {
       currentDetail.value.status = 'PUBLISHED'
@@ -605,9 +632,13 @@ async function publish() {
       node.status = 'PUBLISHED'
       node.version = (node.version ?? 1) + 1
     }
+    // 发布的就是刚保存的版本：未发布修改标记归零
+    savedButUnpublished.value = false
     ElMessage.success('已发布（正文与 REFERENCE 附件已重新切片并纳入检索）')
   } catch (e) {
     ElMessage.error(errMsg(e, '发布失败'))
+  } finally {
+    publishing.value = false
   }
 }
 
@@ -909,14 +940,15 @@ async function downloadAtt(a: KbAttachment) {
             <!-- 唯一输入框：文档标题（飞书式无框大字，对应正文 H1） -->
             <el-input v-model="form.title" placeholder="文档标题" class="kb-title-input" />
             <div class="kb-head-actions">
-              <!-- 状态徽章：显式区分草稿 / 已发布，并标出相对已保存版本的未保存改动 -->
+              <!-- 状态徽章：显式区分草稿 / 已发布，并标出相对已保存版本的未保存改动；
+                   已发布文档保存草稿后显示「有未发布修改」（保存不改发布态，但 AI 检索的还是旧版） -->
               <span
                 v-if="current"
                 class="kb-status"
                 :class="currentStatus.cls"
-                :title="currentStatus.hint"
+                :title="hasUnpublishedEdits ? '已发布版本与当前草稿不一致，重新发布后生效' : currentStatus.hint"
               >
-                {{ currentStatus.label }}<span v-if="isDirty" class="kb-status-dirty">· 未保存</span>
+                {{ currentStatus.label }}<span v-if="isDirty" class="kb-status-dirty">· 未保存</span><span v-else-if="hasUnpublishedEdits" class="kb-status-dirty">· 有未发布修改</span>
               </span>
               <!-- ① 次要项：结构检查（DEBUG-ONLY）+ 文档属性 -->
               <div class="kb-minor-actions">
@@ -947,17 +979,19 @@ async function downloadAtt(a: KbAttachment) {
                   @click="mode = 'preview'"
                 >预览</button>
               </div>
-              <!-- ③ 操作项：发布 / 保存草稿（删除已收敛到树节点三点菜单，见 §25） -->
+              <!-- ③ 操作项：发布（主操作在前）/ 保存草稿（删除已收敛到树节点三点菜单，见 §25）。
+                   发布 = 先静默保存当前编辑内容再发布该版本（保存与发布同步，不出现「已发布·未保存」歧义） -->
               <div class="kb-actions">
                 <el-button
                   v-has-perm="['ai:kb:publish']"
-                  type="warning"
+                  type="primary"
                   :disabled="!current"
+                  :loading="publishing"
                   @click="publish"
                 >发布</el-button>
                 <el-button
                   v-has-perm="['ai:kb:edit']"
-                  type="primary"
+                  style="margin-left: 5px;"
                   :disabled="!current"
                   @click="save"
                 >保存草稿</el-button>

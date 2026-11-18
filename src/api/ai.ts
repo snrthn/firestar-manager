@@ -130,6 +130,23 @@ function parseSseBlock(block: string): SseEvent | null {
   return { event, data: dataLines.join('\n') }
 }
 
+/**
+ * 解码 token/reasoning 帧：后端已改为 JSON 字符串编码下发（保留前导/尾随空格与换行——
+ * SSE 解析按规范剥掉 data: 后的一个空格，裸文本前导空格会被吞导致英文单词粘连）。
+ * 兼容旧后端裸文本格式：非 JSON 引号开头则原样返回。
+ */
+function decodeTextFrame(s: string): string {
+  if (s.startsWith('"')) {
+    try {
+      const v = JSON.parse(s)
+      if (typeof v === 'string') return v
+    } catch {
+      /* 落入原样返回 */
+    }
+  }
+  return s
+}
+
 async function safeText(resp: Response): Promise<string> {
   try {
     return await resp.text()
@@ -152,11 +169,14 @@ function extractMsg(text: string, fallback: string): string {
 /**
  * 发起一次 AI 对话（流式）。返回 Promise 在流结束时 resolve；
  * 中途异常或收到 error/fallback 事件时通过 handlers 回调通知，Promise 仍会 resolve。
+ *
+ * @param opts.conversationId 续聊的服务端会话 id（历史会话回放后继续提问）。
+ *   不传 = 新开会话；后端会回灌该会话最近的 user/assistant 文本历史实现多轮上下文。
  */
 export async function streamChat(
   message: string,
   handlers: ChatStreamHandlers,
-  opts: { signal?: AbortSignal } = {},
+  opts: { signal?: AbortSignal; conversationId?: number } = {},
 ): Promise<void> {
   const baseURL = request.defaults.baseURL || ''
   const token = localStorage.getItem('token')
@@ -167,7 +187,7 @@ export async function streamChat(
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify(opts.conversationId != null ? { message, conversationId: opts.conversationId } : { message }),
     signal: opts.signal,
   })
 
@@ -214,10 +234,10 @@ export async function streamChat(
         if (!ev) continue
         switch (ev.event) {
           case 'token':
-            handlers.onToken(ev.data)
+            handlers.onToken(decodeTextFrame(ev.data))
             break
           case 'reasoning':
-            handlers.onReasoning?.(ev.data)
+            handlers.onReasoning?.(decodeTextFrame(ev.data))
             break
           case 'done':
             finish(() => handlers.onDone())
@@ -276,6 +296,53 @@ export async function streamChat(
  */
 export function fetchLatestDraft(convId: number): Promise<string | null> {
   return request.get(`/ai/conversation/${convId}/latest-draft`).then((r) => (r.data.data as string) ?? null)
+}
+
+// ===== AI 历史会话（服务端持久化：回放 / 续聊 / 删除）=====
+
+export interface ConversationSummary {
+  id: number
+  title: string
+  provider?: string | null
+  /** 1进行中 2已结束 */
+  status?: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface ConversationMessage {
+  id: number
+  /** user | assistant | tool */
+  role: string
+  content?: string | null
+  /** tool 行的工具名（draft_shipment_create → 前端渲染发货单草稿卡） */
+  toolName?: string | null
+  modelVersion?: string | null
+  createdAt?: string
+}
+
+export interface Paged<T> {
+  records: T[]
+  total: number
+  current: number
+  size: number
+}
+
+/** 当前用户历史会话分页（updatedAt 倒序） */
+export function listConversations(pageNum = 1, pageSize = 20) {
+  return request
+    .get('/ai/conversations', { params: { pageNum, pageSize } })
+    .then((r) => r.data.data as Paged<ConversationSummary>)
+}
+
+/** 会话消息回放（时间升序，含 tool 行 + 工具名） */
+export function getConversationMessages(convId: number) {
+  return request.get(`/ai/conversation/${convId}/messages`).then((r) => r.data.data as ConversationMessage[])
+}
+
+/** 删除会话（连同消息与工具调用记录） */
+export function deleteConversation(convId: number) {
+  return request.delete(`/ai/conversation/${convId}`).then((r) => r.data.data)
 }
 
 // ===== AI 提示词管理（【提示词管理】页，ai:prompt:*） =====

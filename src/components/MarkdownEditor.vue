@@ -93,6 +93,9 @@ async function handleUploadImg(files: File[], callback: (urls: UploadImgCallBack
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 4px;
   overflow: hidden;
+  /* 异步组件（defineAsyncComponent chunk）与 md-editor 内部初始化完成前，外层空 div 高度为 0
+     → 页面整体塌陷跳动。给外层保底高度，加载完成后仍由父级 flex 链接管 */
+  min-height: 120px;
 }
 /* 默认：固定高度，避免弹窗等场景撑出视口 */
 .kb-md-editor :deep(.md-editor) {
@@ -102,6 +105,9 @@ async function handleUploadImg(files: File[], callback: (urls: UploadImgCallBack
    选择器多一个 .is-fill，优先级高于上面的固定高度，无需 !important。 */
 .kb-md-editor.is-fill {
   display: flex;
+  /* 编辑器（md-editor-v3 内部工具栏/正文区初始化完成前）高度塌陷的保底：
+     加载完成前至少站住一屏可用高度，加载后 flex:1 继续接管实际分配 */
+  min-height: 480px;
 }
 .kb-md-editor.is-fill :deep(.md-editor) {
   height: auto;

@@ -9,14 +9,22 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, onMounted } from 'vue'
 import ElementPlus from 'element-plus'
 
-const { streamChatMock } = vi.hoisted(() => ({ streamChatMock: vi.fn() }))
+const { streamChatMock, listConversationsMock, getMessagesMock, deleteConvMock } = vi.hoisted(() => ({
+  streamChatMock: vi.fn(),
+  listConversationsMock: vi.fn(),
+  getMessagesMock: vi.fn(),
+  deleteConvMock: vi.fn(),
+}))
 
 vi.mock('@/api/ai', () => ({
   streamChat: (...args: any[]) => streamChatMock(...args),
   fetchLatestDraft: vi.fn(async () => null),
+  listConversations: (...args: any[]) => listConversationsMock(...args),
+  getConversationMessages: (...args: any[]) => getMessagesMock(...args),
+  deleteConversation: (...args: any[]) => deleteConvMock(...args),
 }))
 
 vi.mock('@/api/request', () => ({
@@ -39,15 +47,6 @@ vi.mock('vue-element-plus-x', () => {
       (props) =>
       () =>
         h('div', { class: 'welcome-stub' }, [h('h3', props.title), h('p', props.description)]),
-  })
-
-  const Thinking = defineComponent({
-    name: 'Thinking',
-    props: { content: String, status: String },
-    setup:
-      (props) =>
-      () =>
-        h('div', { class: 'thinking-stub' }, props.content),
   })
 
   const XSender = defineComponent({
@@ -91,7 +90,7 @@ vi.mock('vue-element-plus-x', () => {
     },
   })
 
-  return { Welcome, Thinking, XSender, BubbleList }
+  return { Welcome, XSender, BubbleList }
 })
 
 import AiAssistantFab from './AiAssistantFab.vue'
@@ -107,8 +106,12 @@ import AiAssistantFab from './AiAssistantFab.vue'
  */
 const ElPopoverStub = defineComponent({
   name: 'ElPopover',
-  setup: (_, { slots }) => () =>
-    h('div', { class: 'popover-stub' }, [slots.reference?.(), slots.default?.()]),
+  emits: ['show'],
+  // 模拟真实 popover 打开即 emit show（历史会话 popover 靠 @show 拉服务端列表）
+  setup: (_, { slots, emit }) => {
+    onMounted(() => emit('show'))
+    return () => h('div', { class: 'popover-stub' }, [slots.reference?.(), slots.default?.()])
+  },
 })
 
 /** 通过菜单 UI 链路切模式：点头部菜单按钮，再点对应菜单项 */
@@ -130,6 +133,9 @@ const mountFab = () =>
 describe('AiAssistantFab（云效式面板）', () => {
   beforeEach(() => {
     streamChatMock.mockReset()
+    listConversationsMock.mockReset().mockResolvedValue({ records: [], total: 0, current: 1, size: 20 })
+    getMessagesMock.mockReset().mockResolvedValue([])
+    deleteConvMock.mockReset().mockResolvedValue(undefined)
     sessionStorage.clear()
   })
 
@@ -325,6 +331,50 @@ describe('AiAssistantFab（云效式面板）', () => {
     expect(stored[0].items.length).toBe(2)
   })
 
+  it('思考过程：思考中展开跟随，完成后自动折叠为「已深度思考（用时 N 秒）」', async () => {
+    streamChatMock.mockImplementation(async (_msg: string, handlers: any) => {
+      handlers.onReasoning('仔细想想这个问题')
+      handlers.onToken('答案')
+      handlers.onDone()
+    })
+
+    const wrapper = mountFab()
+    await wrapper.find('.ai-dock').trigger('click')
+    wrapper.findComponent({ name: 'XSender' }).vm.$emit('submit')
+    await flushPromises()
+
+    const think = wrapper.find('.ai-think')
+    expect(think.exists()).toBe(true)
+    expect(think.text()).toContain('已深度思考')
+    // 完成后默认折叠（成熟系统交互：不占正文空间）；v-show 用内联 style 断言（游离 DOM 下 isVisible 不可靠）
+    expect((think.find('.ai-think__body').attributes('style') ?? '').includes('display: none')).toBe(true)
+    // 点击头部可展开回看
+    await think.find('.ai-think__hd').trigger('click')
+    expect((think.find('.ai-think__body').attributes('style') ?? '').includes('display: none')).toBe(false)
+    expect(think.find('.ai-think__text').text()).toContain('仔细想想这个问题')
+  })
+
+  it('思考中状态：标签显示「思考中…」且内容区展开', async () => {
+    // 模拟只完成思考、正文还没开始的流
+    streamChatMock.mockImplementation(async (_msg: string, handlers: any, opts: any) => {
+      handlers.onReasoning('思考片段')
+      await new Promise<void>((resolve) => {
+        opts.signal.addEventListener('abort', () => resolve())
+      })
+    })
+
+    const wrapper = mountFab()
+    await wrapper.find('.ai-dock').trigger('click')
+    wrapper.findComponent({ name: 'XSender' }).vm.$emit('submit')
+    await flushPromises()
+
+    const think = wrapper.find('.ai-think')
+    expect(think.exists()).toBe(true)
+    expect(think.text()).toContain('思考中')
+    expect((think.find('.ai-think__body').attributes('style') ?? '').includes('display: none')).toBe(false)
+    expect(think.find('.ai-think__text').text()).toContain('思考片段')
+  })
+
   it('新建会话清空当前消息但保留历史快照', async () => {
     streamChatMock.mockImplementation(async (_msg: string, handlers: any) => {
       handlers.onToken('回答内容')
@@ -371,5 +421,91 @@ describe('AiAssistantFab（云效式面板）', () => {
 
     expect(wrapper.find('.md-stub').text()).toContain('部分内容')
     expect(wrapper.find('.ai-stop').exists()).toBe(false)
+  })
+
+  // ===== 历史会话（服务端）+ 多轮续聊 =====
+
+  it('历史会话：服务端列表回放时间线，业务卡只读，续聊请求带 conversationId', async () => {
+    listConversationsMock.mockResolvedValue({
+      records: [{ id: 42, title: '发货单查询', provider: 'openai', status: 2, updatedAt: '2026-11-19T10:00:00' }],
+      total: 1,
+      current: 1,
+      size: 20,
+    })
+    getMessagesMock.mockResolvedValue([
+      { id: 1, role: 'user', content: '帮我查项目A的发货' },
+      {
+        id: 2,
+        role: 'tool',
+        toolName: 'draft_shipment_create',
+        content: JSON.stringify({ projectId: 7, projectNo: 'P-001', lines: [{ itemId: 1, itemName: '钢管', shipmentQty: 2 }] }),
+      },
+      { id: 3, role: 'assistant', content: '已生成发货草稿' },
+    ])
+
+    const wrapper = mountFab()
+    await wrapper.find('.ai-dock').trigger('click')
+    await flushPromises()
+
+    // popover 打开（stub mounted 即 emit show）→ 拉服务端第一页
+    expect(listConversationsMock).toHaveBeenCalled()
+    const items = wrapper.findAll('.ai-hist__item')
+    expect(items.length).toBe(1)
+    expect(items[0].text()).toContain('发货单查询')
+
+    // 点击回放：拉消息 → 构造时间线
+    await items[0].trigger('click')
+    await flushPromises()
+    expect(getMessagesMock).toHaveBeenCalledWith(42)
+    // draft 卡项也会渲染 content 槽（空 md-stub），聚合全部 markdown 节点断言
+    const mdText = wrapper.findAll('.md-stub').map((w) => w.text()).join('')
+    expect(mdText).toContain('已生成发货草稿')
+    expect(wrapper.find('.ai-draft').exists()).toBe(true)
+
+    // 回放的业务卡只读（确认按钮禁用，防重复创建发货单）
+    const cardBtn = wrapper.find('.ai-draft button')
+    expect(cardBtn.attributes('disabled')).toBeDefined()
+
+    // 回放后继续提问 = 续聊：请求体带 conversationId（多轮上下文）
+    streamChatMock.mockImplementation(async (_m: string, handlers: any) => {
+      handlers.onToken('好的')
+      handlers.onDone()
+    })
+    wrapper.findComponent({ name: 'XSender' }).vm.$emit('submit')
+    await flushPromises()
+    expect(streamChatMock).toHaveBeenCalledTimes(1)
+    const opts = streamChatMock.mock.calls[0][2]
+    expect(opts.conversationId).toBe(42)
+  })
+
+  it('多轮续聊：首轮 meta 回 conversationId，第二轮请求自动带上', async () => {
+    streamChatMock.mockImplementation(async (_m: string, handlers: any) => {
+      handlers.onMeta(77)
+      handlers.onToken('答')
+      handlers.onDone()
+    })
+    const wrapper = mountFab()
+    await wrapper.find('.ai-dock').trigger('click')
+    wrapper.findComponent({ name: 'XSender' }).vm.$emit('submit')
+    await flushPromises()
+    expect(streamChatMock.mock.calls[0][2].conversationId).toBeUndefined()
+
+    wrapper.findComponent({ name: 'XSender' }).vm.$emit('submit')
+    await flushPromises()
+    expect(streamChatMock.mock.calls[1][2].conversationId).toBe(77)
+  })
+
+  it('历史接口不可达时降级本地快照', async () => {
+    sessionStorage.setItem(
+      'firestar_ai_local_convs_v1',
+      JSON.stringify([{ id: 'loc1', title: '本地会话', time: Date.now(), items: [] }]),
+    )
+    listConversationsMock.mockRejectedValue(new Error('network down'))
+
+    const wrapper = mountFab()
+    await wrapper.find('.ai-dock').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('本地会话')
   })
 })

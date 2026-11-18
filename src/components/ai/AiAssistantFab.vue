@@ -10,12 +10,12 @@
  * 组件分工（不重复造轮子）：
  *   - 气泡列表 / 滚动状态机 / 回底按钮 / 未读角标：vue-element-plus-x 的 BubbleList
  *   - Markdown（GFM + Shiki 高亮 + LaTeX + 流式）：x-markdown-vue（见 AiMarkdown.vue，懒加载）
- *   - 思考过程折叠：Thinking
+ *   - 思考过程折叠：AiThinking（自研，DeepSeek R1 式流光标签 + 用时 + 自动折叠）
  *   - 输入框（@ 提及 / 附件入口 / 发送态）：XSender
  *   - 业务渲染（发货单草稿卡、日期分隔等）：BubbleList 的 #item 插槽
  *
- * 自研的部分只剩「壳」——面板布局、历史会话下拉、「新建会话」与本地会话快照，
- * 因为后端还没有历史会话接口（见 persistCurrent / conversations 的注释）。
+ * 自研的部分只剩「壳」——面板布局、历史会话下拉（服务端分页 + 接口不可达时降级本地快照）、
+ * 「新建会话」与多轮续聊（请求体带 conversationId，后端回灌最近 20 条 user/assistant 历史）。
  *
  * 与旧版的兼容点：
  *   - 入口仍受 AdminLayout 的 v-has-perm="'ai:assistant:use'" 控制，父级不用改；
@@ -25,38 +25,18 @@
  * 旧组件已备份为同目录 AiAssistantFab.vue.bak。
  */
 import { computed, onBeforeUnmount, onMounted, reactive, ref, type Component } from 'vue'
-import { BubbleList, Thinking, Welcome, XSender } from 'vue-element-plus-x'
+import { BubbleList, Welcome, XSender } from 'vue-element-plus-x'
+import AiThinking from './AiThinking.vue'
 import 'vue-element-plus-x/styles/index.css'
 import { ChatDotRound, Check, Clock, Close, FullScreen, Loading, Menu, Plus, Rank } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { streamChat, fetchLatestDraft } from '@/api/ai'
+import { streamChat, fetchLatestDraft, listConversations, getConversationMessages, deleteConversation, type ConversationSummary } from '@/api/ai'
 import request from '@/api/request'
 import AiMarkdown from './AiMarkdown.vue'
+import AiDraftCard from './AiDraftCard.vue'
+import type { DraftPreview } from './AiDraftCard.vue'
 
 // ===== 数据结构 =====
-interface DraftLine {
-  itemId: number
-  itemName: string
-  specModel?: string
-  unit?: string
-  quantity?: number
-  shippedQty?: number
-  remaining?: number
-  shipmentQty: number
-  unitPrice?: number
-  lineAmount?: number
-}
-interface DraftPreview {
-  projectId: number
-  projectNo?: string
-  projectName?: string
-  customerName?: string
-  contractAmount?: number
-  lines: DraftLine[]
-  totalAmount?: number
-  errors?: string[]
-  warnings?: string[]
-}
 
 type ReasoningStatus = 'start' | 'thinking' | 'end' | 'error' | 'cancel'
 
@@ -68,14 +48,18 @@ interface ChatItem {
   content: string
   loading?: boolean
   fallback?: boolean
-  /** 思考过程（后端补 reasoning 帧后自动填充） */
+  /** 思考过程（后端 reasoning 帧独立通道下发，Thinking 组件展示） */
   reasoning?: string
   reasoningStatus?: ReasoningStatus
-  /** 非气泡节点：draft = 发货单草稿卡 */
+  /** 非气泡节点：draft = 发货单草稿卡（AiDraftCard，业务自定义渲染注册项之一） */
   itemType?: 'draft'
   draft?: DraftPreview
   draftCreated?: boolean
   draftCreating?: boolean
+  /** 历史回放：业务卡只读（禁确认按钮，防重复创建） */
+  history?: boolean
+  /** 传给 Bubble 的 noStyle：assistant 回复无气泡背景/padding（云效式平铺，用户消息保留气泡） */
+  noStyle?: boolean
 }
 
 interface StoredConv {
@@ -96,7 +80,11 @@ const conversations = ref<StoredConv[]>([])
 const activeId = ref<string | null>(null)
 /** 后端会话 id（meta 帧带回），Coze 模式下流结束按会话补拉草稿 */
 const remoteConvId = ref<number | null>(null)
+/** 当前打开的服务端会话 id：非空时发送请求带 conversationId（续聊 / 多轮上下文） */
+const activeConvId = ref<number | null>(null)
 let draftReceived = false
+/** 本轮流是否新开会话：只有新会话的流结束后才按会话补拉草稿（续聊补拉会把旧草稿再插一张卡） */
+let streamIsNewConv = false
 
 let controller: AbortController | null = null
 /** 流式输出的节流缓冲：每 60ms 合并一次，避免每个 token 都重渲染整段 Markdown */
@@ -114,7 +102,7 @@ const ctxItems = [
   { label: '@ 本月应收', text: '@应收 ' },
 ]
 
-// ===== 历史会话（本地快照；后端历史接口就绪后换成服务端分页，其余不用改） =====
+// ===== 历史会话（服务端持久化优先，接口不可达时降级本地快照） =====
 const STORE_KEY = 'firestar_ai_local_convs_v1'
 
 function loadConversations() {
@@ -134,6 +122,107 @@ function saveConversations() {
   }
 }
 loadConversations()
+
+const HIST_PAGE_SIZE = 20
+/** 服务端历史（histFailed=false 时展示这份） */
+const serverConvs = ref<ConversationSummary[]>([])
+const serverTotal = ref(0)
+const histPage = ref(1)
+const histLoading = ref(false)
+/** 服务端历史接口不可达 → 降级本地快照（同一浏览器内可回放） */
+const histFailed = ref(false)
+
+async function fetchHistoryPage(page: number) {
+  histLoading.value = true
+  try {
+    const p = await listConversations(page, HIST_PAGE_SIZE)
+    if (page === 1) serverConvs.value = p.records
+    else serverConvs.value = serverConvs.value.concat(p.records)
+    serverTotal.value = p.total
+    histPage.value = page
+    histFailed.value = false
+  } catch {
+    // 接口不可达 / 未登录旧版本等：降级本地快照
+    histFailed.value = true
+    loadConversations()
+  } finally {
+    histLoading.value = false
+  }
+}
+/** popover 打开时拉第一页（每次打开都刷新，保证新会话及时出现） */
+function onHistShow() {
+  serverConvs.value = []
+  serverTotal.value = 0
+  histPage.value = 1
+  void fetchHistoryPage(1)
+}
+const histHasMore = computed(() => !histFailed.value && serverConvs.value.length < serverTotal.value)
+
+/** 点开服务端历史会话：拉消息 → 构造回放时间线 */
+async function switchToServer(conv: ConversationSummary) {
+  if (streaming.value) stop()
+  histLoading.value = true
+  let msgs: Awaited<ReturnType<typeof getConversationMessages>> = []
+  try {
+    msgs = await getConversationMessages(conv.id)
+  } catch {
+    ElMessage.error('历史会话拉取失败，请稍后重试')
+    histLoading.value = false
+    return
+  }
+  histLoading.value = false
+  persistCurrent()
+  const items: ChatItem[] = []
+  for (const m of msgs) {
+    if (m.role === 'user' && m.content) {
+      items.push({ id: `srv${m.id}`, role: 'user', placement: 'end', content: m.content })
+    } else if (m.role === 'assistant' && m.content) {
+      items.push({ id: `srv${m.id}`, role: 'assistant', placement: 'start', content: m.content, noStyle: true })
+    } else if (m.role === 'tool' && m.toolName && m.content) {
+      // 业务自定义渲染回放：draft_* 工具结果 JSON → 对应业务卡（历史卡只读，防重复创建）
+      if (m.toolName === 'draft_shipment_create') {
+        try {
+          items.push({
+            id: `srv${m.id}`,
+            role: 'assistant',
+            placement: 'start',
+            content: '',
+            itemType: 'draft',
+            draft: JSON.parse(m.content) as DraftPreview,
+            history: true,
+            noStyle: true,
+          })
+        } catch {
+          /* 脏数据跳过，不阻断回放 */
+        }
+      }
+    }
+  }
+  activeId.value = `srv-${conv.id}`
+  // 续聊两件套：下次发送带 conversationId（多轮上下文）；流结束补拉草稿也定位到本会话
+  activeConvId.value = conv.id
+  remoteConvId.value = conv.id
+  messages.value = items
+  scrollToBottom()
+}
+
+async function removeServerConv(conv: ConversationSummary) {
+  try {
+    await deleteConversation(conv.id)
+  } catch {
+    ElMessage.error('删除失败，请稍后重试')
+    return
+  }
+  serverConvs.value = serverConvs.value.filter((c) => c.id !== conv.id)
+  serverTotal.value = Math.max(0, serverTotal.value - 1)
+  if (activeConvId.value === conv.id) {
+    activeConvId.value = null
+    remoteConvId.value = null
+    activeId.value = null
+    messages.value = []
+  }
+  ElMessage.success('会话已删除')
+}
 
 function titleOf(items: ChatItem[]) {
   const first = items.find((m) => m.role === 'user' && m.content.trim())
@@ -161,6 +250,7 @@ function newConversation() {
   persistCurrent()
   activeId.value = null
   remoteConvId.value = null
+  activeConvId.value = null
   messages.value = []
 }
 
@@ -403,11 +493,14 @@ async function send(text: string) {
     placement: 'start',
     content: '',
     loading: true,
+    noStyle: true,
   }) as ChatItem
   messages.value.push(ai)
   activeItem = ai
   pendingText = ''
   draftReceived = false
+  // 本轮是否新开会话：决定了流结束后要不要按会话补拉草稿（续聊补拉会把旧草稿重复插卡）
+  streamIsNewConv = activeConvId.value == null
   streaming.value = true
   controller = new AbortController()
   scrollToBottom()
@@ -428,6 +521,8 @@ async function send(text: string) {
         },
         onMeta: (id) => {
           remoteConvId.value = id
+          // 新会话首轮拿到服务端 id 后，本轮后续发送自动变为续聊（多轮上下文）
+          if (activeConvId.value == null) activeConvId.value = id
         },
         onDraft: (payload) => {
           draftReceived = true
@@ -435,8 +530,8 @@ async function send(text: string) {
         },
         onDone: () => {
           finishStream(ai, 'end')
-          // Coze 模式：SSE 流不经过草稿结果，按会话补拉一次
-          if (!draftReceived && remoteConvId.value != null) {
+          // Coze 模式：SSE 流不经过草稿结果，且仅新开会话的流结束后补拉一次
+          if (!draftReceived && streamIsNewConv && remoteConvId.value != null) {
             fetchLatestDraft(remoteConvId.value)
               .then((rj) => {
                 if (rj) pushDraft(rj)
@@ -471,7 +566,7 @@ async function send(text: string) {
               : `AI 服务暂时不可用（${reason || '未知原因'}），请稍后重试。`
         },
       },
-      { signal: controller.signal },
+      { signal: controller.signal, conversationId: activeConvId.value ?? undefined },
     )
   } catch (e: any) {
     finishStream(ai, 'error')
@@ -530,6 +625,7 @@ function pushDraft(resultJson: string) {
       content: '',
       itemType: 'draft',
       draft: data,
+      noStyle: true,
     })
   scrollToBottom()
 }
@@ -593,7 +689,7 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
                 <el-icon :size="17"><Plus /></el-icon>
               </button>
             </el-tooltip>
-            <el-popover placement="bottom-end" :width="320" trigger="click" popper-class="ai-hist-pop">
+            <el-popover placement="bottom-end" :width="340" trigger="click" popper-class="ai-hist-pop" @show="onHistShow">
               <template #reference>
                 <button class="ai-icon-btn" type="button" title="最近会话">
                   <el-icon :size="17"><Clock /></el-icon>
@@ -601,18 +697,52 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
               </template>
               <div class="ai-hist">
                 <div class="ai-hist__hd">最近会话</div>
-                <div v-if="!conversations.length" class="ai-hist__empty">暂无历史会话</div>
-                <button
-                  v-for="c in conversations"
-                  :key="c.id"
-                  type="button"
-                  class="ai-hist__item"
-                  :class="{ 'is-active': c.id === activeId }"
-                  @click="switchTo(c.id)"
-                >
-                  <span class="ai-hist__label">{{ c.title }}</span>
-                  <span class="ai-hist__time">{{ dayLabel(c.time) }}</span>
-                </button>
+                <div v-if="histLoading && !serverConvs.length && !histFailed" class="ai-hist__empty">加载中…</div>
+                <!-- 服务端历史（接口不可达时自动降级本地快照） -->
+                <template v-if="!histFailed">
+                  <div v-if="!histLoading && !serverConvs.length" class="ai-hist__empty">暂无历史会话</div>
+                  <button
+                    v-for="c in serverConvs"
+                    :key="c.id"
+                    type="button"
+                    class="ai-hist__item"
+                    :class="{ 'is-active': c.id === activeConvId }"
+                    @click="switchToServer(c)"
+                  >
+                    <span class="ai-hist__label">{{ c.title || '新会话' }}</span>
+                    <span class="ai-hist__time">{{ dayLabel(new Date(c.updatedAt || c.createdAt || Date.now()).getTime()) }}</span>
+                    <span
+                      class="ai-hist__del"
+                      role="button"
+                      title="删除会话"
+                      @click.stop="removeServerConv(c)"
+                    >×</span>
+                  </button>
+                  <button
+                    v-if="histHasMore"
+                    type="button"
+                    class="ai-hist__more"
+                    :disabled="histLoading"
+                    @click="fetchHistoryPage(histPage + 1)"
+                  >
+                    {{ histLoading ? '加载中…' : '加载更多' }}
+                  </button>
+                </template>
+                <!-- 降级：本地快照（服务端接口不可达时） -->
+                <template v-else>
+                  <div v-if="!conversations.length" class="ai-hist__empty">暂无历史会话</div>
+                  <button
+                    v-for="c in conversations"
+                    :key="c.id"
+                    type="button"
+                    class="ai-hist__item"
+                    :class="{ 'is-active': c.id === activeId }"
+                    @click="switchTo(c.id)"
+                  >
+                    <span class="ai-hist__label">{{ c.title }}</span>
+                    <span class="ai-hist__time">{{ dayLabel(c.time) }}</span>
+                  </button>
+                </template>
               </div>
             </el-popover>
             <!-- 显示模式：历史图标右侧的弹出菜单（云效同位置），是切换浮动/停靠/全屏的唯一入口。
@@ -680,12 +810,10 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
             </template>
 
             <template #header="{ item }">
-              <Thinking
+              <AiThinking
                 v-if="asItem(item).reasoning"
-                :content="asItem(item).reasoning"
+                :content="asItem(item).reasoning ?? ''"
                 :status="asItem(item).reasoningStatus || 'end'"
-                auto-collapse
-                max-width="100%"
                 class="ai-think"
               />
             </template>
@@ -698,57 +826,15 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
             </template>
 
             <template #item="{ item }">
-              <div v-if="asItem(item).itemType === 'draft' && asItem(item).draft" class="ai-draft">
-                <div class="ai-draft__hd">
-                  <span class="ai-draft__title">发货单草稿（待确认）</span>
-                  <el-tag v-if="asItem(item).draftCreated" size="small" type="success">已创建</el-tag>
-                </div>
-                <div class="ai-draft__proj">
-                  {{ asItem(item).draft!.projectName || '—' }}
-                  <span class="ai-draft__sub">（{{ asItem(item).draft!.projectNo || '—' }}）</span>
-                  <span class="ai-draft__sub"> · 客户：{{ asItem(item).draft!.customerName || '—' }}</span>
-                </div>
-                <table v-if="asItem(item).draft!.lines?.length" class="ai-draft__table">
-                  <thead>
-                    <tr>
-                      <th>货物</th>
-                      <th>规格</th>
-                      <th>数量</th>
-                      <th>单价</th>
-                      <th>金额</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(l, li) in asItem(item).draft!.lines" :key="li">
-                      <td>{{ l.itemName }}</td>
-                      <td>{{ l.specModel || '—' }}</td>
-                      <td>{{ l.shipmentQty }} {{ l.unit || '' }}</td>
-                      <td>{{ l.unitPrice != null ? l.unitPrice : '—' }}</td>
-                      <td>{{ l.lineAmount != null ? l.lineAmount : '—' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <div class="ai-draft__total">
-                  合计：{{ asItem(item).draft!.totalAmount != null ? asItem(item).draft!.totalAmount : '—' }}
-                </div>
-                <div v-if="asItem(item).draft!.errors?.length" class="ai-draft__err">
-                  <div v-for="(e, ei) in asItem(item).draft!.errors" :key="'e' + ei">{{ e }}</div>
-                </div>
-                <div v-if="asItem(item).draft!.warnings?.length" class="ai-draft__warn">
-                  <div v-for="(w, wi) in asItem(item).draft!.warnings" :key="'w' + wi">{{ w }}</div>
-                </div>
-                <div class="ai-draft__actions">
-                  <el-button
-                    type="primary"
-                    size="small"
-                    :loading="!!asItem(item).draftCreating"
-                    :disabled="!!asItem(item).draftCreated || !!asItem(item).draft!.errors?.length"
-                    @click="confirmDraft(asItem(item))"
-                  >
-                    确认创建（存草稿）
-                  </el-button>
-                </div>
-              </div>
+              <!-- 业务自定义渲染：itemType → 业务卡组件（draft = 发货单草稿，见 AiDraftCard.vue 注册说明） -->
+              <AiDraftCard
+                v-if="asItem(item).itemType === 'draft' && asItem(item).draft"
+                :draft="asItem(item).draft!"
+                :created="asItem(item).draftCreated"
+                :creating="asItem(item).draftCreating"
+                :history="asItem(item).history"
+                @confirm="confirmDraft(asItem(item))"
+              />
             </template>
           </BubbleList>
         </div>
@@ -965,8 +1051,12 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
 .ai-list {
   flex: 1;
   min-height: 0;
-  /* 第一条消息不贴顶：这个 padding 在 BubbleList 滚动容器之外，滚到哪里都保持间距 */
-  padding-top: 12px;
+  /* 第一条消息不贴顶、最后一条不贴底：padding 在 BubbleList 滚动容器之外，滚到哪里都保持间距 */
+  padding: 12px 0 16px;
+}
+/* assistant 回复走 noStyle（透明无 padding），去掉组件默认的 min-height 撑高 */
+.ai-list :deep(.elx-bubble--no-style .elx-bubble__content) {
+  min-height: 0;
 }
 
 /* ===== 空态欢迎区（云效式：纯文字居中，无背景色/无卡片/无快捷提问） ===== */
@@ -1029,77 +1119,9 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
   color: #909399;
   font-size: 13px;
 }
-.ai-think {
-  margin-bottom: 6px;
-}
+/* 思考块的外距/样式由 AiThinking.vue 自带，这里不再覆写 */
 
-/* ===== 草稿卡（#item 插槽） ===== */
-.ai-draft {
-  margin: 6px 0 12px;
-  padding: 12px;
-  border: 1px solid #b3d8ff;
-  border-radius: 10px;
-  background: #f5f9ff;
-  font-size: 13px;
-  color: #303133;
-}
-.ai-draft__hd {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-.ai-draft__title {
-  font-weight: 600;
-  color: #409eff;
-}
-.ai-draft__proj {
-  margin-bottom: 8px;
-  line-height: 1.6;
-}
-.ai-draft__sub {
-  color: #909399;
-}
-.ai-draft__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-.ai-draft__table th,
-.ai-draft__table td {
-  border: 1px solid #ebeef5;
-  padding: 4px 6px;
-  text-align: left;
-}
-.ai-draft__table th {
-  background: #ecf5ff;
-  color: #606266;
-}
-.ai-draft__total {
-  margin-top: 8px;
-  text-align: right;
-  font-weight: 600;
-}
-.ai-draft__err,
-.ai-draft__warn {
-  margin-top: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  line-height: 1.6;
-}
-.ai-draft__err {
-  background: #fef0f0;
-  color: #f56c6c;
-}
-.ai-draft__warn {
-  background: #fdf6ec;
-  color: #e6a23c;
-}
-.ai-draft__actions {
-  margin-top: 10px;
-  display: flex;
-  gap: 8px;
-}
+/* ===== 草稿卡样式已迁至 AiDraftCard.vue（业务自定义渲染卡组件） ===== */
 
 /* ===== 底部 ===== */
 .ai-ft {
@@ -1209,6 +1231,48 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
   color: #c0c4cc;
   font-size: 12px;
 }
+/* 服务端历史条目的删除按钮：hover 才露出，避免误触 */
+.ai-hist__del {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: #c0c4cc;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.ai-hist__item:hover .ai-hist__del {
+  opacity: 1;
+}
+.ai-hist__del:hover {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+.ai-hist__more {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #409eff;
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+}
+.ai-hist__more:hover {
+  background: #f5f7fa;
+}
+.ai-hist__more:disabled {
+  color: #c0c4cc;
+  cursor: default;
+}
 .ai-ctx__hd {
   padding: 2px 4px 6px;
   color: #909399;
@@ -1236,7 +1300,8 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
    样式表 !important 可以覆盖 EP 写在 popper 上的内联 z-index，拉到面板之上。
    注意 popper 内容不在组件作用域内，规则必须放非 scoped 块 */
 .ai-mode-pop,
-.ai-hist-pop {
+.ai-hist-pop,
+.ai-ctx-pop {
   z-index: 2200 !important;
 }
 
