@@ -5,6 +5,17 @@
         <div class="mc-header">
           <span class="mc-title">AI 模型配置</span>
           <div class="mc-actions">
+            <!-- 类型筛选：字典下拉（ai_model_type），与全站筛选控件口径一致（反馈页同款）。
+                 ⚠️ 这里原先用 el-radio-button，但 element-plus/es/components/radio/style/css.mjs
+                 只聚合了 el-radio.css，漏掉 el-radio-button.css → 原生 <input type=radio> 的
+                 隐藏样式（opacity:0）失效，圆点裸露、连体边框与间距全丢，糊成一坨挤在一起的字。
+                 已改 DictSelect，并在 main.ts 补齐 element-plus 的 radio 样式。 -->
+            <DictSelect
+              v-model="typeFilter"
+              type-code="ai_model_type"
+              placeholder="全部类型"
+              class="filter-select"
+            />
             <el-button
               v-has-perm="['sys:modelConfig:edit']"
               type="primary"
@@ -17,6 +28,12 @@
               @click="load"
             >刷新</el-button>
             <el-button
+              v-if="ttsEnabled"
+              type="success"
+              plain
+              @click="openTtsTest"
+            >语音测试</el-button>
+            <el-button
               v-has-perm="['sys:modelConfig:edit']"
               :icon="Refresh"
               :loading="reloading"
@@ -28,12 +45,19 @@
 
       <el-alert type="info" :closable="false" show-icon class="mc-tip">
         <template #title>
-          密钥入库即加密（SM4-GCM，enc:v1: 前缀），本页仅回显「是否已配置」标记，绝不展示明文 / 密文。
-          使某一行「启用」后运行期即热切换供应商，无需重启。
+          密钥入库即加密（复用 AI_KEK，SM4-GCM，enc:v1: 前缀），本页仅回显「是否已配置」标记，绝不展示明文 / 密文。
+          模型类型分 chat / embedding / rerank / tts，同一供应商可在不同类型下各存一行；每类型各有一条「启用」行生效。
         </template>
       </el-alert>
 
-      <el-table :data="list" v-loading="loading" border stripe class="mc-table">
+      <el-table :data="filteredList" v-loading="loading" border stripe class="mc-table">
+        <el-table-column prop="modelType" label="类型" width="110">
+          <template #default="{ row }">
+            <el-tag :type="modelTypeTagType(row.modelType) || 'info'" effect="dark">
+              {{ modelTypeLabel(row.modelType) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="provider" label="供应商" width="120">
           <template #default="{ row }">
             <el-tag :type="providerTagType(row.provider) || 'info'">
@@ -56,7 +80,13 @@
             <div style="display:inline-flex;align-items:center;gap:16px;white-space:nowrap">
               <span v-if="row.provider === 'coze'">BotId: <el-tag size="small" :type="row.botIdSet ? 'success' : 'info'">{{ row.botIdSet ? '已配置' : '未配置' }}</el-tag></span>
               <span>ApiKey: <el-tag size="small" :type="row.apiKeySet ? 'success' : 'info'">{{ row.apiKeySet ? '已配置' : '未配置' }}</el-tag></span>
-              <span v-if="row.extraSet">附加: <el-tag size="small" type="success">已配置</el-tag></span>
+              <el-tooltip
+                v-if="row.extraSet"
+                content="扩展参数已配置：TTS 的音色/格式/采样率、Embedding 的向量维度等。点击「编辑」查看与修改。"
+                placement="top"
+              >
+                <span>附加: <el-tag size="small" type="success">已配置</el-tag></span>
+              </el-tooltip>
             </div>
           </template>
         </el-table-column>
@@ -84,16 +114,19 @@
       @closed="resetForm"
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
+        <el-form-item label="模型类型" prop="modelType">
+          <DictSelect v-model="form.modelType" type-code="ai_model_type" placeholder="选择模型类型" :disabled="!!form.id" :clearable="false" />
+        </el-form-item>
         <el-form-item label="供应商" prop="provider">
           <DictSelect v-model="form.provider" type-code="ai_provider" placeholder="选择供应商" :disabled="!!form.id" :clearable="false" />
         </el-form-item>
         <el-form-item label="Base URL" prop="baseUrl">
-          <el-input v-model="form.baseUrl" placeholder="Coze: https://api.coze.cn；DeepSeek/OpenAI 兼容: https://api.deepseek.com（代码自动拼 /chat/completions）" />
+          <el-input v-model="form.baseUrl" :placeholder="baseUrlPlaceholder" />
         </el-form-item>
         <el-form-item :label="form.provider === 'coze' ? '模型 / BotId' : '模型名'" prop="model">
           <el-input
             v-model="form.model"
-            :placeholder="form.provider === 'coze' ? 'Coze 填 BotId（也可填在下方 BotId 字段）' : '如 deepseek-chat / gpt-4o / glm-4'"
+            :placeholder="modelPlaceholder"
           />
         </el-form-item>
         <el-form-item v-if="form.provider === 'coze'" label="BotId">
@@ -112,12 +145,48 @@
             placeholder="PAT / API Key；留空 = 保留已有配置"
           />
         </el-form-item>
-        <el-form-item label="附加参数(JSON)">
-          <el-input v-model="form.extraJson" type="textarea" :rows="2" placeholder='可选，如 {"temperature":0.2}' />
+        <!-- TTS 结构化参数：对应 extra_json 的 voice / format / sample_rate -->
+        <template v-if="form.modelType === 'tts'">
+          <el-form-item label="音色">
+            <el-select v-model="ttsForm.voice" filterable placeholder="选择音色" @change="syncTtsToJson">
+              <el-option v-for="v in TTS_VOICES" :key="v.value" :label="v.label" :value="v.value" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="音频格式">
+            <el-select v-model="ttsForm.format" @change="syncTtsToJson">
+              <el-option v-for="f in TTS_FORMATS" :key="f.value" :label="f.label" :value="f.value" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="采样率">
+            <el-select v-model="ttsForm.sampleRate" @change="syncTtsToJson">
+              <el-option v-for="s in TTS_SAMPLE_RATES" :key="s.value" :label="s.label" :value="s.value" />
+            </el-select>
+          </el-form-item>
+        </template>
+
+        <!-- Embedding 向量维度：只读。维度由 ES 索引结构决定，改了必须重建索引 -->
+        <el-form-item v-if="form.modelType === 'embedding'" label="向量维度">
+          <el-input :model-value="embeddingDims ?? '未配置'" disabled />
+          <span class="mc-hint">维度由 ES 索引结构决定，修改需同步改 kb.embedding.dims 并重建索引，勿在此编辑</span>
         </el-form-item>
+
+        <!-- 高级：原始 JSON。结构化表单的改动会同步到这里，用户可继续手改 -->
+        <el-collapse class="mc-advanced">
+          <el-collapse-item title="高级：附加参数 (JSON)" name="extra">
+            <el-form-item label="附加参数(JSON)">
+              <el-input
+                v-model="form.extraJson"
+                type="textarea"
+                :rows="3"
+                placeholder='如 {"temperature":0.2}；留空 = 保留已有配置'
+              />
+              <span class="mc-hint">保存时提交的是这里的完整 JSON；留空 = 保留库内已有配置</span>
+            </el-form-item>
+          </el-collapse-item>
+        </el-collapse>
         <el-form-item label="设为启用">
           <el-switch v-model="form.activeBool" />
-          <span class="mc-hint">启用后该供应商成为运行期生效配置（全局唯一）</span>
+          <span class="mc-hint">启用后成为该类型下的运行期生效配置（每类型唯一）</span>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -125,11 +194,27 @@
         <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- TTS 语音合成试听（V214，验证 tts 配置行是否真正可用） -->
+    <el-dialog v-model="ttsDialogVisible" title="语音合成试听" width="520px" append-to-body>
+      <el-alert type="info" :closable="false" show-icon class="mc-tip">
+        <template #title>使用当前启用的 tts 模型合成语音。文本将发送给第三方（百炼），请勿输入敏感内容。</template>
+      </el-alert>
+      <el-input v-model="ttsText" type="textarea" :rows="3" maxlength="2000" show-word-limit
+        placeholder="输入要合成的文本，如：您好，欢迎使用智能语音助手" />
+      <div v-if="ttsAudioUrl" class="mc-audio">
+        <audio :src="ttsAudioUrl" controls />
+      </div>
+      <template #footer>
+        <el-button @click="ttsDialogVisible = false">关闭</el-button>
+        <el-button type="primary" :loading="ttsSynthesizing" @click="doSynthesize">合成并试听</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { Plus, Refresh, Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import {
@@ -138,6 +223,7 @@ import {
   updateModelConfig,
   deleteModelConfig,
   reloadModelConfig,
+  synthesizeTts,
   type ModelConfigMasked,
   type ModelConfigPayload,
 } from '@/api/ai'
@@ -148,11 +234,13 @@ const loading = ref(false)
 const reloading = ref(false)
 const saving = ref(false)
 const list = ref<ModelConfigMasked[]>([])
+const typeFilter = ref('')
 
 const dialogVisible = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive<ModelConfigPayload & { activeBool: boolean }>({
   id: undefined,
+  modelType: 'chat',
   provider: 'coze',
   baseUrl: '',
   model: '',
@@ -164,12 +252,162 @@ const form = reactive<ModelConfigPayload & { activeBool: boolean }>({
 })
 
 const rules: FormRules = {
+  modelType: [{ required: true, message: '请选择模型类型', trigger: 'change' }],
   provider: [{ required: true, message: '请选择供应商', trigger: 'change' }],
   baseUrl: [{ required: true, message: '请填写 Base URL', trigger: 'blur' }],
 }
 
-// 供应商中文名 / 标签颜色来自字典 ai_provider（替代硬编码 providerLabel）
+// 供应商中文名 / 标签颜色来自字典（替代硬编码）
 const { label: providerLabel, style: providerTagType } = useDictLabels('ai_provider')
+const { label: modelTypeLabel, style: modelTypeTagType } = useDictLabels('ai_model_type')
+
+// ---------------------------------------------------------------- TTS 结构化参数
+// 音色清单取自百炼官方 cosyvoice-v3-flash 音色表（常用中文音色）。
+// 对应 extra_json 的 voice / format / sample_rate 三个键。
+const TTS_VOICES = [
+  { value: 'longanyang', label: '龙安洋（阳光大男孩）' },
+  { value: 'longanhuan', label: '龙安欢（欢脱元气女）' },
+  { value: 'longxiaoxia', label: '龙小夏（沉稳权威女）' },
+  { value: 'longxiaochun', label: '龙小淳（知性积极女）' },
+  { value: 'longyumi', label: 'YUMI（正经青年女）' },
+  { value: 'longanyun', label: '龙安昀（居家暖男）' },
+  { value: 'longfei', label: '龙飞（热血磁性男）' },
+  { value: 'longyingxiao', label: '龙应笑（清甜推销女）' },
+  { value: 'longyingxun', label: '龙应询（年轻青涩男）' },
+  { value: 'longyingjing', label: '龙应静（低调冷静女）' },
+  { value: 'longyingling', label: '龙应聆（温和共情女）' },
+  { value: 'longyingtao', label: '龙应桃（温柔淡定女）' },
+  { value: 'longhuhu', label: '龙呼呼（天真烂漫女童）' },
+  { value: 'longpaopao', label: '龙泡泡（飞天泡泡音）' },
+  { value: 'longxian', label: '龙仙（豪放可爱女）' },
+  { value: 'longling', label: '龙铃（稚气呆板女）' },
+  { value: 'longshanshan', label: '龙闪闪（戏剧化童声）' },
+  { value: 'longniuniu', label: '龙牛牛（阳光男童声）' },
+  { value: 'longjiaxin', label: '龙嘉欣（粤语女）' },
+  { value: 'longjiayi', label: '龙嘉怡（粤语女）' },
+  { value: 'longanyue', label: '龙安粤（粤语男）' },
+  { value: 'longlaotie', label: '龙老铁（东北话）' },
+  { value: 'longshange', label: '龙陕哥（陕西话）' },
+]
+const TTS_FORMATS = [
+  { value: 'mp3', label: 'mp3（默认，体积小）' },
+  { value: 'wav', label: 'wav（无损）' },
+  { value: 'pcm', label: 'pcm（原始音频）' },
+  { value: 'opus', label: 'opus（低延迟）' },
+]
+const TTS_SAMPLE_RATES = [
+  { value: '22050', label: '22050 Hz（默认）' },
+  { value: '24000', label: '24000 Hz' },
+  { value: '16000', label: '16000 Hz' },
+  { value: '8000', label: '8000 Hz' },
+]
+
+// TTS 结构化表单状态（值最终写回 form.extraJson）
+const ttsForm = reactive({ voice: 'longanyang', format: 'mp3', sampleRate: '22050' })
+// Embedding 向量维度（只读展示）
+const embeddingDims = ref<number | null>(null)
+
+/** 安全解析 extra JSON；非法/非对象一律当空对象 */
+function parseExtraObj(json?: string): Record<string, unknown> {
+  if (!json) return {}
+  try {
+    const o = JSON.parse(json)
+    return o && typeof o === 'object' && !Array.isArray(o) ? (o as Record<string, unknown>) : {}
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * 结构化表单 → extra JSON（单向同步）。
+ *
+ * <p>刻意做成单向：用户在「高级 JSON」里手改的内容不会被结构化表单覆盖，
+ * 避免两个入口互相打架、用户不知道自己改的是哪个。反向（JSON → 表单）不做。</p>
+ */
+function syncTtsToJson() {
+  const base = parseExtraObj(form.extraJson)
+  base.voice = ttsForm.voice
+  base.format = ttsForm.format
+  base.sample_rate = Number(ttsForm.sampleRate)
+  form.extraJson = JSON.stringify(base)
+}
+
+/** 编辑时把后端回显的 extra 明文回填到结构化表单 */
+function applyExtra(extraJson?: string | null) {
+  const o = parseExtraObj(extraJson || undefined)
+  if (typeof o.voice === 'string') ttsForm.voice = o.voice
+  if (typeof o.format === 'string') ttsForm.format = o.format
+  const sr = o.sample_rate ?? o.sampleRate
+  if (sr != null && sr !== '') ttsForm.sampleRate = String(sr)
+  if (o.dims != null) embeddingDims.value = Number(o.dims)
+}
+
+// 类型筛选（前端本地过滤，接口一次性返回全部）
+const filteredList = computed(() =>
+  typeFilter.value ? list.value.filter((r) => r.modelType === typeFilter.value) : list.value,
+)
+
+// TTS 试听：仅当存在启用的 tts 配置行时显示入口
+const ttsEnabled = computed(() =>
+  list.value.some((r) => r.modelType === 'tts' && r.active === 1 && r.apiKeySet),
+)
+const ttsDialogVisible = ref(false)
+const ttsText = ref('您好，欢迎使用智能语音助手')
+const ttsSynthesizing = ref(false)
+const ttsAudioUrl = ref('')
+
+function openTtsTest() {
+  ttsText.value = '您好，欢迎使用智能语音助手'
+  if (ttsAudioUrl.value) {
+    URL.revokeObjectURL(ttsAudioUrl.value)
+    ttsAudioUrl.value = ''
+  }
+  ttsDialogVisible.value = true
+}
+
+async function doSynthesize() {
+  if (!ttsText.value.trim()) {
+    ElMessage.warning('请输入要合成的文本')
+    return
+  }
+  ttsSynthesizing.value = true
+  try {
+    const res = await synthesizeTts({ text: ttsText.value })
+    const bin = atob(res.audioBase64)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    const blob = new Blob([bytes], { type: res.contentType || 'audio/mpeg' })
+    if (ttsAudioUrl.value) URL.revokeObjectURL(ttsAudioUrl.value)
+    ttsAudioUrl.value = URL.createObjectURL(blob)
+    ElMessage.success(`合成成功（${res.bytes} 字节，${res.format}）`)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '语音合成失败')
+  } finally {
+    ttsSynthesizing.value = false
+  }
+}
+
+// 按类型切换 Base URL / 模型名占位提示，降低填错概率
+const baseUrlPlaceholder = computed(() => {
+  switch (form.modelType) {
+    case 'embedding':
+    case 'rerank':
+      return '百炼兼容模式: https://dashscope.aliyuncs.com/compatible-mode/v1'
+    case 'tts':
+      return '百炼 WebSocket: wss://dashscope.aliyuncs.com/api-ws/v1/inference'
+    default:
+      return 'Coze: https://api.coze.cn；DeepSeek/OpenAI 兼容: https://api.deepseek.com'
+  }
+})
+const modelPlaceholder = computed(() => {
+  switch (form.modelType) {
+    case 'embedding': return '如 text-embedding-v3'
+    case 'rerank': return '如 text-rerank'
+    case 'tts': return '如 cosyvoice-v3-flash'
+    default:
+      return form.provider === 'coze' ? 'Coze 填 BotId（也可填在下方 BotId 字段）' : '如 deepseek-chat / gpt-4o / glm-4'
+  }
+})
 
 // 切走 Coze 时清空 BotId（该字段仅 Coze 使用，避免残留值误提交）
 watch(
@@ -192,6 +430,7 @@ async function load() {
 
 function resetForm() {
   form.id = undefined
+  form.modelType = 'chat'
   form.provider = 'coze'
   form.baseUrl = ''
   form.model = ''
@@ -200,6 +439,10 @@ function resetForm() {
   form.extraJson = ''
   form.active = 0
   form.activeBool = false
+  ttsForm.voice = 'longanyang'
+  ttsForm.format = 'mp3'
+  ttsForm.sampleRate = '22050'
+  embeddingDims.value = null
   formRef.value?.clearValidate()
 }
 
@@ -211,11 +454,15 @@ function openCreate() {
 function openEdit(row: ModelConfigMasked) {
   resetForm()
   form.id = row.id
+  form.modelType = row.modelType
   form.provider = row.provider
   form.baseUrl = row.baseUrl || ''
   form.model = row.model || ''
   form.activeBool = row.active === 1
   form.active = row.active
+  // extra 回显明文（配置参数非密钥）：结构化表单需要原值才能正确回填并 merge
+  form.extraJson = row.extraJson || ''
+  applyExtra(row.extraJson)
   // botId / apiKey 故意清空：编辑时留空 = 沿用库内已有密文
   dialogVisible.value = true
 }
@@ -227,6 +474,7 @@ async function submit() {
     saving.value = true
     const payload: ModelConfigPayload = {
       id: form.id,
+      modelType: form.modelType,
       provider: form.provider,
       baseUrl: form.baseUrl,
       model: form.model,
@@ -255,9 +503,11 @@ async function submit() {
 
 async function remove(row: ModelConfigMasked) {
   try {
-    await ElMessageBox.confirm(`确认删除该模型配置（供应商=${providerLabel(row.provider)}）？`, '删除确认', {
-      type: 'warning',
-    })
+    await ElMessageBox.confirm(
+      `确认删除该模型配置（类型=${modelTypeLabel(row.modelType)}，供应商=${providerLabel(row.provider)}）？`,
+      '删除确认',
+      { type: 'warning' },
+    )
   } catch {
     return
   }
@@ -291,6 +541,20 @@ onMounted(load)
   align-items: center;
   justify-content: space-between;
 }
+/* 操作区：筛选下拉 + 按钮组。按钮间距仍由 EP 的 .el-button + .el-button{margin-left:12px} 提供，
+   flex 只负责垂直居中与消除 inline-block 的换行风险。 */
+.mc-actions {
+  display: flex;
+  align-items: center;
+}
+/* 下拉与后面的「新增配置」按钮之间补 12px —— EP 的相邻按钮 margin 规则只覆盖 button+button，
+   下拉与按钮相邻时没有间距；flex:none 保证 200px 宽不被压缩。
+   用 :deep() 而非直接 .filter-select —— 后者要靠「子组件根节点继承父 scope id」才命中，
+   :deep() 不依赖这条隐含规则（feedback.vue 同一处也是 :deep 写法）。 */
+.mc-actions :deep(.filter-select) {
+  margin-right: 12px;
+  flex: none;
+}
 .mc-title {
   font-size: 16px;
   font-weight: 600;
@@ -305,5 +569,25 @@ onMounted(load)
   margin-left: 8px;
   color: #909399;
   font-size: 12px;
+}
+/* 高级 JSON 折叠区：默认收起，不喧宾夺主 */
+.mc-advanced {
+  margin-top: 4px;
+}
+.mc-advanced :deep(.el-collapse-item__header) {
+  font-size: 13px;
+  color: #909399;
+}
+.mc-advanced :deep(.el-collapse-item__content) {
+  padding-bottom: 0;
+}
+.mc-audio {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+.mc-audio audio {
+  width: 100%;
 }
 </style>

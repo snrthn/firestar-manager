@@ -19,6 +19,17 @@
   margin-bottom: 16px;
 }
 
+/* 筛选下拉统一宽度（2026-11-18：模型配置页的类型筛选原用 el-radio-button，
+   但 element-plus 的 radio 样式入口只聚合了 el-radio.css、漏掉 el-radio-button.css，
+   原生 <input type=radio> 的隐藏样式失效 → 圆点裸露、连体边框与间距全丢，糊成一坨。
+   改成字典下拉 DictSelect 后与反馈页的「类别/状态筛选」同口径。
+   DictSelect 的根元素就是 el-select，class 直接落在它身上即可定宽；
+   200px 与 .query-bar 下的控件宽度一致。此前只有 feedback.vue 存了一份 scoped 副本，
+   现上提为全局唯一真源，避免两处并存靠先后顺序才勉强生效）。 */
+.filter-select {
+  width: 200px;
+}
+
 /* 表单旁的灰色提示小字 */
 .form-tip {
   margin-left: 12px;

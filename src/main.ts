@@ -150,6 +150,13 @@ import 'element-plus/es/components/popover/style/css'
 // popover 浮层由 ElTooltip 渲染（定位/箭头在 tooltip 包内），缺它浮层错位无箭头
 import 'element-plus/es/components/tooltip/style/css'
 import 'element-plus/es/components/radio/style/css'
+// ⚠️ 上面的 radio/style/css 入口只聚合了 el-radio.css，漏掉 el-radio-group.css 与
+// el-radio-button.css（element-plus 2.14 聚合入口的疏漏），必须单独补：
+//   · 缺 el-radio-group.css  → 全站 15+ 处 el-radio-group 丢失 font-size / line-height 布局；
+//   · 缺 el-radio-button.css  → el-radio-button 内原生 <input type=radio> 的隐藏样式（opacity:0）
+//     失效，原生圆点裸露 + 连体边框/间距全丢，糊成一坨挤在一起的字（2026-11-18 实锤）。
+import 'element-plus/theme-chalk/el-radio-group.css'
+import 'element-plus/theme-chalk/el-radio-button.css'
 import 'element-plus/es/components/result/style/css'
 import 'element-plus/es/components/switch/style/css'
 import 'element-plus/es/components/tag/style/css'

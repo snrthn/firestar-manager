@@ -443,11 +443,9 @@ async function submitCreate() {
 /* 类别/状态筛选下拉：不给定宽度时 el-select 在 flex 容器里塌陷成最小宽（2026-10-21 实锤）。
    DictSelect 的根元素就是 el-select，class 直接落在它身上即可定宽。
    2026-10-23 虎哥：统一拉齐到全站规范 200px（原 150px 与 .filter-select 并存，
-   同权重靠先后顺序才勉强生效，容易踩坑——两处一并改为 200px）。 */
+   同权重靠先后顺序才勉强生效，容易踩坑——两处一并改为 200px）。
+   2026-11-18：.filter-select 已上提 styles/pages.css 作全站唯一真源，本地副本删除。 */
 .toolbar-right :deep(.el-select) {
-  width: 200px;
-}
-.filter-select {
   width: 200px;
 }
 /* .pagination-bar 已上提到 styles/pages.css 全局（2026-10-26），本文件不再留本地副本 */

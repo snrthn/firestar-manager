@@ -46,9 +46,19 @@ const project = {
   version: 'v0.0.1',
 }
 
+/**
+ * 系统状态标签的 el-tag type。
+ *
+ * 【⚠️ 为什么失败态是 'danger' 而不是 'error'】
+ * Element Plus 的 el-tag 只接受 5 个 type：primary / success / info / warning / danger，
+ * **没有 'error'**。传 'error' 不会报错、只是静默失效，但 Vue 会在控制台刷：
+ *   [Vue warn]: Invalid prop: validation failed for prop "type".
+ *   Expected one of ["primary","success","info","warning","danger"], got value "error".
+ * 失败态统一映射到 'danger'（红色），与 el-alert 的 type="error"（alert 支持 error）区分开。
+ */
 const statusType = computed(() => {
   if (!checked.value) return 'info'
-  return healthError.value ? 'error' : 'success'
+  return healthError.value ? 'danger' : 'success'
 })
 
 const statusText = computed(() => {

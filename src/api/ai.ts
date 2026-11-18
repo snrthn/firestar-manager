@@ -6,6 +6,7 @@ import request from './request'
 
 export interface ModelConfigMasked {
   id: number
+  modelType: string
   provider: string
   active: number
   baseUrl?: string | null
@@ -13,11 +14,14 @@ export interface ModelConfigMasked {
   botIdSet: boolean
   apiKeySet: boolean
   extraSet: boolean
+  /** extra_json 的明文内容（配置参数，非密钥）：TTS 的 voice/format/sample_rate、embedding 的 dims 等 */
+  extraJson?: string | null
 }
 
 /** 提交体：敏感字段留空 = 保留库内已有密文，不覆盖 */
 export interface ModelConfigPayload {
   id?: number
+  modelType?: string
   provider: string
   baseUrl?: string
   model?: string
@@ -45,6 +49,28 @@ export function deleteModelConfig(id: number) {
 
 export function reloadModelConfig() {
   return request.post('/ai/model-config/reload').then((r) => r.data.data)
+}
+
+// ===== AI 语音合成 TTS（V214，sys:modelConfig:view） =====
+export function ttsAvailable() {
+  return request.post('/ai/tts/available').then((r) => r.data.data as boolean)
+}
+
+export interface TtsPayload {
+  text: string
+  voice?: string
+  format?: string
+  sampleRate?: number
+}
+export interface TtsResult {
+  audioBase64: string
+  contentType: string
+  format: string
+  sampleRate: number
+  bytes: number
+}
+export function synthesizeTts(payload: TtsPayload) {
+  return request.post('/ai/tts/synthesize', payload).then((r) => r.data.data as TtsResult)
 }
 
 // ===== AI 对话流式（fetch + ReadableStream 消费 SSE，设计 §10） =====

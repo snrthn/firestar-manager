@@ -107,9 +107,20 @@ export interface DictLabeler {
   ready: Ref<boolean>
   /** value → 字典 label；空值返回 placeholder，未命中返回原始值 */
   label: (value?: string | null, placeholder?: string) => string
-  /** value → 字典 style（el-tag 取色用）；空值/未命中/字典未配置返回 null，由调用方兜底 */
+  /** value → 字典 style（el-tag 取色用）；空值/未命中/字典未配置/**style 非法** 返回 null，由调用方兜底 */
   style: (value?: string | null) => string | null
 }
+
+/**
+ * Element Plus <el-tag> 的合法 type 白名单。
+ *
+ * 【为什么需要白名单】el-tag 只接受 primary/success/info/warning/danger 五个值，
+ * 传其它值（如 'error'）页面不报错，但 Vue 会刷：
+ *   [Vue warn]: Invalid prop: validation failed for prop "type" ...
+ * 字典 style 是运营在【字典管理】页自由填的，DB 里出现一个非法值就会全站刷警告。
+ * 这里在出口处收敛：非法 style 一律返回 null，由调用方 `|| 'info'` 兜底。
+ */
+const EL_TAG_TYPES = new Set(['primary', 'success', 'info', 'warning', 'danger'])
 
 export function useDictLabels(typeCode: string): DictLabeler {
   const labelMap = ref<Record<string, string>>({})
@@ -135,7 +146,9 @@ export function useDictLabels(typeCode: string): DictLabeler {
 
   function style(value?: string | null): string | null {
     if (value == null || value === '') return null
-    return styleMap.value[value] ?? null
+    const s = styleMap.value[value]
+    // 非 el-tag 合法 type 的 style 一律丢弃（见 EL_TAG_TYPES 注释）
+    return s && EL_TAG_TYPES.has(s) ? s : null
   }
 
   return { ready, label, style }
