@@ -51,14 +51,14 @@
       </el-alert>
 
       <el-table :data="filteredList" v-loading="loading" border stripe class="mc-table">
-        <el-table-column prop="modelType" label="类型" width="110">
+        <el-table-column prop="modelType" label="类型" width="130">
           <template #default="{ row }">
             <el-tag :type="modelTypeTagType(row.modelType) || 'info'" effect="dark">
               {{ modelTypeLabel(row.modelType) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="provider" label="供应商" width="120">
+        <el-table-column prop="provider" label="供应商" width="130">
           <template #default="{ row }">
             <el-tag :type="providerTagType(row.provider) || 'info'">
               {{ providerLabel(row.provider) }}
