@@ -16,8 +16,10 @@
 import { MarkdownRendererAsync } from 'x-markdown-vue'
 import 'x-markdown-vue/style'
 import 'katex/dist/katex.min.css'
+import { computed } from 'vue'
+import { cleanAiMarkdown } from '@/utils/aiMarkdown'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     content?: string
     /** 流式输出中的雾化打字效果（结束后关掉可省一次重绘） */
@@ -25,6 +27,11 @@ withDefaults(
   }>(),
   { content: '', animate: false },
 )
+/**
+ * 渲染边界兜底清洗：后端已剥离 DSML 伪调用块，但历史脏数据与运行期换模型仍可能漏出，
+ * 这里按行过滤。原始 props.content 不动（复制/下载由调用方按同一规则清洗）。
+ */
+const cleaned = computed(() => cleanAiMarkdown(props.content))
 </script>
 
 <template>
@@ -33,7 +40,7 @@ withDefaults(
   <Suspense>
     <MarkdownRendererAsync
       class="ai-md"
-      :markdown="content"
+      :markdown="cleaned"
       :allow-html="false"
       :sanitize="true"
       :enable-animate="animate"

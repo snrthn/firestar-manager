@@ -97,6 +97,10 @@ export interface ChatStreamHandlers {
   onFallback?: (mode: string, reason: string) => void
   /** 流起始元数据帧：携带 conversationId（Coze 模式事后按会话拉草稿用） */
   onMeta?: (conversationId: number) => void
+  /** 流起始元数据帧携带的本次请求 ID（排障/复制用，与 assistant 消息一起落库） */
+  onRequestId?: (requestId: string) => void
+  /** 本轮 assistant 消息落库后的 id（收到即可挂赞/踩，无需等下次历史回放） */
+  onMessageId?: (messageId: number) => void
   /** 草稿预览帧：payload={toolName,argsJson,resultJson}，前端据此渲染「待确认表单」卡片 */
   onDraft?: (payload: { toolName: string; argsJson: string; resultJson: string }) => void
   /**
@@ -257,6 +261,15 @@ export async function streamChat(
             try {
               const o = JSON.parse(ev.data)
               if (o?.conversationId != null) handlers.onMeta?.(Number(o.conversationId))
+              if (typeof o?.requestId === 'string' && o.requestId) handlers.onRequestId?.(o.requestId)
+            } catch {
+              /* ignore */
+            }
+            break
+          case 'message_id':
+            try {
+              const id = Number(JSON.parse(ev.data))
+              if (Number.isFinite(id) && id > 0) handlers.onMessageId?.(id)
             } catch {
               /* ignore */
             }
@@ -321,6 +334,12 @@ export interface ConversationMessage {
   toolName?: string | null
   modelVersion?: string | null
   createdAt?: string
+  /** 本次请求 ID（V217，复制请求ID / 排障） */
+  requestId?: string | null
+  /** 当前用户对该回答的反馈：LIKE / DISLIKE / null（回放时回显按钮态） */
+  myFeedback?: string | null
+  /** 本次回答耗时（毫秒） */
+  latencyMs?: number | null
 }
 
 export interface Paged<T> {
@@ -345,6 +364,14 @@ export function getConversationMessages(convId: number) {
 /** 删除会话（连同消息与工具调用记录） */
 export function deleteConversation(convId: number) {
   return request.delete(`/ai/conversation/${convId}`).then((r) => r.data.data)
+}
+
+/**
+ * 对某条 AI 回答点赞/点踩；同类型再点一次即取消（传空串）。
+ * 后端做消息→会话→用户归属校验，越权 404。
+ */
+export function rateMessage(messageId: number, type: 'LIKE' | 'DISLIKE' | '') {
+  return request.post(`/ai/message/${messageId}/feedback`, null, { params: { type } }).then((r) => r.data.data)
 }
 
 // ===== AI 提示词管理（【提示词管理】页，ai:prompt:*） =====

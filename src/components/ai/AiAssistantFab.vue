@@ -28,13 +28,14 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, type Component } f
 import { BubbleList, Welcome, XSender } from 'vue-element-plus-x'
 import AiThinking from './AiThinking.vue'
 import 'vue-element-plus-x/styles/index.css'
-import { ChatDotRound, Check, Clock, Close, FullScreen, Loading, Menu, Plus, Rank } from '@element-plus/icons-vue'
+import { ChatDotRound, Check, Clock, Close, CopyDocument, Download, FullScreen, Loading, Menu, Plus, Rank, Tickets } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { streamChat, fetchLatestDraft, listConversations, getConversationMessages, deleteConversation, type ConversationSummary } from '@/api/ai'
+import { streamChat, fetchLatestDraft, listConversations, getConversationMessages, deleteConversation, rateMessage, type ConversationSummary } from '@/api/ai'
 import request from '@/api/request'
 import AiMarkdown from './AiMarkdown.vue'
 import AiDraftCard from './AiDraftCard.vue'
 import type { DraftPreview } from './AiDraftCard.vue'
+import { cleanAiMarkdown } from '@/utils/aiMarkdown'
 
 // ===== 数据结构 =====
 
@@ -60,6 +61,12 @@ interface ChatItem {
   history?: boolean
   /** 传给 Bubble 的 noStyle：assistant 回复无气泡背景/padding（云效式平铺，用户消息保留气泡） */
   noStyle?: boolean
+  /** 服务端消息 id：流式回答由 message_id 帧带回，历史回放由详情带回；赞踩接口要用 */
+  messageId?: number
+  /** 本次请求 ID（meta 帧 / 历史详情），供「复制请求ID」排障 */
+  requestId?: string | null
+  /** 当前用户对该回答的反馈：LIKE / DISLIKE / null（回放时回显按钮态） */
+  myFeedback?: 'LIKE' | 'DISLIKE' | null
 }
 
 interface StoredConv {
@@ -186,6 +193,10 @@ async function switchToServer(conv: ConversationSummary) {
         // 思考过程回放（V216 落库）：AiThinking 直接折叠展示（end 状态不显示用时）
         reasoning: m.reasoningText || undefined,
         reasoningStatus: 'end',
+        // V217：请求 ID / 赞踩状态随历史一起回放，操作栏在历史会话里同样可用
+        messageId: m.id,
+        requestId: m.requestId ?? null,
+        myFeedback: m.myFeedback === 'LIKE' || m.myFeedback === 'DISLIKE' ? m.myFeedback : null,
       })
     } else if (m.role === 'tool' && m.toolName && m.content) {
       // 业务自定义渲染回放：draft_* 工具结果 JSON → 对应业务卡（历史卡只读，防重复创建）
@@ -533,6 +544,12 @@ async function send(text: string) {
           // 新会话首轮拿到服务端 id 后，本轮后续发送自动变为续聊（多轮上下文）
           if (activeConvId.value == null) activeConvId.value = id
         },
+        onRequestId: (rid) => {
+          if (rid) ai.requestId = rid
+        },
+        onMessageId: (id) => {
+          ai.messageId = id
+        },
         onDraft: (payload) => {
           draftReceived = true
           pushDraft(payload.resultJson)
@@ -657,6 +674,94 @@ async function confirmDraft(item: ChatItem) {
   } finally {
     item.draftCreating = false
   }
+}
+
+// ===== 回答操作栏（云效式：赞 / 踩 / 复制请求ID / 复制回答 / 下载 .md）=====
+/** 只对「已落库的正经回答」显示操作栏；用户气泡 / 加载中 / 草稿卡 / 空回答都不显示 */
+function showActions(item: ChatItem): boolean {
+  return item.role === 'assistant' && !item.loading && !item.itemType && !!item.content.trim()
+}
+
+/** BubbleList 槽可能传副本，统一回 messages.value 里找原对象再改，保证持久化与回显一致 */
+function messageOf(item: ChatItem): ChatItem | undefined {
+  return messages.value.find((m) => m.id === item.id)
+}
+
+async function copyText(text: string, label: string) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      // 非 HTTPS / 老浏览器兜底：临时 textarea + execCommand
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      const ok = document.execCommand?.('copy') ?? false
+      ta.remove()
+      if (!ok) throw new Error('execCommand copy failed')
+    }
+    ElMessage.success(`${label}已复制`)
+  } catch {
+    ElMessage.error(`${label}复制失败，请手动选择文本`)
+  }
+}
+
+/** 同类型再点一次即取消（后端约定空串取消） */
+async function rateAnswer(item: ChatItem, type: 'LIKE' | 'DISLIKE') {
+  const m = messageOf(item) ?? item
+  if (!m.messageId) {
+    ElMessage.warning('该回答暂无反馈通道（历史旧数据）')
+    return
+  }
+  const next = m.myFeedback === type ? '' : type
+  try {
+    await rateMessage(m.messageId, next)
+    m.myFeedback = next || null
+    if (item !== m) item.myFeedback = next || null
+    ElMessage.success(next ? (type === 'LIKE' ? '已点赞' : '已点踩') : '已取消反馈')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '反馈提交失败')
+  }
+}
+
+function copyRequestId(item: ChatItem) {
+  const rid = (messageOf(item) ?? item).requestId
+  if (!rid) {
+    ElMessage.warning('该回答暂无请求 ID（历史旧数据）')
+    return
+  }
+  void copyText(rid, '请求 ID')
+}
+
+function copyAnswer(item: ChatItem) {
+  const raw = (messageOf(item) ?? item).content ?? ''
+  const text = cleanAiMarkdown(raw)
+  if (!text.trim()) {
+    ElMessage.warning('暂无可复制的回答')
+    return
+  }
+  void copyText(text, '回答')
+}
+
+function downloadAnswer(item: ChatItem) {
+  const m = messageOf(item) ?? item
+  const text = cleanAiMarkdown(m.content ?? '')
+  if (!text.trim()) {
+    ElMessage.warning('暂无可下载的回答')
+    return
+  }
+  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `ai-answer-${m.messageId ?? m.id}.md`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 const reasoningActive = computed(() => messages.value.some((m) => m.reasoningStatus === 'thinking'))
@@ -815,7 +920,47 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
           >
             <template #content="{ item }">
               <div v-if="asItem(item).role === 'user'" class="ai-user-text">{{ asItem(item).content }}</div>
-              <AiMarkdown v-else :content="asItem(item).content" />
+              <div v-else class="ai-answer">
+                <AiMarkdown :content="asItem(item).content" />
+                <div v-if="showActions(asItem(item))" class="ai-acts">
+                  <button
+                    type="button"
+                    class="ai-act"
+                    :class="{ 'is-on': asItem(item).myFeedback === 'LIKE' }"
+                    title="点赞"
+                    @click="rateAnswer(asItem(item), 'LIKE')"
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                      <path fill="currentColor" d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z" />
+                    </svg>
+                    <span>赞</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="ai-act"
+                    :class="{ 'is-bad': asItem(item).myFeedback === 'DISLIKE' }"
+                    title="点踩"
+                    @click="rateAnswer(asItem(item), 'DISLIKE')"
+                  >
+                    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                      <path fill="currentColor" d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z" />
+                    </svg>
+                    <span>踩</span>
+                  </button>
+                  <button type="button" class="ai-act" title="复制请求ID" @click="copyRequestId(asItem(item))">
+                    <el-icon :size="14"><Tickets /></el-icon>
+                    <span>请求ID</span>
+                  </button>
+                  <button type="button" class="ai-act" title="复制回答" @click="copyAnswer(asItem(item))">
+                    <el-icon :size="14"><CopyDocument /></el-icon>
+                    <span>复制</span>
+                  </button>
+                  <button type="button" class="ai-act" title="下载 Markdown" @click="downloadAnswer(asItem(item))">
+                    <el-icon :size="14"><Download /></el-icon>
+                    <span>下载</span>
+                  </button>
+                </div>
+              </div>
             </template>
 
             <template #header="{ item }">
@@ -892,6 +1037,52 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
 </template>
 
 <style scoped>
+/* ===== 回答操作栏：赞 / 踩 / 复制请求ID / 复制回答 / 下载 .md ===== */
+.ai-answer {
+  min-width: 0;
+}
+.ai-acts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  /* 贴近正文：分隔线、margin、padding 全部去掉。
+     正文末尾的换行空段落由 cleanAiMarkdown().trimEnd() 从源头消除（二者叠加才是完整修复）。 */
+  margin-top: 0;
+  padding-top: 0;
+  opacity: 1;
+}
+.ai-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  /* 默认色从 #909399 加深到 #606266，且不再用 opacity 0.72 整体压淡 */
+  color: #606266;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ai-act:hover {
+  color: #409eff;
+  background: #f5f7fa;
+}
+.ai-act.is-on {
+  color: #409eff;
+  background: #ecf5ff;
+}
+.ai-act.is-bad {
+  color: #f56c6c;
+  background: #fef0f0;
+}
+.ai-act:focus-visible {
+  outline: 2px solid #409eff;
+  outline-offset: -2px;
+}
 /* ===== 吸边入口（沿用原交互：贴右边缘只露图标，划过滑出；面板打开时隐藏） ===== */
 .ai-dock {
   position: fixed;

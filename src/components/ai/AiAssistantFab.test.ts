@@ -12,11 +12,12 @@ import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { defineComponent, h, onMounted } from 'vue'
 import ElementPlus from 'element-plus'
 
-const { streamChatMock, listConversationsMock, getMessagesMock, deleteConvMock } = vi.hoisted(() => ({
+const { streamChatMock, listConversationsMock, getMessagesMock, deleteConvMock, rateMessageMock } = vi.hoisted(() => ({
   streamChatMock: vi.fn(),
   listConversationsMock: vi.fn(),
   getMessagesMock: vi.fn(),
   deleteConvMock: vi.fn(),
+  rateMessageMock: vi.fn(),
 }))
 
 vi.mock('@/api/ai', () => ({
@@ -25,6 +26,7 @@ vi.mock('@/api/ai', () => ({
   listConversations: (...args: any[]) => listConversationsMock(...args),
   getConversationMessages: (...args: any[]) => getMessagesMock(...args),
   deleteConversation: (...args: any[]) => deleteConvMock(...args),
+  rateMessage: (...args: any[]) => rateMessageMock(...args),
 }))
 
 vi.mock('@/api/request', () => ({
@@ -136,6 +138,7 @@ describe('AiAssistantFab（云效式面板）', () => {
     listConversationsMock.mockReset().mockResolvedValue({ records: [], total: 0, current: 1, size: 20 })
     getMessagesMock.mockReset().mockResolvedValue([])
     deleteConvMock.mockReset().mockResolvedValue(undefined)
+    rateMessageMock.mockReset().mockResolvedValue(undefined)
     sessionStorage.clear()
   })
 
@@ -507,5 +510,70 @@ describe('AiAssistantFab（云效式面板）', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('本地会话')
+  })
+
+  it('流式回答拿到 requestId / message_id 后操作栏可用，点赞同类型再点即取消', async () => {
+    streamChatMock.mockImplementation(async (_m: string, handlers: any) => {
+      handlers.onMeta(77)
+      handlers.onRequestId('req-v217-1')
+      handlers.onMessageId(101)
+      handlers.onToken('这是回答正文')
+      handlers.onDone()
+    })
+    const wrapper = mountFab()
+    await wrapper.find('.ai-dock').trigger('click')
+    wrapper.findComponent({ name: 'XSender' }).vm.$emit('submit')
+    await flushPromises()
+
+    const acts = wrapper.findAll('.ai-act')
+    expect(acts.length).toBe(5)
+    expect(wrapper.find('.ai-act[title="复制请求ID"]').exists()).toBe(true)
+
+    const like = wrapper.find('.ai-act[title="点赞"]')
+    await like.trigger('click')
+    await flushPromises()
+    expect(rateMessageMock).toHaveBeenCalledWith(101, 'LIKE')
+    expect(wrapper.find('.ai-act[title="点赞"]').classes()).toContain('is-on')
+
+    await wrapper.find('.ai-act[title="点赞"]').trigger('click')
+    await flushPromises()
+    expect(rateMessageMock).toHaveBeenLastCalledWith(101, '')
+    expect(wrapper.find('.ai-act[title="点赞"]').classes()).not.toContain('is-on')
+  })
+
+  it('历史回放回填 requestId 与赞踩状态，旧数据不显示操作栏', async () => {
+    listConversationsMock.mockResolvedValue({
+      records: [{ id: 42, title: '历史会话', status: 2 }],
+      total: 1,
+      current: 1,
+      size: 20,
+    })
+    getMessagesMock.mockResolvedValue([
+      { id: 9, role: 'user', content: '问题' },
+      {
+        id: 10,
+        role: 'assistant',
+        content: '历史回答',
+        requestId: 'req-old-1',
+        myFeedback: 'DISLIKE',
+      },
+      { id: 11, role: 'assistant', content: '无元数据的旧回答', requestId: null, myFeedback: null },
+    ])
+    const wrapper = mountFab()
+    await wrapper.find('.ai-dock').trigger('click')
+    await flushPromises()
+    await wrapper.find('.ai-hist__item').trigger('click')
+    await flushPromises()
+
+    const dislikes = wrapper.findAll('.ai-act[title="点踩"]')
+    expect(dislikes.length).toBe(2)
+    expect(dislikes[0].classes()).toContain('is-bad')
+    expect(dislikes[1].classes()).not.toContain('is-bad')
+    // 请求ID 按钮对旧数据仍显示（点了给提示），由 copyRequestId 内部判空
+    expect(wrapper.findAll('.ai-act[title="复制请求ID"]').length).toBe(2)
+
+    await wrapper.find('.ai-act[title="点踩"]').trigger('click')
+    await flushPromises()
+    expect(rateMessageMock).toHaveBeenCalledWith(10, '')
   })
 })
