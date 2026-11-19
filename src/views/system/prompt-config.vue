@@ -40,7 +40,7 @@
             <el-tag v-else type="info">未生效</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column v-if="opVisible" label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button
               v-has-perm="['ai:prompt:edit']"
@@ -94,9 +94,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { Plus, Refresh, Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 import {
   listPrompts,
   createPrompt,
@@ -109,6 +110,11 @@ import {
 const loading = ref(false)
 const saving = ref(false)
 const list = ref<AiPromptConfig[]>([])
+
+// 操作列显隐（同 dict.vue 等页的既有实践）：编辑/删除要 ai:prompt:edit，启用要 ai:prompt:use，
+// 两点全无时整列隐藏，不留一个永远空着的「操作」表头。
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['ai:prompt:edit', 'ai:prompt:use']))
 
 const dialogVisible = ref(false)
 const formRef = ref<FormInstance>()

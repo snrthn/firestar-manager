@@ -134,3 +134,16 @@
   font-weight: 600;
   color: #303133;
 }
+
+/* ===== 表格内按钮聚焦圈被裁（虎哥 2026-11-19 截图：操作列「编辑」聚焦底边切掉，全局问题） =====
+ * 根因（EP dist/index.css 实证）：
+ *   1) .el-button:focus-visible { outline: 2px solid; outline-offset: 1px } —— 圈画在按钮盒**外** 3px；
+ *   2) .el-button.is-link { height: auto; padding: 2px } + .el-button { line-height: 1 } —— 盒子紧贴文字
+ *      （与 InvoiceDetailDialog .attach-name 2026-10-25 实证同族：line-height:1 直击按钮 → 盒太紧 → 下半截出事）；
+ *   3) .el-table .cell { overflow: hidden; line-height: 23px; padding: 0 12px } —— cell 无纵向余量，
+ *      盒外 3px 的圈底部越界被裁。所有列表页操作列共用这套样式，故为全局问题，修在这里一处生效。
+ * 修法：表格内按钮的聚焦圈改画进按钮内部（outline-offset 负值）——不依赖外部余量，永不裁切；
+ *      圈落在 2px padding 带内不压文字，布局零影响（不加 margin/行高，不动行高一致性）。 */
+.el-table .cell .el-button:focus-visible {
+  outline-offset: -2px;
+}

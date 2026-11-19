@@ -113,7 +113,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column v-if="opVisible" label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button
               v-has-perm="['sys:modelConfig:edit']"
@@ -253,6 +253,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { Plus, Refresh, Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 import {
   listModelConfigs,
   createModelConfig,
@@ -266,6 +267,11 @@ import {
 } from '@/api/ai'
 import DictSelect from '@/components/DictSelect.vue'
 import { loadDictDefault, useDictLabels } from '@/composables/useDict'
+
+// 操作列显隐（同 dict.vue 等页的既有实践）：编辑/删除共用同一权限点，
+// 无权限时整列隐藏，不留一个永远空着的「操作」表头。
+const userStore = useUserStore()
+const opVisible = computed(() => userStore.hasAnyPerm(['sys:modelConfig:edit']))
 
 const loading = ref(false)
 const reloading = ref(false)
