@@ -14,9 +14,9 @@
  * 界面约定（2026-11-09）：
  *   ① 外层 .view-wrap 已有 --fs-content-padding:16px，本页不再叠 padding；
  *   ② 目录树与内容区等高撑满，结构检查改弹窗（DEBUG-ONLY，可整体移除不影响布局）；
- *   ③ 顶部只留一个标题输入框，摘要移入「文档属性」弹窗；
- *   ④ header 收成单行：标题在左，①结构检查+文档属性 / ②编辑·预览 /
- *      ③删除·发布·保存草稿 按序靠右（2026-11-09 截图要求，取代此前两行布局）；
+ *   ③ 顶部只留一个标题输入框；摘要字段在后端零消费，已从编辑 UI 移除；
+ *   ④ header 收成单行：标题在左，①结构检查+文档信息 / ②编辑·预览 /
+ *      ③保存草稿(warning)·发布(primary) 按序靠右，删除已收敛到树节点三点菜单；
  *   ⑤ 编辑/预览改分段控件；树节点支持 inline 重命名（新建即命名）；
  *   ⑥ 空态只在 el-tree 的 #empty 插槽渲染一次，树外不再叠加 el-empty（避免重复占位），
  *      并留出顶部间距，避免「暂无文档」紧贴搜索框；
@@ -82,6 +82,19 @@ import {
   isLazyRequired,
 } from '@/utils/kbTree'
 import type { KbMoveTarget } from '@/utils/kbTree'
+
+/**
+ * REFERENCE 附件格式白名单 —— 必须与后端 KbFileTextExtractor.extract() 的 switch 分支一致。
+ * 后端只解析这些扩展名，其余（图片/压缩包/doc/xls/ppt 等）即便上传成功，发布时也会被
+ * 静默跳过、不纳入 AI 检索。文件框 accept 只做第一层过滤；onAttFileChange 再做扩展名兜底，
+ * 防「浏览器切到所有文件」或拖拽绕过 accept 后，用户以为加上了其实永远搜不到。
+ */
+const KB_ATTACH_EXTS = ['txt', 'md', 'markdown', 'csv', 'log', 'text', 'json', 'docx', 'xlsx', 'pdf', 'html', 'htm']
+const KB_ATTACH_ACCEPT = KB_ATTACH_EXTS.map((e) => '.' + e).join(',')
+function kbAttachExt(name: string): string {
+  const dot = name.lastIndexOf('.')
+  return dot < 0 || dot === name.length - 1 ? '' : name.slice(dot + 1).toLowerCase()
+}
 import { validateMarkdown, collectFileRefs, extractHeadings } from '@/utils/markdown'
 
 // ⚠️ 编辑器与预览都必须异步加载：编辑器把 CodeMirror / 本地 mermaid 实例、
@@ -109,6 +122,15 @@ const form = reactive({ title: '', summary: '', contentMd: '' })
 const attachments = ref<KbAttachment[]>([])
 const uploadingAtt = ref(false)
 const attFileInput = ref<HTMLInputElement | null>(null)
+/** 附件列表默认收起（不挤占编辑器 / 预览高度）；标题行数量摘要 + 展开箭头做够指引 */
+const attachmentsCollapsed = ref(true)
+/** 收起态也可见的附件摘要：数量、纳入检索数、未纳入数、发布才生效 */
+const attachmentSummary = computed(() => {
+  const total = attachments.value.length
+  if (!total) return '暂无附件 · 点击右侧「添加附件」'
+  const on = attachments.value.filter((a) => a.indexable === 1).length
+  return `${on} 个纳入检索${on < total ? ` · ${total - on} 个未纳入` : ''} · 发布后生效`
+})
 const treeKeyword = ref('')
 const expandedKeys = ref<number[]>([])
 const treeRef = ref<TreeExpose | null>(null)
@@ -116,8 +138,8 @@ const loading = ref(false)
 const loadError = ref('')
 const serverLazy = ref(false)
 
-/** 摘要属业务字段（切片前置上下文），收进「文档属性」弹窗，不占顶部主视觉 */
-const showProps = ref(false)
+/** 文档信息面板：只读概览（状态 / 版本 / 字数 / 章节 / 附件 / ID），不占顶部主视觉 */
+const showInfo = ref(false)
 /** DEBUG-ONLY：结构检查调试面板，后期整体删除不影响布局 */
 const showCheck = ref(false)
 
@@ -219,15 +241,14 @@ const isDirty = computed(() => !!current.value && (
   form.summary !== (current.value.summary ?? '') ||
   form.contentMd !== (current.value.contentMd ?? '')
 ))
-/**
- * 已发布文档保存了草稿但尚未重新发布：库内保存版本 ≠ 已发布版本（AI 检索的还是旧版）。
- * 成熟系统（语雀/飞书文档）规则：保存草稿不改发布态，但必须显式提示「有未发布修改」；
- * 重新发布（先保存后发布的原子语义）后归零。
- */
-const savedButUnpublished = ref(false)
 /** 发布按钮 loading（发布 = 先保存再发布，两次请求） */
 const publishing = ref(false)
-const hasUnpublishedEdits = computed(() => current.value?.status === 'PUBLISHED' && savedButUnpublished.value)
+/**
+ * 已发布文档保存了草稿但尚未重新发布：库内保存版本 ≠ 已发布版本（AI 检索的还是旧版）。
+ * 判定由后端权威计算（updatedAt > publishedAt），随详情 / 骨架一起下发；save / publish
+ * 后前端做同口径乐观同步。切走再回来、整页刷新都能保持，不再依赖页面内存态。
+ */
+const hasUnpublishedEdits = computed(() => current.value?.hasUnpublishedEdits === true)
 /**
  * 「新建位置」上下文（对齐飞书/Confluence 树内 + 号的位置语义）。
  * 与 currentId 刻意分离：currentId 只跟随文档（右侧编辑态），activeFolderId 只跟随文件夹
@@ -269,6 +290,8 @@ const moveCanSubmit = computed(() => {
 const issues = computed(() => validateMarkdown(form.contentMd))
 const headings = computed(() => extractHeadings(form.contentMd))
 const fileRefs = computed(() => collectFileRefs(form.contentMd))
+/** 文档信息面板：正文字数（非空白字符数） */
+const wordCount = computed(() => (form.contentMd.match(/\S/g) ?? []).length)
 
 function errMsg(e: unknown, fallback: string): string {
   const x = e as { response?: { data?: { message?: string } }; message?: string }
@@ -301,20 +324,19 @@ function clearForm() {
   form.title = ''
   form.summary = ''
   form.contentMd = ''
-  savedButUnpublished.value = false
 }
 
 async function loadDoc(node: KbNode) {
   if (node.nodeType === 'FOLDER') return
   currentId.value = node.id
+  attachmentsCollapsed.value = true // 切换文档恢复默认收起，不带上一份文档的展开态
   try {
     const d = await getKbDoc(node.id)
     currentDetail.value = d
     form.title = d.title
     form.summary = d.summary ?? ''
     form.contentMd = d.contentMd ?? ''
-    // 库内保存版本与发布版本的差异标记：打开新文档时以库内为准重新计算
-    savedButUnpublished.value = false
+    // hasUnpublishedEdits 由后端随详情下发（d.hasUnpublishedEdits），切走再回来不丢
     mode.value = 'edit'
     void loadAttachments(node.id)
   } catch (e) {
@@ -575,7 +597,7 @@ async function submitMove() {
 
 /**
  * 把当前表单内容落库（保存草稿）。成功返回 true，供「发布」前置保存静默复用。
- * 已发布文档保存草稿后置 savedButUnpublished：库内保存版本 ≠ 已发布版本。
+ * 已发布文档保存草稿后乐观置 hasUnpublishedEdits：库内保存版本 ≠ 已发布版本。
  */
 async function persist(): Promise<boolean> {
   // 防御：顶部按钮已 disabled，但编辑器工具栏「保存」等入口仍可能触发（§26）
@@ -599,10 +621,14 @@ async function persist(): Promise<boolean> {
       currentDetail.value.title = form.title.trim()
       currentDetail.value.summary = form.summary.trim()
       currentDetail.value.contentMd = form.contentMd
-      if (currentDetail.value.status === 'PUBLISHED') savedButUnpublished.value = true
+      // 保存刷新后端 updatedAt 但不动 publishedAt → 与后端权威判定同口径
+      if (currentDetail.value.status === 'PUBLISHED') currentDetail.value.hasUnpublishedEdits = true
     }
     const node = currentNode.value
-    if (node) node.title = form.title.trim()
+    if (node) {
+      node.title = form.title.trim()
+      if (node.status === 'PUBLISHED') node.hasUnpublishedEdits = true
+    }
     return true
   } catch (e) {
     ElMessage.error(errMsg(e, '保存失败'))
@@ -632,8 +658,9 @@ async function publish() {
       node.status = 'PUBLISHED'
       node.version = (node.version ?? 1) + 1
     }
-    // 发布的就是刚保存的版本：未发布修改标记归零
-    savedButUnpublished.value = false
+    // 发布的就是刚保存的版本：后端把 updatedAt/publishedAt 对齐，前端同口径归零
+    if (currentDetail.value) currentDetail.value.hasUnpublishedEdits = false
+    if (node) node.hasUnpublishedEdits = false
     ElMessage.success('已发布（正文与 REFERENCE 附件已重新切片并纳入检索）')
   } catch (e) {
     ElMessage.error(errMsg(e, '发布失败'))
@@ -667,12 +694,28 @@ function pickAttFile() {
   attFileInput.value?.click()
 }
 
+/**
+ * 附件增 / 删 / 切换检索都会影响下次发布的切片，后端已同步刷新文档 updatedAt。
+ * 这里前端乐观置同一标志，不重新拉详情——拉详情会覆盖用户未保存的编辑内容。
+ */
+function markAttDirty() {
+  if (current.value?.status === 'PUBLISHED') current.value.hasUnpublishedEdits = true
+  if (currentNode.value?.status === 'PUBLISHED') currentNode.value.hasUnpublishedEdits = true
+}
+
 /** 选文件 → 上传 → 登记 REFERENCE 关系 → 刷新（发布时才切片） */
 async function onAttFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = '' // 允许重复选同一文件
   if (!file || !currentId.value) return
+  // 兜底校验：accept 只是浏览器建议，切「所有文件」或拖拽仍可绕过；后端解析不了的格式
+  // 上传后发布会被静默跳过，必须在入口拦下并说清原因，别让用户白等一个搜不到的附件。
+  const ext = kbAttachExt(file.name)
+  if (!KB_ATTACH_EXTS.includes(ext)) {
+    ElMessage.warning(`「${file.name}」格式不支持，AI 无法解析。仅支持：${KB_ATTACH_EXTS.join(' / ')}`)
+    return
+  }
   uploadingAtt.value = true
   try {
     const f = new FormData()
@@ -683,6 +726,8 @@ async function onAttFileChange(e: Event) {
     const vo = await uploadFile(f)
     await addKbAttachment(currentId.value, vo.id)
     attachments.value = await listKbAttachments(currentId.value)
+    attachmentsCollapsed.value = false // 添加后自动展开：让用户立即看到刚加的附件，别以为没加上
+    markAttDirty()
     ElMessage.success('附件已添加（发布后纳入检索）')
   } catch (err) {
     ElMessage.error(errMsg(err, '附件添加失败'))
@@ -695,6 +740,7 @@ async function onAttFileChange(e: Event) {
 async function setAttIndexable(a: KbAttachment, v: number) {
   try {
     await setKbAttachmentIndexable(a.id, v)
+    markAttDirty()
   } catch (err) {
     a.indexable = v === 1 ? 0 : 1 // 失败回滚
     ElMessage.error(errMsg(err, '切换检索开关失败'))
@@ -711,6 +757,7 @@ async function removeAtt(a: KbAttachment) {
   try {
     await removeKbAttachment(a.id)
     attachments.value = attachments.value.filter((x) => x.id !== a.id)
+    markAttDirty()
     ElMessage.success('已移除')
   } catch (err) {
     ElMessage.error(errMsg(err, '移除失败'))
@@ -849,8 +896,8 @@ async function downloadAtt(a: KbAttachment) {
                 <span
                   v-if="data.nodeType === 'DOC'"
                   class="kb-node-dot"
-                  :class="statusMeta(data.status).cls"
-                  :title="statusMeta(data.status).hint"
+                  :class="[statusMeta(data.status).cls, { 'has-unpublished': data.hasUnpublishedEdits }]"
+                  :title="data.hasUnpublishedEdits ? '有未发布修改（重新发布后生效）' : statusMeta(data.status).hint"
                 />
                 <span
                   v-has-perm="['ai:kb:edit']"
@@ -950,14 +997,14 @@ async function downloadAtt(a: KbAttachment) {
               >
                 {{ currentStatus.label }}<span v-if="isDirty" class="kb-status-dirty">· 未保存</span><span v-else-if="hasUnpublishedEdits" class="kb-status-dirty">· 有未发布修改</span>
               </span>
-              <!-- ① 次要项：结构检查（DEBUG-ONLY）+ 文档属性 -->
+              <!-- ① 次要项：结构检查（DEBUG-ONLY）+ 文档信息 -->
               <div class="kb-minor-actions">
                 <!-- DEBUG-ONLY START（触发按钮）：删除时连同下方结构检查弹窗一起移除，布局零影响 -->
                 <el-button link size="small" @click="showCheck = true">结构检查</el-button>
                 <!-- DEBUG-ONLY END -->
-                <!-- 文档属性：业务字段入口 -->
-                <el-button link size="small" :disabled="!current" @click="showProps = true">
-                  文档属性
+                <!-- 文档信息：只读概览，替代原「文档属性」摘要编辑（后端零消费） -->
+                <el-button link size="small" :disabled="!current" @click="showInfo = true">
+                  文档信息
                 </el-button>
               </div>
               <!-- ② 现代化分段控件：替换 el-radio-group，去掉 radio 圆点与异常图标 -->
@@ -979,9 +1026,15 @@ async function downloadAtt(a: KbAttachment) {
                   @click="mode = 'preview'"
                 >预览</button>
               </div>
-              <!-- ③ 操作项：发布（主操作在前）/ 保存草稿（删除已收敛到树节点三点菜单，见 §25）。
+              <!-- ③ 操作项：保存草稿（warning，左）/ 发布（primary，右），删除已收敛到树节点三点菜单。
                    发布 = 先静默保存当前编辑内容再发布该版本（保存与发布同步，不出现「已发布·未保存」歧义） -->
               <div class="kb-actions">
+                <el-button
+                  v-has-perm="['ai:kb:edit']"
+                  type="warning"
+                  :disabled="!current"
+                  @click="save"
+                >保存草稿</el-button>
                 <el-button
                   v-has-perm="['ai:kb:publish']"
                   type="primary"
@@ -989,12 +1042,6 @@ async function downloadAtt(a: KbAttachment) {
                   :loading="publishing"
                   @click="publish"
                 >发布</el-button>
-                <el-button
-                  v-has-perm="['ai:kb:edit']"
-                  style="margin-left: 5px;"
-                  :disabled="!current"
-                  @click="save"
-                >保存草稿</el-button>
               </div>
             </div>
           </div>
@@ -1021,8 +1068,19 @@ async function downloadAtt(a: KbAttachment) {
              固定高度独立区块，不挤占上方编辑器/预览的 flex:1 高度 -->
         <section class="kb-attachments">
           <div class="kb-attach-head">
-            <span class="kb-attach-title">附件（补充材料）</span>
-            <span class="kb-attach-tip">发布时解析切片并纳入 AI 检索</span>
+            <!-- 整行标题即收起 / 展开开关：箭头随状态旋转，数量 badge + 摘要在收起态也可见 -->
+            <button
+              type="button"
+              class="kb-attach-toggle"
+              :aria-expanded="!attachmentsCollapsed"
+              title="点击展开 / 收起附件列表"
+              @click="attachmentsCollapsed = !attachmentsCollapsed"
+            >
+              <el-icon class="kb-attach-caret" :class="{ 'is-open': !attachmentsCollapsed }"><ArrowDown /></el-icon>
+              <span class="kb-attach-title">附件（补充材料）</span>
+              <span v-if="attachments.length" class="kb-attach-count">{{ attachments.length }}</span>
+              <span class="kb-attach-summary">{{ attachmentSummary }}</span>
+            </button>
             <span class="kb-attach-spacer" />
             <el-button
               v-has-perm="['ai:kb:edit']"
@@ -1033,9 +1091,10 @@ async function downloadAtt(a: KbAttachment) {
               :disabled="!currentId"
               @click="pickAttFile"
             >添加附件</el-button>
-            <input ref="attFileInput" type="file" hidden @change="onAttFileChange" />
+            <input ref="attFileInput" type="file" hidden :accept="KB_ATTACH_ACCEPT" @change="onAttFileChange" />
           </div>
-          <div v-if="attachments.length" class="kb-attach-list">
+          <el-collapse-transition>
+          <div v-show="!attachmentsCollapsed && attachments.length" class="kb-attach-list">
             <div v-for="a in attachments" :key="a.id" class="kb-attach-item">
               <el-icon class="kb-attach-icon"><Document /></el-icon>
               <button type="button" class="kb-attach-name" @click="downloadAtt(a)">
@@ -1064,7 +1123,8 @@ async function downloadAtt(a: KbAttachment) {
               />
             </div>
           </div>
-          <p v-else class="kb-attach-empty">
+          </el-collapse-transition>
+          <p v-if="!attachments.length && !attachmentsCollapsed" class="kb-attach-empty">
             暂无附件。添加 docx / xlsx / pdf / txt 等文件，发布后即可被 AI 检索并引用。
           </p>
         </section>
@@ -1124,23 +1184,27 @@ async function downloadAtt(a: KbAttachment) {
       </template>
     </el-dialog>
 
-    <!-- 文档属性：业务字段，不随调试面板移除 -->
-    <el-dialog v-model="showProps" title="文档属性" width="520px" append-to-body>
-      <div class="kb-prop-row">
-        <label>摘要</label>
-        <el-input
-          v-model="form.summary"
-          type="textarea"
-          :rows="3"
-          placeholder="切片前置上下文（可选）"
-        />
-        <p class="kb-prop-hint">摘要会作为 chunk 的前置上下文，不参与正文渲染。</p>
-      </div>
-      <div class="kb-prop-meta">
-        状态 {{ current ? currentStatus.label : '—' }}（{{ current?.status ?? '—' }}） · 版本 v{{ current?.version ?? 0 }} · 文档 ID {{ current?.id ?? '—' }}
-      </div>
+    <!-- 文档信息：只读概览。原摘要字段后端全链路零消费（切片只取正文、检索不读），
+         改造为真正有用的文档元信息，避免「看着能填其实没用」的假入口。 -->
+    <el-dialog v-model="showInfo" title="文档信息" width="560px" append-to-body>
+      <!-- 布局对齐「日志详情」面板：el-descriptions 两列带边框，标签在左、值在右，
+           文档 ID 独占整行（同操作日志详情的「备注」:span=2）。--> 
+      <el-descriptions class="kb-info-desc" :column="2" border label-width="88px">
+        <el-descriptions-item label="状态">
+          <span :class="currentStatus.cls">{{ currentStatus.label }}</span>
+          <em v-if="hasUnpublishedEdits" class="kb-info-flag">有未发布修改</em>
+        </el-descriptions-item>
+        <el-descriptions-item label="版本">v{{ current?.version ?? 0 }}</el-descriptions-item>
+        <el-descriptions-item label="正文字数">{{ wordCount }}</el-descriptions-item>
+        <el-descriptions-item label="章节数">{{ headings.length }}</el-descriptions-item>
+        <el-descriptions-item label="附件数">{{ attachments.length }}</el-descriptions-item>
+        <el-descriptions-item label="更新时间">{{ current?.updatedAt ?? '—' }}</el-descriptions-item>
+        <el-descriptions-item label="文档 ID" :span="2">
+          <span class="kb-info-mono">{{ current?.id ?? '—' }}</span>
+        </el-descriptions-item>
+      </el-descriptions>
       <template #footer>
-        <el-button type="primary" @click="showProps = false">完成</el-button>
+        <el-button type="primary" @click="showInfo = false">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -1408,6 +1472,10 @@ async function downloadAtt(a: KbAttachment) {
 .kb-node-dot.is-archived {
   background: var(--el-text-color-placeholder);
 }
+/* 已发布但有未发布修改：直接把圆点染成橙色，与纯已发布的绿点一眼可分（不套外圈） */
+.kb-node-dot.has-unpublished {
+  background: var(--el-color-warning);
+}
 /* header 状态徽章：原生 span + 淡底，不依赖 el-tag 按需注册 */
 .kb-status {
   flex: none;
@@ -1592,7 +1660,8 @@ async function downloadAtt(a: KbAttachment) {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  /* 保存草稿 / 发布两按钮收紧，与组间 10px 形成层次：组内紧、组间松 */
+  gap: 2px;
 }
 /* 分段控件（segmented control）：胶囊容器 + 选中白块 + 微阴影，替代 radio-button */
 .kb-mode-switch {
@@ -1668,23 +1737,25 @@ async function downloadAtt(a: KbAttachment) {
 .kb-move-selected b {
   color: var(--el-text-color-primary);
 }
-.kb-prop-row label {
-  display: block;
+/* 文档信息面板：el-descriptions 两列表格（对齐日志详情），仅保留状态色 + 未发布标记 */
+.kb-info-desc .is-published {
+  color: var(--el-color-success);
+}
+.kb-info-desc .is-draft {
+  color: var(--el-text-color-regular);
+}
+.kb-info-flag {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-style: normal;
+  color: var(--el-color-warning);
+  background: var(--el-color-warning-light-9);
+}
+.kb-info-mono {
+  font-family: var(--el-font-family-mono, monospace);
   font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 6px;
-}
-.kb-prop-hint {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.kb-prop-meta {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--el-border-color-lighter);
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
 }
 .kb-check-grid {
   display: grid;
@@ -1763,21 +1834,63 @@ async function downloadAtt(a: KbAttachment) {
   font-size: 14px;
   font-weight: 600;
 }
-.kb-attach-tip {
+/* 收起 / 展开开关：整行标题可点，箭头旋转指示状态，hover 有反馈 */
+.kb-attach-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--el-text-color-primary);
+  cursor: pointer;
+}
+.kb-attach-toggle:hover {
+  background: var(--el-fill-color-light);
+}
+.kb-attach-caret {
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
+  transform: rotate(-90deg); /* 收起态箭头朝右，提示可展开 */
+  transition: transform 0.2s ease;
+}
+.kb-attach-caret.is-open {
+  transform: rotate(0); /* 展开态箭头朝下 */
+}
+/* 数量 badge：收起态也能一眼看到有几个附件 */
+.kb-attach-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+.kb-attach-summary {
   font-size: 12px;
+  font-weight: 400;
   color: var(--el-text-color-secondary);
 }
 .kb-attach-spacer {
   flex: 1;
 }
 .kb-attach-list {
+  --kb-attach-row: 40px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 200px;
-  overflow: auto;
+  /* 满 3 条即滚动：3 * 40 + 2 * 8 = 136px，第 4 条起出滚动条 */
+  max-height: calc(var(--kb-attach-row) * 3 + 16px);
+  overflow-y: auto;
 }
 .kb-attach-item {
+  height: var(--kb-attach-row);
+  box-sizing: border-box;
+  flex: none;
   display: flex;
   align-items: center;
   gap: 10px;

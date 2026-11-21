@@ -46,6 +46,8 @@ export interface KbNode {
   hasChild: boolean
   aclRoles?: string | null
   updatedAt?: string
+  /** 已发布节点是否留有未重新发布的保存修改（后端权威计算） */
+  hasUnpublishedEdits?: boolean
 }
 
 export interface KbNodePage {
@@ -67,6 +69,8 @@ export interface KbDocDetail {
   aclRoles?: string | null
   egressAllowed?: boolean
   updatedAt?: string
+  /** 已发布文档是否留有未重新发布的保存修改（后端权威计算） */
+  hasUnpublishedEdits?: boolean
 }
 
 export interface KbNodeQuery {
