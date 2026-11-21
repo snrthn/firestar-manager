@@ -34,4 +34,17 @@ describe('cleanAiMarkdown（DSML 兜底清洗）', () => {
     expect(cleanAiMarkdown('补充说明：只能走管理员重置流程。\n\n')).toBe('补充说明：只能走管理员重置流程。')
     expect(cleanAiMarkdown('结论。\n  \n\t')).toBe('结论。')
   })
+
+  it('请求 9c476e37 真实落库的 DSML 变体：无 parameter 行、开标签带 calls>/invoke>', () => {
+    const raw = [
+      '我来查询文件列表，并查看系统返回的文件总数。',
+      '',
+      '<|DSML|> calls>',
+      '<|DSML|> invoke name="search_files">',
+      '',
+      '</|DSML|> invoke>',
+      '</|DSML|> calls>',
+    ].join('\n')
+    expect(cleanAiMarkdown(raw)).toBe('我来查询文件列表，并查看系统返回的文件总数。')
+  })
 })

@@ -12,6 +12,7 @@
  */
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { ArrowDown, Loading, Star } from '@element-plus/icons-vue'
+import { cleanAiMarkdown } from '@/utils/aiMarkdown'
 
 const props = defineProps<{
   /** 思考文本（流式增量拼接） */
@@ -89,6 +90,13 @@ const label = computed(() => {
   if (props.status === 'cancel') return '已停止思考'
   return '已深度思考'
 })
+
+/**
+ * 思考文本同样兜底清洗 DSML 噪声：DeepSeek 会把伪工具调用写进 reasoning 通道，
+ * 该通道不走正文的 DsmlTokenFilter，历史脏数据回放时曾原样露出 <|DSML|> 标签。
+ * computed 保证流式增长过程中每帧都重新清洗。
+ */
+const cleanedContent = computed(() => cleanAiMarkdown(props.content))
 </script>
 
 <template>
@@ -103,8 +111,8 @@ const label = computed(() => {
       </span>
       <el-icon class="ai-think__chev"><ArrowDown /></el-icon>
     </button>
-    <div v-show="open && content" class="ai-think__body">
-      <div ref="bodyRef" class="ai-think__text">{{ content }}</div>
+    <div v-show="open && cleanedContent" class="ai-think__body">
+      <div ref="bodyRef" class="ai-think__text">{{ cleanedContent }}</div>
     </div>
   </div>
 </template>

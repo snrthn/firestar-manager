@@ -51,4 +51,19 @@ describe('AiThinking', () => {
     expect(replay.text()).not.toContain('用时')
     expect(isFolded(replay)).toBe(true)
   })
+
+  it('思考文本兜底清洗 DSML：展开后不露出 <|DSML|> 伪调用标签', async () => {
+    const raw = [
+      '我来查询文件列表。',
+      '<|DSML|> calls>',
+      '<|DSML|> invoke name="search_files">',
+      '</|DSML|> invoke>',
+      '</|DSML|> calls>',
+    ].join('\n')
+    const w = mount(AiThinking, { props: { content: raw, status: 'end' } })
+    await w.find('.ai-think__hd').trigger('click') // 展开回看
+    const text = w.find('.ai-think__text').text()
+    expect(text).toBe('我来查询文件列表。')
+    expect(text).not.toContain('DSML')
+  })
 })
