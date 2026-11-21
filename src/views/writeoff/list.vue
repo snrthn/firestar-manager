@@ -6,6 +6,7 @@ const userStore = useUserStore()
 const opVisible = computed(() => userStore.hasAnyPerm(['writeoff:reverse', 'writeoff:writeoff']))
 import { MagicStick, Refresh, Search, Download } from '@element-plus/icons-vue'
 import { downloadViaBackend } from '@/utils/fileDownload'
+import { buildExportName } from '@/utils/exportName'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -99,7 +100,7 @@ const onExport = () => {
   if (query.keyword.trim()) qs.append('keyword', query.keyword.trim())
   if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
   if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
-  downloadViaBackend('/writeoff/export?' + qs.toString(), 'writeoff_export.xlsx')
+  downloadViaBackend('/writeoff/export?' + qs.toString(), buildExportName('核销管理'))
 }
 
 const handleSizeChange = () => {

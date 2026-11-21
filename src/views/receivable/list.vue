@@ -4,6 +4,7 @@ import { useUserStore } from '@/stores/user'
 import EmptyState from '@/components/EmptyState.vue'
 import { Refresh, Search, Download } from '@element-plus/icons-vue'
 import { downloadViaBackend } from '@/utils/fileDownload'
+import { buildExportName } from '@/utils/exportName'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { receivablePage } from '@/api/receivable'
@@ -14,6 +15,7 @@ import DictSelect from '@/components/DictSelect.vue'
 import { useDictLabels } from '@/composables/useDict'
 import { formatDate } from '@/utils/datetime'
 import ReceivableDetailDialog from './ReceivableDetailDialog.vue'
+import ImportButton from '@/components/ImportButton.vue'
 
 // 应收管理列表页（只读）。
 // 应收单由发货「客户已收货」时点自动生成，1 发货 = 1 应收单，后端不暴露写接口，
@@ -81,7 +83,7 @@ const onExport = () => {
   if (query.status) qs.append('status', query.status)
   if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
   if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
-  downloadViaBackend('/receivable/export?' + qs.toString(), 'receivable_export.xlsx')
+  downloadViaBackend('/receivable/export?' + qs.toString(), buildExportName('应收管理'))
 }
 
 const handleSizeChange = () => {
@@ -195,7 +197,8 @@ onMounted(() => {
     <div class="toolbar">
       <el-button :icon="Refresh" @click="loadList">刷新</el-button>
       <el-button v-has-perm="'receivable:export'" :icon="Download" @click="onExport">导出</el-button>
-      <span class="muted">应收单由发货「客户已收货」自动生成，不支持手工新增</span>
+      <ImportButton import-key="receivable_opening" label="导入期初应收" @imported="loadList" />
+      <span class="muted">日常应收由发货「客户已收货」自动生成，不支持手工新增</span>
     </div>
 
     <el-table v-loading="loading" :data="list" border :row-class-name="redRowClass">

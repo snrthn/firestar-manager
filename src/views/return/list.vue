@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
 import { downloadViaBackend } from '@/utils/fileDownload'
+import { buildExportName } from '@/utils/exportName'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -84,7 +85,7 @@ const onExport = () => {
   if (query.executeStatus) qs.append('executeStatus', query.executeStatus)
   if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
   if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
-  downloadViaBackend('/return/export?' + qs.toString(), 'return_export.xlsx')
+  downloadViaBackend('/return/export?' + qs.toString(), buildExportName('退货管理'))
 }
 
 const openDetail = (row: ReturnVO) => {

@@ -4,6 +4,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import { useRoute } from 'vue-router'
 import { Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
 import { downloadViaBackend } from '@/utils/fileDownload'
+import { buildExportName } from '@/utils/exportName'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { shipmentPage } from '@/api/shipment'
@@ -13,6 +14,7 @@ import { useDictLabels } from '@/composables/useDict'
 import { formatDateTime } from '@/utils/datetime'
 import ShipmentCreateDialog from './ShipmentCreateDialog.vue'
 import ShipmentDetailDialog from './ShipmentDetailDialog.vue'
+import ImportButton from '@/components/ImportButton.vue'
 
 // 查询条件（2026-10-28 修正 + 补齐，口径对齐核销台账）：批次编号 / 项目编号 / 项目名称
 // 模糊、发货状态 / 审批状态精确、发货日期区间。
@@ -87,7 +89,7 @@ const onExport = () => {
   if (query.approvalStatus) qs.append('approvalStatus', query.approvalStatus)
   if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
   if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
-  downloadViaBackend('/shipment/export?' + qs.toString(), 'shipment_export.xlsx')
+  downloadViaBackend('/shipment/export?' + qs.toString(), buildExportName('发货管理'))
 }
 
 const handleSizeChange = () => {
@@ -177,6 +179,7 @@ onMounted(() => {
       <el-button type="primary" :icon="Plus" v-has-perm="'shipment:create'" @click="openCreate">新建发货</el-button>
       <el-button :icon="Refresh" @click="loadList">刷新</el-button>
       <el-button v-has-perm="'shipment:export'" :icon="Download" @click="onExport">导出</el-button>
+      <ImportButton import-key="shipment_opening" label="导入期初发货" @imported="loadList" />
     </div>
 
     <el-table v-loading="loading" :data="list" border>

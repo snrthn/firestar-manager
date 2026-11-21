@@ -19,6 +19,7 @@ import type { RoleManageVO } from '@/types/role'
 import type { PostOptionVO } from '@/types/post'
 import type { LevelOptionVO } from '@/types/level'
 import { formatDateTime } from '@/utils/datetime'
+import ImportButton from '@/components/ImportButton.vue'
 const userStore = useUserStore()
 const opVisible = computed(() => userStore.hasAnyPerm(['user:delete', 'user:edit']))
 
@@ -281,6 +282,7 @@ onMounted(() => {
     <div class="toolbar">
       <el-button type="primary" :icon="Plus" v-has-perm="'user:create'" @click="openCreate">新增用户</el-button>
       <el-button :icon="Refresh" @click="loadUsers">刷新</el-button>
+      <ImportButton import-key="user_opening" label="导入期初用户" @imported="loadUsers" />
     </div>
 
     <el-table v-loading="loading" :data="userList" border>

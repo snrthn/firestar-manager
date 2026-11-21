@@ -5,6 +5,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import type { FormInstance } from 'element-plus'
 import { Delete, Plus, Refresh, Search, Download, Upload } from '@element-plus/icons-vue'
 import { downloadViaBackend } from '@/utils/fileDownload'
+import { buildExportName } from '@/utils/exportName'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import ElMessageBox from 'element-plus/es/components/message-box/index.mjs'
@@ -25,6 +26,7 @@ import { useDictLabels } from '@/composables/useDict'
 import { uploadFile } from '@/api/file'
 import type { FileVO } from '@/types/file'
 import MasterDataDrawer from '@/components/MasterDataDrawer.vue'
+import ImportButton from '@/components/ImportButton.vue'
 
 // ===== 查询条件（2026-10-28 补齐，口径对齐核销台账） =====
 // 项目编号 / 项目名称 / 客户名称 模糊；审批状态 / 合同状态 / 销售经理 精确；创建时间闭区间
@@ -102,7 +104,7 @@ const onExport = () => {
   if (query.salesManagerId != null) qs.append('salesManagerId', String(query.salesManagerId))
   if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
   if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
-  downloadViaBackend('/project/export?' + qs.toString(), 'project_export.xlsx')
+  downloadViaBackend('/project/export?' + qs.toString(), buildExportName('项目列表'))
 }
 
 const handleSizeChange = () => {
@@ -552,6 +554,7 @@ onMounted(() => {
       <el-button v-has-perm="'project:export'" :icon="Download" @click="onExport">导出</el-button>
       <el-button :icon="Upload" v-has-perm="'customer:manage'" @click="openMasterData('customer')">客户档案</el-button>
       <el-button :icon="Upload" v-has-perm="'goods:manage'" @click="openMasterData('goods')">货物档案</el-button>
+      <ImportButton import-key="project_opening" label="导入期初项目" @imported="loadList" />
     </div>
 
     <el-table v-loading="loading" :data="list" border>

@@ -27,7 +27,7 @@
               </el-select>
             </el-form-item>
             <el-form-item v-else label="导入类型">
-              <el-tag type="primary">{{ fixedName }}</el-tag>
+              <el-tag type="primary">{{ typeName }}</el-tag>
             </el-form-item>
 
             <el-form-item label="数据文件">
@@ -204,7 +204,16 @@ const reportRow = ref<ImportBatch | null>(null)
 const reportDiff = ref('')
 
 const effectiveKey = computed(() => props.fixedKey || selectedKey.value)
-const drawerTitle = computed(() => (props.fixedName ? `${props.fixedName} · 数据导入` : '历史数据导入'))
+/**
+ * 导入类型展示名：优先用调用方传入的 fixedName（如客户/货物抽屉），
+ * 否则回退到后端 keys 接口的 displayName（各业务页 ImportButton 只传 key 的情况）。
+ */
+const typeName = computed(() => {
+  if (props.fixedName) return props.fixedName
+  const hit = keyOptions.value.find((k) => k.key === effectiveKey.value)
+  return hit?.displayName || effectiveKey.value || '未选择'
+})
+const drawerTitle = computed(() => (effectiveKey.value ? `${typeName.value} · 数据导入` : '历史数据导入'))
 const hasActive = computed(() => history.value.some(isActive))
 const reportErrors = computed(() => {
   const ext = reportRow.value?.ext

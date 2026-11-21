@@ -4,6 +4,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import { useRoute } from 'vue-router'
 import { Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
 import { downloadViaBackend } from '@/utils/fileDownload'
+import { buildExportName } from '@/utils/exportName'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { invoicePage } from '@/api/invoice'
@@ -16,6 +17,7 @@ import { formatDate, formatDateTime } from '@/utils/datetime'
 import InvoiceCreateDialog from './InvoiceCreateDialog.vue'
 import InvoiceDetailDialog from './InvoiceDetailDialog.vue'
 import InvoiceIssueDialog from './InvoiceIssueDialog.vue'
+import ImportButton from '@/components/ImportButton.vue'
 
 // 查询条件（2026-10-28 补齐，口径对齐核销台账）：项目 / 发票号码 / 项目名称 /
 // 发票类型 / 单据方向 / 开票状态 / 开票日期区间。后端 InvoiceController.page 已声明
@@ -93,7 +95,7 @@ const onExport = () => {
   if (query.status) qs.append('status', query.status)
   if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
   if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
-  downloadViaBackend('/invoice/export?' + qs.toString(), 'invoice_export.xlsx')
+  downloadViaBackend('/invoice/export?' + qs.toString(), buildExportName('发票管理'))
 }
 
 const handleSizeChange = () => {
@@ -240,6 +242,7 @@ onMounted(() => {
       <el-button type="primary" :icon="Plus" v-has-perm="'invoice:create'" @click="openCreate">新建发票</el-button>
       <el-button :icon="Refresh" @click="loadList">刷新</el-button>
       <el-button v-has-perm="'invoice:export'" :icon="Download" @click="onExport">导出</el-button>
+      <ImportButton import-key="invoice_opening" label="导入期初发票" @imported="loadList" />
     </div>
 
     <el-table v-loading="loading" :data="list" border>

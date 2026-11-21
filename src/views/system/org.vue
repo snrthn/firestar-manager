@@ -12,6 +12,7 @@ import { listUserOptions } from '@/api/user'
 import type { OrgFormData, OrgVO } from '@/types/org'
 import type { UserOptionVO } from '@/types/user'
 import DictSelect from '@/components/DictSelect.vue'
+import ImportButton from '@/components/ImportButton.vue'
 const userStore = useUserStore()
 const opVisible = computed(() => userStore.hasAnyPerm(['org:create', 'org:delete', 'org:edit']))
 
@@ -287,6 +288,7 @@ onMounted(() => {
         {{ allExpanded ? '折叠全部' : '展开全部' }}
       </el-button>
       <el-button :icon="Refresh" @click="loadOrgs">刷新</el-button>
+      <ImportButton import-key="org_opening" label="导入期初组织" @imported="loadOrgs" />
     </div>
 
     <el-table

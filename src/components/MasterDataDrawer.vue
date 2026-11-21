@@ -15,7 +15,7 @@
             :prefix-icon="Search" @keyup.enter="loadCustomers" @clear="loadCustomers" />
           <el-button type="primary" :icon="Search" @click="loadCustomers">查询</el-button>
           <el-button type="success" :icon="Plus" v-has-perm="'customer:manage'" @click="openCustomerForm()">新增</el-button>
-          <el-button :icon="Upload" v-has-perm="'import:customer'" @click="openImport('customer', '客户档案')">导入</el-button>
+          <el-button type="warning" :icon="Upload" v-has-perm="'import:customer'" @click="openImport('customer', '客户档案')">导入</el-button>
           <div class="spacer" />
           <span class="muted">共 {{ customerTotal }} 条</span>
         </div>
@@ -59,7 +59,7 @@
             :prefix-icon="Search" @keyup.enter="loadGoods" @clear="loadGoods" />
           <el-button type="primary" :icon="Search" @click="loadGoods">查询</el-button>
           <el-button type="success" :icon="Plus" v-has-perm="'goods:manage'" @click="openGoodsForm()">新增</el-button>
-          <el-button :icon="Upload" v-has-perm="'import:goods'" @click="openImport('goods', '货物档案')">导入</el-button>
+          <el-button type="warning" :icon="Upload" v-has-perm="'import:goods'" @click="openImport('goods', '货物档案')">导入</el-button>
           <div class="spacer" />
           <span class="muted">共 {{ goodsTotal }} 条</span>
         </div>

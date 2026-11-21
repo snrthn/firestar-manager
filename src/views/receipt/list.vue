@@ -4,6 +4,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import { useRoute } from 'vue-router'
 import { Plus, Refresh, Search, Download } from '@element-plus/icons-vue'
 import { downloadViaBackend } from '@/utils/fileDownload'
+import { buildExportName } from '@/utils/exportName'
 // 函数式组件按项目约定 deep-import（顶层入口会把全库拖进首包，见 main.ts 注释）
 import ElMessage from 'element-plus/es/components/message/index.mjs'
 import { receiptPage } from '@/api/receipt'
@@ -16,6 +17,7 @@ import { useReceiptTypeLabels } from '@/composables/useReceiptType'
 import { formatDate, formatDateTime } from '@/utils/datetime'
 import ReceiptCreateDialog from './ReceiptCreateDialog.vue'
 import ReceiptDetailDialog from './ReceiptDetailDialog.vue'
+import ImportButton from '@/components/ImportButton.vue'
 
 // 查询条件（2026-10-28 补齐，口径对齐核销台账）：项目 / 收款单号 / 项目名称 /
 // 款项类型 / 单据方向 / 收款状态 / 收款日期区间。后端 ReceiptController.page 已声明
@@ -95,7 +97,7 @@ const onExport = () => {
   if (query.status) qs.append('status', query.status)
   if (query.dateRange?.[0]) qs.append('dateFrom', query.dateRange[0])
   if (query.dateRange?.[1]) qs.append('dateTo', query.dateRange[1])
-  downloadViaBackend('/receipt/export?' + qs.toString(), 'receipt_export.xlsx')
+  downloadViaBackend('/receipt/export?' + qs.toString(), buildExportName('收款管理'))
 }
 
 const handleSizeChange = () => {
@@ -230,6 +232,7 @@ onMounted(() => {
       <el-button type="primary" :icon="Plus" v-has-perm="'receipt:create'" @click="openCreate">新建回款</el-button>
       <el-button :icon="Refresh" @click="loadList">刷新</el-button>
       <el-button v-has-perm="'receipt:export'" :icon="Download" @click="onExport">导出</el-button>
+      <ImportButton import-key="receipt_opening" label="导入期初收款" @imported="loadList" />
     </div>
 
     <el-table v-loading="loading" :data="list" border>
