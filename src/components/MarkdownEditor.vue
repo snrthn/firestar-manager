@@ -96,6 +96,11 @@ async function handleUploadImg(files: File[], callback: (urls: UploadImgCallBack
   /* 异步组件（defineAsyncComponent chunk）与 md-editor 内部初始化完成前，外层空 div 高度为 0
      → 页面整体塌陷跳动。给外层保底高度，加载完成后仍由父级 flex 链接管 */
   min-height: 120px;
+  /* 创建局部层叠上下文：md-editor-v3 代码块头是 position:sticky + z-index:10000，
+     不隔离就会盖过 Teleport 到 body、z-index:2100 的 AI 面板（2026-11-21 截图实锤）。
+     isolation 把内部 10000 关进本组件，对外部只按本容器（auto）参与比较，
+     于是吸顶功能保留、面板照样盖在其上——比强制 position:static 砍掉吸顶更正确。 */
+  isolation: isolate;
 }
 /* 默认：固定高度，避免弹窗等场景撑出视口 */
 .kb-md-editor :deep(.md-editor) {
@@ -113,5 +118,18 @@ async function handleUploadImg(files: File[], callback: (urls: UploadImgCallBack
   height: auto;
   flex: 1;
   min-height: 0;
+}
+
+/* ===== 代码块横向限宽（2026-11-21 修复） =====
+   md-editor-v3 7.1.0 的代码块头是 position:sticky + z-index:10000，吸顶是它的正常功能，
+   必须保留。层级逃逸已由容器 isolation:isolate 隔离解决（见上），这里只处理横向溢出：
+   代码块本体限宽，长行在块内横向滚动，不撑破预览区。不再强制 position:static。 */
+.kb-md-editor :deep(.md-editor-preview .md-editor-code) {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.kb-md-editor :deep(.md-editor-preview .md-editor-code pre) {
+  max-width: 100%;
+  overflow-x: auto;
 }
 </style>

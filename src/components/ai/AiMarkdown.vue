@@ -70,6 +70,34 @@ const cleaned = computed(() => cleanAiMarkdown(props.content))
   border-radius: 8px;
   overflow: hidden;
 }
+/* 代码块横向溢出修复：库样式 .x-md-renderer pre:has(.x-md-code-header-wrapper--sticky)
+   {overflow:unset} 优先级高于上面的 .ai-md pre，且 :has 命中 sticky header 代码块后
+   把横向滚动关掉——长代码行（如带缩进的路径/命令）不换行，直接撑破气泡宽度，
+   视觉上「飘」到 AI 面板外、盖住相邻表格。这里按同样的 :has 结构提权，把
+   代码块限制在气泡宽度内并恢复横向滚动；外层 overflow 保持 visible 以保留
+   sticky header，仅对代码体 pre 做 overflow-x:auto。 */
+.ai-md .x-md-code-block,
+.ai-md .x-md-code-block:has(.x-md-code-header-wrapper--sticky) {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.ai-md .x-md-renderer pre:has(.x-md-code-header-wrapper--sticky),
+.ai-md .x-md-code-body pre,
+.ai-md pre {
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+/* sticky 代码块头是「长文档阅读」场景的功能，在气泡消息列表里会脱离代码块
+   粘到滚动容器顶部，视觉上飘到面板上方盖住别的消息/表格。AI 回答气泡不需要，
+   强制回 static。外层 hidden 也让它失去可滚动祖先，双保险。 */
+.ai-md .x-md-code-header-wrapper--sticky {
+  position: static !important;
+}
+.ai-md {
+  max-width: 100%;
+  overflow-x: hidden;
+}
 .ai-md p {
   margin: 0 0 8px;
 }

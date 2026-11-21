@@ -72,18 +72,32 @@ function onRootClick(e: MouseEvent) {
 
 <template>
   <div ref="rootRef" class="kb-md-view" @click="onRootClick">
-    <MarkdownRendererAsync
-      :markdown="md"
-      :allow-html="false"
-      :sanitize="true"
-      :enable-animate="false"
-      :enable-gfm="true"
-      :enable-breaks="false"
-      :enable-latex="false"
-      :enable-shiki="true"
-      :enable-mermaid="true"
-      :show-code-block-header="true"
-    />
+    <!-- MarkdownRendererAsync 是 async setup（Shiki / mermaid chunk 懒加载）：
+         加载期间必须有固定高度占位 + Loading，否则切到「预览」tab 会白屏塌陷。
+         fallback 用纯 CSS 骨架，不依赖 el-skeleton（测试环境未注册会告警）。 -->
+    <Suspense>
+      <MarkdownRendererAsync
+        :markdown="md"
+        :allow-html="false"
+        :sanitize="true"
+        :enable-animate="false"
+        :enable-gfm="true"
+        :enable-breaks="false"
+        :enable-latex="false"
+        :enable-shiki="true"
+        :enable-mermaid="true"
+        :show-code-block-header="true"
+      />
+      <template #fallback>
+        <div class="kb-md-loading" role="status" aria-label="正在加载文档预览">
+          <div class="kb-md-loading__bar" />
+          <div class="kb-md-loading__bar kb-md-loading__bar--mid" />
+          <div class="kb-md-loading__bar" />
+          <div class="kb-md-loading__bar kb-md-loading__bar--short" />
+          <span class="kb-md-loading__text">正在加载文档预览…</span>
+        </div>
+      </template>
+    </Suspense>
     <el-image-viewer
       v-if="viewerVisible"
       :url-list="viewerUrls"
@@ -97,6 +111,40 @@ function onRootClick(e: MouseEvent) {
 
 <!-- 非 scoped：渲染器动态注入节点带不到 scoped 属性 -->
 <style>
+/* 预览加载骨架：固定占位高度，切 tab / 首次渲染期间不塌陷 */
+.kb-md-loading {
+  min-height: 420px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.kb-md-loading__bar {
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f2f4f7 25%, #e8ebf0 37%, #f2f4f7 63%);
+  background-size: 400% 100%;
+  animation: kb-md-shimmer 1.4s ease-in-out infinite;
+}
+.kb-md-loading__bar--mid {
+  width: 78%;
+}
+.kb-md-loading__bar--short {
+  width: 55%;
+}
+.kb-md-loading__text {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #a8abb2;
+}
+@keyframes kb-md-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
 .kb-md-view {
   font-size: 14px;
   color: #303133;

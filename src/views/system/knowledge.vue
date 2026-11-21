@@ -1633,10 +1633,15 @@ async function downloadAtt(a: KbAttachment) {
 .kb-editor {
   flex: 1;
   min-height: 0;
+  /* flex 子项默认 min-width:auto，超宽代码块会把编辑器撑破到右侧 AI 面板上。
+     显式归零，配合 MarkdownEditor 内的代码块限宽，双重防溢出。 */
+  min-width: 0;
 }
 .kb-preview {
   flex: 1;
-  min-height: 0;
+  /* 与编辑器 .kb-md-editor.is-fill 的 480px 保底对齐：渲染器异步 chunk 加载期间
+     骨架站住高度，预览区不塌成一条线、页面不跳动。加载完成后由 flex:1 接管。 */
+  min-height: 480px;
   overflow: auto;
   padding: 12px 16px;
   border: 1px solid var(--el-border-color-lighter);
