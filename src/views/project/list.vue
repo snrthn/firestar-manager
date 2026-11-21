@@ -24,6 +24,7 @@ import type { GoodsOptionVO } from '@/types/goods'
 import { useDictLabels } from '@/composables/useDict'
 import { uploadFile } from '@/api/file'
 import type { FileVO } from '@/types/file'
+import MasterDataDrawer from '@/components/MasterDataDrawer.vue'
 
 // ===== 查询条件（2026-10-28 补齐，口径对齐核销台账） =====
 // 项目编号 / 项目名称 / 客户名称 模糊；审批状态 / 合同状态 / 销售经理 精确；创建时间闭区间
@@ -230,6 +231,21 @@ const ensureGoodsOptions = async () => {
   if (goodsOpts.value.length === 0) {
     goodsOpts.value = (await goodsOptions()) ?? []
   }
+}
+
+// 主数据档案抽屉（V218）：客户/货物管理 + 导入入口挂在项目页，不新增菜单。
+const masterDataVisible = ref(false)
+/** 打开主数据抽屉时指定初始 Tab（点哪个按钮就落在哪个 Tab） */
+const masterDataTab = ref<'customer' | 'goods'>('customer')
+function openMasterData(tab: 'customer' | 'goods') {
+  masterDataTab.value = tab
+  masterDataVisible.value = true
+}
+const onMasterDataChanged = async () => {
+  // 清下拉缓存并强制重拉，让新导入/新建的客户货物在立项下拉里立刻可见
+  customerOpts.value = []
+  goodsOpts.value = []
+  await Promise.all([ensureCustomerOptions(), ensureGoodsOptions()])
 }
 
 /**
@@ -534,6 +550,8 @@ onMounted(() => {
       <el-button type="primary" :icon="Plus" v-has-perm="'project:create'" @click="openCreate">新建立项</el-button>
       <el-button :icon="Refresh" @click="loadList">刷新</el-button>
       <el-button v-has-perm="'project:export'" :icon="Download" @click="onExport">导出</el-button>
+      <el-button :icon="Upload" v-has-perm="'customer:manage'" @click="openMasterData('customer')">客户档案</el-button>
+      <el-button :icon="Upload" v-has-perm="'goods:manage'" @click="openMasterData('goods')">货物档案</el-button>
     </div>
 
     <el-table v-loading="loading" :data="list" border>
@@ -818,6 +836,13 @@ onMounted(() => {
       <el-button type="primary" :loading="saving" v-has-perm="'project:create'" @click="handleSubmit">保存</el-button>
     </template>
   </el-dialog>
+
+  <!-- 客户/货物档案管理抽屉（V218）：查询 + 增改 + 数据导入，入口挂项目页不新增菜单 -->
+  <MasterDataDrawer
+    v-model:visible="masterDataVisible"
+    :initial-tab="masterDataTab"
+    @changed="onMasterDataChanged"
+  />
 </template>
 
 <style scoped>
@@ -826,7 +851,8 @@ onMounted(() => {
 }
 .toolbar {
   display: flex;
-  gap: 0;
+  gap: 10px;
+  align-items: center;
   margin-bottom: 16px;
 }
 /* .pagination-bar 已上提到 styles/pages.css 全局（2026-10-26），本文件不再留本地副本 */
