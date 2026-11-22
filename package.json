@@ -12,7 +12,7 @@
     "build:prod": "vite build --mode production",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
-    "test": "vitest run",
+    "test": "node scripts/vitest-ci-report.mjs",
     "coverage": "vitest run --coverage"
   },
   "dependencies": {

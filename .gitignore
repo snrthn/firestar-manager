@@ -34,6 +34,10 @@ dist*/
 .env.*
 !.env.example
 
+# CI 单测报告产物（scripts/vitest-ci-report.mjs 每次 npm test 自动生成）
+mochawesome-report/
+coverage/
+
 # Logs
 logs/
 *.log
