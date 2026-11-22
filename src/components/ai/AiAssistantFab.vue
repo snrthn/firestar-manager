@@ -138,6 +138,14 @@ const histPage = ref(1)
 const histLoading = ref(false)
 /** 服务端历史接口不可达 → 降级本地快照（同一浏览器内可回放） */
 const histFailed = ref(false)
+/** 历史会话弹出层实例：点开某条记录后手动收起（与 modePopRef 同款，trigger=click 不会自动关） */
+const histPopRef = ref<{ hide: () => void } | null>(null)
+
+/** 收起历史面板：切换会话时调用，避免面板挡住刚切进去的会话界面 */
+function closeHistPop() {
+  const pop = histPopRef.value as { hide?: () => void } | null
+  if (pop && typeof pop.hide === 'function') pop.hide()
+}
 
 async function fetchHistoryPage(page: number) {
   histLoading.value = true
@@ -165,8 +173,18 @@ function onHistShow() {
 }
 const histHasMore = computed(() => !histFailed.value && serverConvs.value.length < serverTotal.value)
 
+/** 历史条目点击入口：删除气泡里的确认/取消点击不能切会话、关面板。
+ *  popconfirm 用 :teleported=false 把气泡挂在条目 DOM 内，点确认/取消时事件会
+ *  冒泡到本行的 @click；不加来源守卫会误调 switchToServer → closeHistPop。 */
+function onHistItemClick(conv: ConversationSummary, e: MouseEvent) {
+  if ((e.target as HTMLElement | null)?.closest('.el-popconfirm')) return
+  switchToServer(conv)
+}
+
 /** 点开服务端历史会话：拉消息 → 构造回放时间线 */
 async function switchToServer(conv: ConversationSummary) {
+  // 点记录的同时收起面板，让用户直接看到切换后的会话界面
+  closeHistPop()
   if (streaming.value) stop()
   histLoading.value = true
   let msgs: Awaited<ReturnType<typeof getConversationMessages>> = []
@@ -276,6 +294,7 @@ function newConversation() {
 
 function switchTo(id: string) {
   if (id === activeId.value) return
+  closeHistPop()
   if (streaming.value) stop()
   persistCurrent()
   const conv = conversations.value.find((c) => c.id === id)
@@ -803,7 +822,7 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
                 <el-icon :size="17"><Plus /></el-icon>
               </button>
             </el-tooltip>
-            <el-popover placement="bottom-end" :width="340" trigger="click" popper-class="ai-hist-pop" @show="onHistShow">
+            <el-popover ref="histPopRef" placement="bottom-end" :width="340" trigger="click" popper-class="ai-hist-pop" @show="onHistShow">
               <template #reference>
                 <button class="ai-icon-btn" type="button" title="最近会话">
                   <el-icon :size="17"><Clock /></el-icon>
@@ -821,16 +840,28 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
                     type="button"
                     class="ai-hist__item"
                     :class="{ 'is-active': c.id === activeConvId }"
-                    @click="switchToServer(c)"
+                    @click="onHistItemClick(c, $event)"
                   >
                     <span class="ai-hist__label">{{ c.title || '新会话' }}</span>
                     <span class="ai-hist__time">{{ dayLabel(new Date(c.updatedAt || c.createdAt || Date.now()).getTime()) }}</span>
-                    <span
-                      class="ai-hist__del"
-                      role="button"
-                      title="删除会话"
-                      @click.stop="removeServerConv(c)"
-                    >×</span>
+                    <el-popconfirm
+                      title="删除该会话？删除后不可恢复"
+                      confirm-button-text="删除"
+                      cancel-button-text="取消"
+                      confirm-button-type="danger"
+                      :teleported="false"
+                      width="200"
+                      @confirm="removeServerConv(c)"
+                    >
+                      <template #reference>
+                        <span
+                          class="ai-hist__del"
+                          role="button"
+                          title="删除会话"
+                          @click.stop
+                        >×</span>
+                      </template>
+                    </el-popconfirm>
                   </button>
                   <button
                     v-if="histHasMore"
@@ -1431,7 +1462,8 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
   color: #c0c4cc;
   font-size: 12px;
 }
-/* 服务端历史条目的删除按钮：hover 才露出，避免误触 */
+/* 服务端历史条目的删除按钮：常显 warning 系统色（虎哥要求灰色缺警示感，用 --el-color-warning）。
+   不加任何 hover 变色/红底。 */
 .ai-hist__del {
   flex: none;
   width: 18px;
@@ -1440,18 +1472,9 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
   align-items: center;
   justify-content: center;
   border-radius: 5px;
-  color: #c0c4cc;
+  color: var(--el-color-warning, #e6a23c);
   font-size: 14px;
   line-height: 1;
-  opacity: 0;
-  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
-}
-.ai-hist__item:hover .ai-hist__del {
-  opacity: 1;
-}
-.ai-hist__del:hover {
-  background: #fef0f0;
-  color: #f56c6c;
 }
 .ai-hist__more {
   display: block;

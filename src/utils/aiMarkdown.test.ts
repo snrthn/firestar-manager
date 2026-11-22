@@ -48,3 +48,41 @@ describe('cleanAiMarkdown（DSML 兜底清洗）', () => {
     expect(cleanAiMarkdown(raw)).toBe('我来查询文件列表，并查看系统返回的文件总数。')
   })
 })
+
+describe('normalizeAiMarkdown（扣子无换行伪 Markdown 恢复）', () => {
+  it('msg 276 真实片段：行内 ### 标题连写 → 断行 + 补空格', () => {
+    const raw = '如果忘记登录密码，可按以下通用步骤处理：###1.优先走官方自助找回通道平台登录页面一般都有入口。'
+    expect(cleanAiMarkdown(raw)).toBe(
+      '如果忘记登录密码，可按以下通用步骤处理：\n\n### 1.优先走官方自助找回通道平台登录页面一般都有入口。',
+    )
+  })
+
+  it('msg 276 真实片段：标点后紧跟「-列表项」→ 断行 + 补空格', () => {
+    const raw = '就能直接重置新密码：-最常用的是手机号验证：输入手机号，收取验证码；-如果绑定过邮箱：选择邮箱验证。'
+    expect(cleanAiMarkdown(raw)).toBe(
+      '就能直接重置新密码：\n- 最常用的是手机号验证：输入手机号，收取验证码；\n- 如果绑定过邮箱：选择邮箱验证。',
+    )
+  })
+
+  it('msg 276 真实片段：标点后紧跟「1.条目」→ 断行 + 补空格；不误伤小数与版本号', () => {
+    expect(cleanAiMarkdown('注意事项：1.重置密码建议用强口令；2.及时更新绑定信息。')).toBe(
+      '注意事项：\n1. 重置密码建议用强口令；\n2. 及时更新绑定信息。',
+    )
+    // 小数 / 版本号不受影响
+    expect(cleanAiMarkdown('圆周率约等于3.14，版本号v1.2已发布。')).toBe('圆周率约等于3.14，版本号v1.2已发布。')
+  })
+
+  it('合法 Markdown 不被改动（幂等）', () => {
+    const proper = '# 标题\n\n## 二级标题\n\n- 第一项\n- 第二项\n\n1. 条目一\n2. 条目二\n\n| A | B |\n| --- | --- |\n| 1 | 2 |'
+    expect(cleanAiMarkdown(proper)).toBe(proper)
+  })
+
+  it('数字区间与连接号不被误断', () => {
+    expect(cleanAiMarkdown('服务时间：2020-2021年，共10-20人。')).toBe('服务时间：2020-2021年，共10-20人。')
+  })
+
+  it('围栏代码块内容整体跳过', () => {
+    const raw = '参考下面命令：\n```bash\n# 这是注释\nrun-1.0\n```'
+    expect(cleanAiMarkdown(raw)).toBe('参考下面命令：\n```bash\n# 这是注释\nrun-1.0\n```')
+  })
+})

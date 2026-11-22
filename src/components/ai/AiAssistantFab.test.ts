@@ -459,8 +459,7 @@ describe('AiAssistantFab（云效式面板）', () => {
     // 点击回放：拉消息 → 构造时间线
     await items[0].trigger('click')
     await flushPromises()
-    expect(getMessagesMock).toHaveBeenCalledWith(42)
-    // draft 卡项也会渲染 content 槽（空 md-stub），聚合全部 markdown 节点断言
+    expect(getMessagesMock).toHaveBeenCalledWith(42)    // draft 卡项也会渲染 content 槽（空 md-stub），聚合全部 markdown 节点断言
     const mdText = wrapper.findAll('.md-stub').map((w) => w.text()).join('')
     expect(mdText).toContain('已生成发货草稿')
     expect(wrapper.find('.ai-draft').exists()).toBe(true)
@@ -479,6 +478,48 @@ describe('AiAssistantFab（云效式面板）', () => {
     expect(streamChatMock).toHaveBeenCalledTimes(1)
     const opts = streamChatMock.mock.calls[0][2]
     expect(opts.conversationId).toBe(42)
+  })
+
+  it('历史条目删除按钮：popconfirm 包裹后仍在行内渲染（回归：× 消失）', async () => {
+    listConversationsMock.mockResolvedValue({
+      records: [{ id: 9, title: '待删会话', provider: 'coze', status: 2, updatedAt: '2026-11-22T10:00:00' }],
+      total: 1,
+      current: 1,
+      size: 20,
+    })
+    const wrapper = mountFab()
+    await wrapper.find('.ai-dock').trigger('click')
+    await flushPromises()
+
+    const items = wrapper.findAll('.ai-hist__item')
+    expect(items.length).toBe(1)
+    // × 删除钮必须还是行的直接后代（el-popconfirm 包裹不得破坏 DOM/样式选择器）
+    const del = items[0].find('.ai-hist__del')
+    expect(del.exists()).toBe(true)
+    expect(del.classes()).toContain('ai-hist__del')
+    // 点击 × 不应触发行内会话切换（switchToServer 不被调用）
+    // 注：popconfirm 气泡的打开/确认交互依赖 popper 定位，happy-dom 下不可测（最小复现同样失败），
+    // 真实浏览器验证；这里只守护 DOM 结构与防误触。
+    await del.trigger('click')
+    await flushPromises()
+    expect(getMessagesMock).not.toHaveBeenCalled()
+    expect(deleteConvMock).not.toHaveBeenCalled()
+
+    // 模拟 popconfirm 气泡内确认/取消按钮的点击（:teleported=false → 气泡 DOM 挂在行内）：
+    // 事件冒泡到行上的 @click 时必须被来源守卫拦掉，否则会误切会话并关掉历史面板。
+    const bubble = document.createElement('div')
+    bubble.className = 'el-popconfirm'
+    const confirmBtn = document.createElement('button')
+    bubble.appendChild(confirmBtn)
+    ;(items[0].element as HTMLElement).appendChild(bubble)
+    confirmBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    expect(getMessagesMock).not.toHaveBeenCalled()
+
+    // 守卫不能误伤正常行点击
+    await items[0].trigger('click')
+    await flushPromises()
+    expect(getMessagesMock).toHaveBeenCalledWith(9)
   })
 
   it('多轮续聊：首轮 meta 回 conversationId，第二轮请求自动带上', async () => {

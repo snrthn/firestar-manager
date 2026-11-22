@@ -59,6 +59,11 @@ import ElNotification from 'element-plus/es/components/notification/index.mjs'
 // 参考按钮被淹没、点选/回显交互全废（2026-10-14 虎哥截图实锤）。
 // 内部由 ElTooltip 承载定位与箭头，tooltip 样式需一并引入。
 import ElPopover from 'element-plus/es/components/popover/index.mjs'
+// ElPopconfirm：AI 助手「最近会话」删除确认气泡（2026-11-22）。漏注册时
+// <el-popconfirm> 被当未解析组件，#reference 插槽整个不渲染——删除 × 直接
+// 从页面上消失、控制台 "Failed to resolve component: el-popconfirm"
+// （同 el-badge / el-checkbox / el-timeline 族坑）。
+import ElPopconfirm from 'element-plus/es/components/popconfirm/index.mjs'
 // ElTooltip：超收标记的精致悬浮气泡（虎哥 2026-10-27 要求）。此前只引了 style/css 漏了
 // 组件本体，导致 <el-tooltip> 运行时是未注册标签、气泡永不弹。popover 内部定位/箭头也复用它。
 import ElTooltip from 'element-plus/es/components/tooltip/index.mjs'
@@ -147,6 +152,7 @@ import 'element-plus/es/components/message-box/style/css'
 import 'element-plus/es/components/notification/style/css'
 import 'element-plus/es/components/pagination/style/css'
 import 'element-plus/es/components/popover/style/css'
+import 'element-plus/es/components/popconfirm/style/css'
 // popover 浮层由 ElTooltip 渲染（定位/箭头在 tooltip 包内），缺它浮层错位无箭头
 import 'element-plus/es/components/tooltip/style/css'
 import 'element-plus/es/components/radio/style/css'
@@ -234,6 +240,7 @@ app.use(ElMessageBox)
 app.use(ElNotification)
 app.use(ElPagination)
 app.use(ElPopover)
+app.use(ElPopconfirm)
 app.use(ElTooltip)
 app.use(ElSelect)
 app.use(ElOption)
