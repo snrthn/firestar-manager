@@ -11,6 +11,10 @@ export interface InitStatusVO {
   canReset: boolean
   /** 是否存在超管账号（admin） */
   adminExists: boolean
+  /** 上次重置时间（仅重置页鉴权端点回显，匿名端点恒为 undefined） */
+  lastResetTime?: string
+  /** 上次重置操作人（仅重置页鉴权端点回显，匿名端点恒为 undefined） */
+  lastResetBy?: string
 }
 
 /** 初始化安装向导请求：POST /system/init，三项均可空（留空回退默认值） */
@@ -29,6 +33,8 @@ export interface ResetRequest {
   confirmText?: string
   /** 验证码。首次获取时为空，后端生成并回传；二次提交时携带该码 */
   verifyCode?: string
+  /** 当前登录管理员密码。仅执行重置（带 verifyCode）时必填 —— 后端做二次身份校验 */
+  password?: string
 }
 
 /** 系统重置返回 */
@@ -43,6 +49,8 @@ export interface ResetResultVO {
   resetType?: string
   /** 本次清理的表名清单（full 重置为 Flyway clean+migrate 占位说明） */
   clearedTables?: string[]
+  /** 是否需要重新执行初始化向导（true = 完整重置后系统回到未初始化态，需登出并跳 /install） */
+  requireReinstall?: boolean
 }
 
 /** 环境预检项：GET /system/init/precheck 返回（安装向导 /install 页展示） */

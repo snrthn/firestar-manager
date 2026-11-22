@@ -30,6 +30,13 @@
               {{ status.adminExists ? '已存在' : '不存在' }}
             </el-tag>
           </el-descriptions-item>
+          <el-descriptions-item label="上次重置">
+            <span v-if="status.lastResetTime">
+              {{ status.lastResetTime }}
+              <template v-if="status.lastResetBy">（{{ status.lastResetBy }}）</template>
+            </span>
+            <span v-else class="ir-muted">从未重置</span>
+          </el-descriptions-item>
         </el-descriptions>
       </div>
       <el-skeleton v-else :rows="4" />
@@ -42,7 +49,7 @@
         type="warning"
         :closable="false"
         class="ir-tip"
-        title="重置将清空业务数据，操作不可恢复。仅试运行模式（trial_mode=true）下可用，且需二次确认 + 验证码。"
+        title="重置将清空业务数据，操作不可恢复。仅试运行模式（trial_mode=true）下可用，且需二次确认 + 验证码 + 当前登录密码。"
       />
       <div class="ir-reset-actions">
         <el-button
@@ -90,8 +97,24 @@
           <el-form-item label="验证码">
             <el-input v-model="verifyCode" placeholder="请输入上方验证码" />
           </el-form-item>
+          <!-- 后端二次身份校验：仅凭管理员会话不足以清库，必须再输一次登录密码 -->
+          <el-form-item label="管理员密码" required>
+            <el-input
+              v-model="adminPassword"
+              type="password"
+              show-password
+              placeholder="请输入当前登录账号的密码"
+            />
+            <div class="ir-hint">重置会清空数据，需再次校验你的登录密码。</div>
+          </el-form-item>
           <el-form-item>
-            <el-button type="danger" :loading="resetLoading" v-has-perm="'system:reset'" @click="executeReset">确认执行重置</el-button>
+            <el-button
+              type="danger"
+              :loading="resetLoading"
+              :disabled="!adminPassword"
+              v-has-perm="'system:reset'"
+              @click="executeReset"
+            >确认执行重置</el-button>
           </el-form-item>
         </template>
       </el-form>
@@ -101,11 +124,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getInitStatus, resetLight, resetFull } from '@/api/system'
+import { getResetStatus, resetLight, resetFull } from '@/api/system'
+import { refreshInitState } from '@/router'
 import { useUserStore } from '@/stores/user'
 import type { InitStatusVO } from '@/types/system'
 
+const router = useRouter()
 const userStore = useUserStore()
 
 const status = ref<InitStatusVO | null>(null)
@@ -115,6 +141,7 @@ const resetVisible = ref(false)
 const resetType = ref<'light' | 'full'>('light')
 const confirmText = ref('')
 const verifyCode = ref('')
+const adminPassword = ref('')
 const generatedCode = ref('')
 const resetLoading = ref(false)
 
@@ -128,14 +155,16 @@ const resetDisabledTip = computed(() => {
 })
 const resetWarnText = computed(() =>
   resetType.value === 'full'
-    ? '完整重置将清空全部数据并通过 Flyway 重建数据库（恢复出厂），超级管理员账号将重新生成。'
-    : '轻度重置将清空业务数据表、Flowable 运行/历史数据与上传文件，保留系统配置。',
+    ? '完整重置将清空全部数据并通过 Flyway 重建数据库（恢复出厂），超级管理员账号将重新生成；完成后会重新部署流程定义，但仍建议重启后端服务以确保流程引擎状态完全一致。'
+    : '轻度重置将清空业务数据表（含 AI 会话记录）、Flowable 运行/历史数据与上传文件，保留系统配置与知识库。',
 )
 
 async function loadStatus() {
   loadingStatus.value = true
   try {
-    status.value = await getInitStatus()
+    // 必须用鉴权端点：匿名 /system/init/status 在已初始化后只回 initialized:true，
+    // trialMode/canReset 全为 false，会导致重置按钮永久不可用。
+    status.value = await getResetStatus()
   } catch (e: any) {
     ElMessage.error(e?.message || '获取系统状态失败')
   } finally {
@@ -147,6 +176,7 @@ function openReset(type: 'light' | 'full') {
   resetType.value = type
   confirmText.value = ''
   verifyCode.value = ''
+  adminPassword.value = ''
   generatedCode.value = ''
   resetVisible.value = true
 }
@@ -154,6 +184,7 @@ function openReset(type: 'light' | 'full') {
 function onResetClosed() {
   confirmText.value = ''
   verifyCode.value = ''
+  adminPassword.value = ''
   generatedCode.value = ''
   resetLoading.value = false
 }
@@ -189,13 +220,31 @@ async function executeReset() {
     ElMessage.warning('请输入验证码')
     return
   }
+  if (!adminPassword.value) {
+    ElMessage.warning('请输入当前管理员登录密码')
+    return
+  }
   resetLoading.value = true
   try {
     const fn = resetType.value === 'full' ? resetFull : resetLight
-    const res = await fn({ confirmText: 'RESET', verifyCode: verifyCode.value })
+    const res = await fn({
+      confirmText: 'RESET',
+      verifyCode: verifyCode.value,
+      password: adminPassword.value,
+    })
     if (res.executed) {
-      ElMessage.success(res.message || '重置完成')
       resetVisible.value = false
+      if (res.requireReinstall) {
+        // 完整重置：sys_user 已被 Flyway 重建，当前 token 立即失效，
+        // 且 sys_initialized 回到 false。必须清掉本地登录态并回到安装向导，
+        // 否则用户停在原页只会看到一连串 401。
+        ElMessage.success('完整重置完成，请重新初始化系统')
+        userStore.logoutLocal()
+        await refreshInitState()
+        await router.replace('/install')
+        return
+      }
+      ElMessage.success(res.message || '重置完成')
       await loadStatus()
     } else {
       ElMessage.error(res.message || '重置未执行')
@@ -253,6 +302,9 @@ onMounted(loadStatus)
   color: #e6a23c;
   font-size: 13px;
   margin-top: 4px;
+}
+.ir-muted {
+  color: #909399;
 }
 .ir-reset-form {
   margin-top: 12px;

@@ -18,6 +18,16 @@ export function doInit(data: InitRequest) {
   return request.post('/system/init', data).then((r) => r.data.data as InitStatusVO)
 }
 
+/**
+ * 重置页专用状态（已登录可达，返回完整状态）。
+ *
+ * ⚠️ 不要用 getInitStatus() 渲染重置页：那是匿名端点，初始化完成后会被后端裁剪成
+ * 只回 initialized:true，trialMode/canReset 全部为 false，会导致按钮永久 disabled。
+ */
+export function getResetStatus() {
+  return request.get('/system/reset/status').then((r) => r.data.data as InitStatusVO)
+}
+
 /** 环境预检（安装向导展示，未初始化时公开，返回只读明细） */
 export function getPrecheck() {
   return request.get('/system/init/precheck').then((r) => r.data.data as EnvCheckItem[])
