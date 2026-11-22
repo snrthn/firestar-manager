@@ -241,7 +241,7 @@ onMounted(reloadAll)
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="remark" label="备注" min-width="160">
+      <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip>
         <template #default="{ row }">{{ row.remark || '—' }}</template>
       </el-table-column>
       <el-table-column label="操作" width="140" fixed="right" align="center" v-if="opVisible">

@@ -147,3 +147,35 @@
 .el-table .cell .el-button:focus-visible {
   outline-offset: -2px;
 }
+
+/* ===== 弹窗内容超高撑出页面滚动条：全局兜底（虎哥 2026-11-22 要求排查） =====
+ * 根因：Element Plus 默认 .el-dialog 无 max-height / 无 overflow，
+ *       .el-overlay 自身 overflow:auto，弹窗一旦超过视口，顶部被滚出且弹窗内无法滚动。
+ * 排查结果：59 个 el-dialog 中仅 11 个用 .detail-scroll / .dialog-scroll 自行限高，
+ *          其余 48 个（13 个含动态表格/长表单/附件列表的高风险项）全部裸奔。
+ * 修法：全局一处兜底——弹窗轴改为 flex 列、限高到视口内、body 内部滚动。
+ *   · :not(.is-fullscreen) 必须排除 FilePreviewDialog 的全屏预览态（它自带 height:100%）。
+ *   · 已有 .detail-scroll / .dialog-scroll 的弹窗 body 改 hidden，避免内外双滚动条
+ *     （那批用 :has 匹配，旧浏览器不支持时仅退化为双滚动条，不会溢出，可接受）。
+ *   · max-height 上限 600px（虎哥 2026-11-22 要求：600 屏幕垂直居中观感更好），
+ *     小屏用 min() 保留视口兜底，避免 600px + top 15vh 顶出视口。 */
+.el-dialog:not(.is-fullscreen) {
+  display: flex;
+  flex-direction: column;
+  max-height: min(600px, calc(100vh - var(--el-dialog-margin-top, 15vh) - 50px));
+}
+.el-dialog:not(.is-fullscreen) > .el-dialog__header {
+  flex: 0 0 auto;
+}
+.el-dialog:not(.is-fullscreen) > .el-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.el-dialog:not(.is-fullscreen) > .el-dialog__footer {
+  flex: 0 0 auto;
+}
+.el-dialog:not(.is-fullscreen):has(.detail-scroll) > .el-dialog__body,
+.el-dialog:not(.is-fullscreen):has(.dialog-scroll) > .el-dialog__body {
+  overflow-y: hidden;
+}

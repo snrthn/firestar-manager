@@ -72,7 +72,14 @@ import ElPagination from 'element-plus/es/components/pagination/index.mjs'
 // ElOption 与 ElSelect 同入口具名导出（官方 select/index.ts：
 // export const ElOption = withNoopInstall(Option)，与 menu-item 同套路）。
 // 字典数据页的「样式」下拉用；样式 select/style/css 已随 tree-select 依赖引入过。
-import ElSelect, { ElOption } from 'element-plus/es/components/select/index.mjs'
+import ElSelect, { ElOption, ElOptionGroup } from 'element-plus/es/components/select/index.mjs'
+// ElProgress：导入抽屉上传进度 + 看板项目排名履约/开票/回款率（ImportDrawer.vue:105、
+// ProjectTab.vue:73/81/89 共 4 处使用）。漏注册时 Vue 当未知标签，控制台
+// "Failed to resolve component: el-progress" 且进度条整块不渲染（2026-11-22 虎哥截图实锤）。
+import ElProgress from 'element-plus/es/components/progress/index.mjs'
+// ElCollapseTransition：知识库文档列表折叠过渡（knowledge.vue:1096/1126），
+// 纯逻辑组件无独立样式；漏注册时折叠动画失效并告警。
+import ElCollapseTransition from 'element-plus/es/components/collapse-transition/index.mjs'
 import ElRadio, { ElRadioGroup } from 'element-plus/es/components/radio/index.mjs'
 import ElResult from 'element-plus/es/components/result/index.mjs'
 import ElSwitch from 'element-plus/es/components/switch/index.mjs'
@@ -173,6 +180,7 @@ import 'element-plus/es/components/tree-select/style/css'
 // 缺了这两行，父菜单下拉框与树节点样式全丢。
 // （字典数据页的 el-select 直接复用这两行，无需重复引入）
 import 'element-plus/es/components/select/style/css'
+import 'element-plus/es/components/progress/style/css'
 import 'element-plus/es/components/tree/style/css'
 import 'element-plus/es/components/menu/style/css'
 import 'element-plus/es/components/tabs/style/css'
@@ -244,6 +252,9 @@ app.use(ElPopconfirm)
 app.use(ElTooltip)
 app.use(ElSelect)
 app.use(ElOption)
+app.use(ElOptionGroup)
+app.use(ElProgress)
+app.use(ElCollapseTransition)
 app.use(ElRadio)
 app.use(ElRadioGroup)
 app.use(ElResult)

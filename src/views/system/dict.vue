@@ -211,7 +211,7 @@ onMounted(loadTypes)
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="remark" label="备注" min-width="200">
+      <el-table-column prop="remark" label="备注" min-width="300"  show-overflow-tooltip >
         <template #default="{ row }">{{ row.remark || '—' }}</template>
       </el-table-column>
       <el-table-column label="操作" width="200" fixed="right" align="center" v-if="opVisible">

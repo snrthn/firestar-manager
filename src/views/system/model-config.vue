@@ -323,32 +323,39 @@ const dictDefaultsReady = Promise.all([
 })
 
 // ---------------------------------------------------------------- TTS 结构化参数
-// 音色清单取自百炼官方 cosyvoice-v3-flash 音色表（常用中文音色）。
+// 音色清单取自百炼官方 cosyvoice-v3-flash 音色表（2026-11 核对）：
+// https://help.aliyun.com/zh/model-studio/cosyvoice-voice-list
+// ⚠️ 关键坑：v3-flash 的音色 voice 参数**绝大多数带 `_v3` 后缀**，与 cosyvoice-v2
+// 的同名音色不是一回事。此前清单漏写后缀，导致除 longanyang / longanhuan 两个
+// 「兼容别名」外全部 21 个音色在百炼侧报「音色不存在」→ 合成失败（虎哥截图实锤）。
 // 对应 extra_json 的 voice / format / sample_rate 三个键。
 const TTS_VOICES = [
-  { value: 'longanyang', label: '龙安洋（阳光大男孩）' },
-  { value: 'longanhuan', label: '龙安欢（欢脱元气女）' },
-  { value: 'longxiaoxia', label: '龙小夏（沉稳权威女）' },
-  { value: 'longxiaochun', label: '龙小淳（知性积极女）' },
-  { value: 'longyumi', label: 'YUMI（正经青年女）' },
-  { value: 'longanyun', label: '龙安昀（居家暖男）' },
-  { value: 'longfei', label: '龙飞（热血磁性男）' },
-  { value: 'longyingxiao', label: '龙应笑（清甜推销女）' },
-  { value: 'longyingxun', label: '龙应询（年轻青涩男）' },
-  { value: 'longyingjing', label: '龙应静（低调冷静女）' },
-  { value: 'longyingling', label: '龙应聆（温和共情女）' },
-  { value: 'longyingtao', label: '龙应桃（温柔淡定女）' },
-  { value: 'longhuhu', label: '龙呼呼（天真烂漫女童）' },
-  { value: 'longpaopao', label: '龙泡泡（飞天泡泡音）' },
-  { value: 'longxian', label: '龙仙（豪放可爱女）' },
-  { value: 'longling', label: '龙铃（稚气呆板女）' },
-  { value: 'longshanshan', label: '龙闪闪（戏剧化童声）' },
-  { value: 'longniuniu', label: '龙牛牛（阳光男童声）' },
-  { value: 'longjiaxin', label: '龙嘉欣（粤语女）' },
-  { value: 'longjiayi', label: '龙嘉怡（粤语女）' },
-  { value: 'longanyue', label: '龙安粤（粤语男）' },
-  { value: 'longlaotie', label: '龙老铁（东北话）' },
-  { value: 'longshange', label: '龙陕哥（陕西话）' },
+  { value: 'longanyang', label: '龙安洋（阳光大男孩）' }, // 标杆音色，官方无后缀
+  { value: 'longanhuan', label: '龙安欢（欢脱元气女）' }, // 官方共存无后缀别名
+  { value: 'longanhuan_v3', label: '龙安欢V3（多方言元气女）' },
+  { value: 'longxiaoxia_v3', label: '龙小夏（沉稳权威女）' },
+  { value: 'longxiaochun_v3', label: '龙小淳（知性积极女）' },
+  { value: 'longyumi_v3', label: 'YUMI（正经青年女）' },
+  { value: 'longanyun_v3', label: '龙安昀（居家暖男）' },
+  { value: 'longfei_v3', label: '龙飞（热血磁性男）' },
+  { value: 'longyingxiao_v3', label: '龙应笑（清甜推销女）' },
+  { value: 'longyingxun_v3', label: '龙应询（年轻青涩男）' },
+  { value: 'longyingjing_v3', label: '龙应静（低调冷静女）' },
+  { value: 'longyingling_v3', label: '龙应聆（温和共情女）' },
+  { value: 'longyingtao_v3', label: '龙应桃（温柔淡定女）' },
+  { value: 'longhuhu_v3', label: '龙呼呼（天真烂漫女童）' },
+  { value: 'longpaopao_v3', label: '龙泡泡（飞天泡泡音）' },
+  { value: 'longjielidou_v3', label: '龙杰力豆（阳光顽皮男）' },
+  { value: 'longxian_v3', label: '龙仙（豪放可爱女）' },
+  { value: 'longling_v3', label: '龙铃（稚气呆板女）' },
+  { value: 'longshanshan_v3', label: '龙闪闪（戏剧化童声）' },
+  { value: 'longniuniu_v3', label: '龙牛牛（阳光男童声）' },
+  { value: 'longjiaxin_v3', label: '龙嘉欣（优雅粤语女）' },
+  { value: 'longjiayi_v3', label: '龙嘉怡（知性粤语女）' },
+  { value: 'longanyue_v3', label: '龙安粤（欢脱粤语男）' },
+  { value: 'longlaotie_v3', label: '龙老铁（东北直率男）' },
+  { value: 'longshange_v3', label: '龙陕哥（原味陕北男）' },
+  { value: 'longanmin_v3', label: '龙安闽（清纯闽南语女）' },
 ]
 const TTS_FORMATS = [
   { value: 'mp3', label: 'mp3（默认，体积小）' },
