@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cleanAiMarkdown } from './aiMarkdown'
+import { cleanAiMarkdown, normalizeAiMarkdown } from './aiMarkdown'
 
 describe('cleanAiMarkdown（DSML 兜底清洗）', () => {
   it('剥离 DSML 伪工具调用块及其标签尾巴', () => {
@@ -70,6 +70,30 @@ describe('normalizeAiMarkdown（扣子无换行伪 Markdown 恢复）', () => {
     )
     // 小数 / 版本号不受影响
     expect(cleanAiMarkdown('圆周率约等于3.14，版本号v1.2已发布。')).toBe('圆周率约等于3.14，版本号v1.2已发布。')
+  })
+
+  it('连体伪表格（请求 f2f881c9 真实落库）：|| 行边界拆成合法 GFM 表格', () => {
+    const raw =
+      '当前待开票金额为 **618.0元**。本月开票相关核心指标汇总：|指标 |数值 || ---- | ---- ||累计开票总金额（含税） |11425.0元 ||其中税额 |1487.5元 ||待开票余额 |618.0元 |'
+    const expected = [
+      '当前待开票金额为 **618.0元**。本月开票相关核心指标汇总：',
+      '|指标 |数值 |',
+      '| ---- | ---- |',
+      '|累计开票总金额（含税） |11425.0元 |',
+      '|其中税额 |1487.5元 |',
+      '|待开票余额 |618.0元 |',
+    ].join('\n')
+    expect(normalizeAiMarkdown(raw)).toBe(expected)
+  })
+
+  it('有分隔行特征但双竖线带空格（空单元格写法）不命中拆行', () => {
+    const raw = '| 项目 | 金额 |\n| --- | --- |\n| A | | 100 |'
+    expect(normalizeAiMarkdown(raw)).toBe(raw)
+  })
+
+  it('代码块内的伪表格样例原样保留', () => {
+    const raw = '示例：\n```\n|指标 |数值 || ---- | ---- ||A |1 |\n```\n完毕。'
+    expect(normalizeAiMarkdown(raw)).toBe(raw)
   })
 
   it('合法 Markdown 不被改动（幂等）', () => {

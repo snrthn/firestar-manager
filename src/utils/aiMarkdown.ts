@@ -25,6 +25,24 @@ const TAG_TAIL = /^\s*(?:parameter|invoke|calls)\s*>\s*$/i
  * 只处理「标记与前后文连写」的位置；已是合法结构的文本不会被任何规则命中。
  */
 function normalizeSegment(seg: string): string {
+  // ⑦ 连体伪表格（2026-11-23 请求 f2f881c9 实锤）：扣子把多行表格输出成一行，
+  //    「…汇总：|指标 |数值 || ---- | ---- ||累计开票总金额 |11425.0元 ||…」，
+  //    || 是相邻两行的行尾/行首竖线拼接，表头还可能与前置正文连写。
+  //    仅当段内存在 GFM 分隔行特征（|---|）且出现紧贴 || 才拆行；
+  //    正常表格的双竖线（空单元格）必有空格「| a | | b |」，DeepSeek 等正常输出不命中。
+  if (/\|\s*:?-{2,}:?\s*\|/.test(seg) && seg.includes('||')) {
+    const lines = seg.replace(/\|\|/g, '|\n|').split('\n')
+    const sepIdx = lines.findIndex((l) => /\|\s*:?-{2,}:?\s*\|/.test(l))
+    // 表头行（分隔行的上一行）若与前置正文连写，在第一个竖线前断行
+    if (sepIdx > 0) {
+      const header = lines[sepIdx - 1]
+      const firstBar = header.indexOf('|')
+      if (firstBar > 0) {
+        lines[sepIdx - 1] = header.slice(0, firstBar) + '\n' + header.slice(firstBar)
+      }
+    }
+    seg = lines.join('\n')
+  }
   return seg
     // ① 行内伪标题（##~######，不含单个 #——防误伤「C#」「话题标签」）：
     //    「：###1.标题正文」→「：\n\n### 1.标题正文」（断行 + 标记后补空格）
