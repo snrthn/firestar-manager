@@ -29,12 +29,23 @@ stages:
         condition: |
           "${ACTION}" == "deploy"
         steps:
-          build_step:
+          # 2026-11-22 补：测试门禁。此前本流水线只有 npm install + build，
+          # 118 个 vitest 用例（含 P0 的 401 僵尸 token、sessionGuard、v-has-perm）
+          # 全部不参与发版门禁——回归了也照样发布。这里在构建前插入，失败即中断。
+          # npm ci 比 npm install 严格（lock 不一致直接失败），但为兼容现有流程保留 install。
+          test_step:
             step: Command
-            name: 安装依赖并构建
+            name: 前端单元测试（vitest）
             with:
               run: |
+                set -e
                 npm install
+                npm run test
+          build_step:
+            step: Command
+            name: 构建
+            with:
+              run: |
                 npm run build
           upload_step:
             step: ArtifactUpload
