@@ -1,0 +1,217 @@
+# =====================================================================
+# firestar-manager CI/CD（GitHub Actions 版）
+#
+# 定位：云效流水线「火星财务-管理端」(5314973) 的等价翻译，供接手者在
+#       GitHub 侧复用同一套流程。对应关系（云效 → 本文件）：
+#
+#   云效 stage/job                        → GitHub job
+#   ------------------------------------------------------------
+#   JavaScript 代码扫描                    → 不迁移（云效内置扫描器）；
+#                                            如需等价可自加 eslint 步骤
+#   Node.js 单元测试 (npm run test)        → test（走 vitest-ci-report，
+#                                            产物 mochawesome-report/）
+#   Node.js 构建 (npm run build:prod)      → build
+#   构建物上传 + 主机部署                   → deploy
+#
+# 门禁语义对齐：
+#   - 云效 jobs 串行 needs（扫描→单测→构建→部署）→ GitHub needs 链
+#   - 云效 FirstBatchPause（首批暂停人工确认）→ environment: production
+#     需在仓库 Settings → Environments → production 配置 Required reviewers
+#
+# 接手者必配（仓库 Settings → Secrets and variables → Actions）：
+#   ECS_SSH_HOST        生产 ECS 地址
+#   ECS_SSH_USER        SSH 用户（云效 executeUser=root）
+#   ECS_SSH_KEY         SSH 私钥（对应用户在 ECS authorized_keys 中的公钥）
+#   ECS_SSH_PORT        SSH 端口（默认 22，可不配，job 里有默认值）
+#   NPM_TOKEN           （仅当依赖走私有 npm registry 时需要；公共源不用）
+#
+# 与云效的差异说明：
+#   - 云效用 cnpm（国内源加速）；GitHub runner 在海外，直接 npm 官方源，
+#     lockfile 已在仓库中，安装结果可复现。
+#   - 云效 UnitTestReport 步骤按 mochawesome 格式收集报告
+#     （这是 run140 失败的根因，vitest 不产 mochawesome 文件）；
+#     本仓库 package.json 的 test 脚本已切换为 scripts/vitest-ci-report.mjs，
+#     npm test 会自动生成 mochawesome-report/，GitHub 侧直接把它作为
+#     artifact 上传即可在 Actions 页面下载查看。
+#   - 部署目录 /usr/local/www/firestar 与云效 VMDeploy execute_cmd 一致。
+# =====================================================================
+name: firestar-manager CI/CD
+
+on:
+  push:
+    branches: [main]
+    # docs/README 等纯文档变更不触发（等价云效 pathFilter 思路）
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'vitest.config.ts'
+      - 'scripts/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.ts'
+      - 'vitest.config.ts'
+      - 'scripts/**'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: '测试+构建通过后部署生产（还需 environment 审批）'
+        type: boolean
+        default: false
+
+concurrency:
+  group: firestar-manager-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ------------------------------------------------------------
+  # 1) 单元测试（等价云效「Node.js 单元测试」job）
+  #    npm run test = node scripts/vitest-ci-report.mjs：
+  #    vitest 全量用例 + 自动生成 mochawesome-report/（JSON + HTML）。
+  #    退出码原样透传：真有用例失败本步即红，流水线中断。
+  # ------------------------------------------------------------
+  test:
+    name: 单元测试（vitest）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # 私有 registry 场景：在仓库配 NPM_TOKEN secret 并取消下行注释
+      # - name: 配置 .npmrc
+      #   run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+      #   env:
+      #     NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 运行单元测试
+        run: npm run test
+
+      - name: 上传测试报告（mochawesome，Actions 页面可下载查看）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mochawesome-report-${{ github.run_number }}
+          path: mochawesome-report/
+          if-no-files-found: ignore
+
+  # ------------------------------------------------------------
+  # 2) 构建打包（等价云效「Node.js 构建」job，命令逐字一致：
+  #    npm install → npm run build:prod → 校验 dist/index.html）
+  # ------------------------------------------------------------
+  build:
+    name: 前端构建
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 构建并校验产物
+        run: |
+          set -e
+          echo "========== 开始构建流程 =========="
+          echo "📦 安装依赖..."
+          npm install
+          echo "🔨 开始构建项目..."
+          npm run build:prod
+          echo "✅ 验证构建产物..."
+          if [ ! -f "dist/index.html" ]; then
+            echo "❌ 错误：dist/index.html 不存在"
+            ls -la dist/ || true
+            exit 1
+          fi
+          echo "✅ 构建成功！"
+          du -sh dist/
+
+      - name: 打部署包（包内为 dist 内容，无 dist/ 前缀——与云效制品同构）
+        run: tar czf package.tgz -C dist .
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: firestar-manager-dist-${{ github.run_number }}
+          path: package.tgz
+          retention-days: 7
+
+  # ------------------------------------------------------------
+  # 3) 生产部署（等价云效「主机部署」job）
+  #    触发条件：手动 dispatch + 勾选 deploy + test/build 全绿。
+  #    environment: production → 需在 Settings 配置 Required reviewers，
+  #    部署前 GitHub 会弹出人工审批，等价云效 FirstBatchPause。
+  #    服务器侧命令与云效 VMDeploy execute_cmd 逐字一致：
+  #    清空 /usr/local/www/firestar → 解压新制品。
+  # ------------------------------------------------------------
+  deploy:
+    name: 部署生产 ECS
+    needs: [test, build]
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.deploy == true &&
+      needs.test.result == 'success' &&
+      needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: firestar-manager-dist-${{ github.run_number }}
+          path: .
+
+      - name: 上传部署包到 ECS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ECS_SSH_HOST }}
+          username: ${{ secrets.ECS_SSH_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          port: ${{ secrets.ECS_SSH_PORT || 22 }}
+          source: package.tgz
+          target: /home/admin/fe-firestar/
+
+      - name: 清空并解压新制品（命令与云效 execute_cmd 一致）
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ECS_SSH_HOST }}
+          username: ${{ secrets.ECS_SSH_USER }}
+          key: ${{ secrets.ECS_SSH_KEY }}
+          port: ${{ secrets.ECS_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+            # 清空目标目录（保留目录本身，含隐藏文件）
+            rm -rf /usr/local/www/firestar/*
+            rm -rf /usr/local/www/firestar/.[!.]* 2>/dev/null || true
+            # 解压新制品
+            tar zxvf /home/admin/fe-firestar/package.tgz -C /usr/local/www/firestar/
+            echo "===== 部署后探活 ====="
+            ls -la /usr/local/www/firestar/ | head -10
+            test -f /usr/local/www/firestar/index.html && echo "index.html OK"
