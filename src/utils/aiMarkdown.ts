@@ -25,23 +25,55 @@ const TAG_TAIL = /^\s*(?:parameter|invoke|calls)\s*>\s*$/i
  * 只处理「标记与前后文连写」的位置；已是合法结构的文本不会被任何规则命中。
  */
 function normalizeSegment(seg: string): string {
-  // ⑦ 连体伪表格（2026-11-23 请求 f2f881c9 实锤）：扣子把多行表格输出成一行，
-  //    「…汇总：|指标 |数值 || ---- | ---- ||累计开票总金额 |11425.0元 ||…」，
-  //    || 是相邻两行的行尾/行首竖线拼接，表头还可能与前置正文连写。
-  //    仅当段内存在 GFM 分隔行特征（|---|）且出现紧贴 || 才拆行；
-  //    正常表格的双竖线（空单元格）必有空格「| a | | b |」，DeepSeek 等正常输出不命中。
-  if (/\|\s*:?-{2,}:?\s*\|/.test(seg) && seg.includes('||')) {
-    const lines = seg.replace(/\|\|/g, '|\n|').split('\n')
-    const sepIdx = lines.findIndex((l) => /\|\s*:?-{2,}:?\s*\|/.test(l))
-    // 表头行（分隔行的上一行）若与前置正文连写，在第一个竖线前断行
-    if (sepIdx > 0) {
-      const header = lines[sepIdx - 1]
-      const firstBar = header.indexOf('|')
-      if (firstBar > 0) {
-        lines[sepIdx - 1] = header.slice(0, firstBar) + '\n' + header.slice(firstBar)
-      }
-    }
-    seg = lines.join('\n')
+  // ⑦ 连体伪表格（两种形态，均扣子 0 换行输出实锤）：
+  //    a) 2026-11-22 f2f881c9：「|指标 |数值 || ---- | ---- ||累计…||」——|| 紧贴拼接；
+  //    b) 2026-11-23 4970e028：「|累计回款 | | --- | --- | | PJ-… |80000.0元 |2.全周期…」
+  //       ——行尾/行首竖线间带一个空格（| |），且表格嵌在编号列表项里、表格尾直接连正文结论句。
+  //    以行为单位判定：只有「同一行内同时出现 GFM 分隔行特征与行间连体（|\s*|）」才处理。
+  //    正常表格分隔行独占一行、不含 | | 连体（空单元格行也不与分隔行同行），永不命中；
+  //    列间分隔竖线后是文字不是竖线，|\s*| 不命中列间——DeepSeek 等正常输出零影响。
+  const SEP_ROW = /\|\s*:?-{2,}:?\s*\|/
+  /** test 用（无 g，避免 lastIndex 状态漂移）；replace 用必须带 g（全部行间连体点都要拆） */
+  const JOINED_TEST = /\|\s*\|/
+  const JOINED_REPLACE = /\|\s*\|/g
+  const isJoinedTableRow = (l: string) => SEP_ROW.test(l) && JOINED_TEST.test(l)
+  if (seg.split('\n').some(isJoinedTableRow)) {
+    seg = seg
+      .split('\n')
+      .map((l) => {
+        if (!isJoinedTableRow(l)) return l
+        // 行间拆行：行尾竖线与下一行行首竖线之间（无论有无空格）断行
+        let rows = l.replace(JOINED_REPLACE, '|\n|').split('\n')
+        const sepIdx = rows.findIndex((r) => SEP_ROW.test(r))
+        if (sepIdx < 0) return rows.join('\n')
+        // 表头行（分隔行上一行）前若有正文连写（如列表项「1.项目总数：…，项目详情： |项目编号…」）：
+        // 在第一个竖线前断行，并补一个空行——空行让表格脱离段落/列表上下文成为块级元素，
+        // 否则 CommonMark 把表格行当列表项的惰性续行，整表不渲染（4970e028 未渲染的第二根因）
+        const header = rows[sepIdx - 1]
+        const firstBar = header.indexOf('|')
+        if (sepIdx > 0 && firstBar > 0) {
+          rows[sepIdx - 1] = header.slice(0, firstBar).trimEnd() + '\n\n' + header.slice(firstBar)
+          rows = rows.join('\n').split('\n')
+        }
+        // 表格尾正文连写（「|80000.0元 |2.全周期累计总回款金额：…」）：结论句直接拼在数据行尾，
+        // 会被解析器并进末列截断丢失——在最后一个表格行尾竖线后断行 + 补空行
+        const sepIdx2 = rows.findIndex((r) => SEP_ROW.test(r))
+        let lastRow = -1
+        for (let i = sepIdx2 + 1; i < rows.length; i++) {
+          if (rows[i].trimStart().startsWith('|')) lastRow = i
+          else break
+        }
+        if (lastRow > sepIdx2) {
+          const row = rows[lastRow]
+          const lastBar = row.lastIndexOf('|')
+          const tail = row.slice(lastBar + 1).trim()
+          if (tail) {
+            rows[lastRow] = row.slice(0, lastBar + 1) + '\n\n' + tail
+          }
+        }
+        return rows.join('\n')
+      })
+      .join('\n')
   }
   return seg
     // ① 行内伪标题（##~######，不含单个 #——防误伤「C#」「话题标签」）：

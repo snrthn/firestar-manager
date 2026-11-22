@@ -67,6 +67,8 @@ interface ChatItem {
   requestId?: string | null
   /** 当前用户对该回答的反馈：LIKE / DISLIKE / null（回放时回显按钮态） */
   myFeedback?: 'LIKE' | 'DISLIKE' | null
+  /** 流式进行中：赞踩/复制等操作栏在回复完成前不展示（2026-11-23 虎哥要求） */
+  pending?: boolean
 }
 
 interface StoredConv {
@@ -533,6 +535,7 @@ async function send(text: string) {
     content: '',
     loading: true,
     noStyle: true,
+    pending: true,
   }) as ChatItem
   messages.value.push(ai)
   activeItem = ai
@@ -591,6 +594,7 @@ async function send(text: string) {
           flushTimer = null
           flushTokens()
           ai.loading = false
+          ai.pending = false
           if (ai.reasoning) ai.reasoningStatus = 'cancel'
           if (!ai.content.trim()) ai.content = '（已停止生成）'
           streaming.value = false
@@ -628,6 +632,7 @@ function finishStream(ai: ChatItem, status: ReasoningStatus) {
   }
   flushTokens()
   ai.loading = false
+  ai.pending = false
   if (ai.reasoning) ai.reasoningStatus = status
   streaming.value = false
   activeItem = null
@@ -698,7 +703,8 @@ async function confirmDraft(item: ChatItem) {
 // ===== 回答操作栏（云效式：赞 / 踩 / 复制请求ID / 复制回答 / 下载 .md）=====
 /** 只对「已落库的正经回答」显示操作栏；用户气泡 / 加载中 / 草稿卡 / 空回答都不显示 */
 function showActions(item: ChatItem): boolean {
-  return item.role === 'assistant' && !item.loading && !item.itemType && !!item.content.trim()
+  // pending：本轮流式还没结束（回复完成前不展示赞踩等操作栏，虎哥 2026-11-23 要求）
+  return item.role === 'assistant' && !item.loading && !item.pending && !item.itemType && !!item.content.trim()
 }
 
 /** BubbleList 槽可能传副本，统一回 messages.value 里找原对象再改，保证持久化与回显一致 */

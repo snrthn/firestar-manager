@@ -74,7 +74,7 @@ npm run build:prod    # --mode production
 - **AI 助手交互升级（2026-11-18~21）**：交互重构 + 视觉调整、思考流持久化展示、回复内容支持操作、模型配置排序（`src/views/system/model-config.vue`）。
 - **历史数据导入（2026-11-22）**：客户 / 货物信息导入（`src/components/ImportDrawer.vue`），导出功能格式调整。
 - **系统重置功能补全（2026-11-22）**：重置页改走鉴权状态端点 `GET /system/reset/status`、执行重置弹窗补管理员密码、完整重置后登出并跳 `/install`。
-- **测试与质量**：vitest 16 文件 / 134 用例（安装向导 / 重置 / 路由守卫 / AI Markdown 渲染等）；云效前端流水线新增 test_step 跑 `npm run test`。
+- **测试与质量**：vitest 16 文件 / 135 用例（安装向导 / 重置 / 路由守卫 / AI Markdown 渲染等）；云效前端流水线新增 test_step 跑 `npm run test`。
 - ⚠️ **路径前缀约定**：本文档 / 代码里出现的 `/api` 仅为前端 vite proxy 与生产 nginx 的**代理层**，开发与生产请求均被剥离；浏览器实际请求到后端的真实路径**不含 `/api`**（如 `/system/init/status`）。联调以「后端真实路径」为准。
 
 ## 近期变更（截至 2026-11-01，代码已落地、待 git 提交与部署重启）
@@ -95,4 +95,4 @@ npm run build:prod    # --mode production
 - **AI 助手交互升级（11-18~21）**：Vue 版本升级 + 交互重构 + 视觉调整、思考流持久化、回复内容支持操作、模型配置排序与新增配置类型、DSML 异常修复。
 - **导入导出（11-22）**：客户 / 货物信息导入（ImportDrawer）、导出功能格式调整、Excel 列宽优化。
 - **系统重置补全（11-22）**：鉴权状态端点 + 管理员密码弹窗 + 完整重置后跳转安装向导。
-- **测试补齐（11-22~23）**：新增 reset / install / router 等测试，vitest 达 16 文件 / 134 用例全绿（11-23 新增 aiMarkdown 伪表格拆行 3 条：连体伪表格拆 GFM / 空单元格不误拆 / 代码块内保留）；CI 新增 test_step。
+- **测试补齐（11-22~23）**：新增 reset / install / router 等测试，vitest 达 16 文件 / 135 用例全绿（11-23 新增 aiMarkdown 伪表格拆行 4 条：连体伪表格拆 GFM / 空单元格不误拆 / 代码块内保留 / 带空格连体变体，配套 `aiMarkdown.ts` 拆行修复）；CI 新增 test_step。
