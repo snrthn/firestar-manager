@@ -22,7 +22,7 @@ import { flattenMenus } from '@/utils/menuRoute'
 import request from '@/api/request'
 import { statsOverview, statsPlatform } from '@/api/stats'
 import { myTasksPage } from '@/api/approval'
-import { getFlags, getAnnouncement } from '@/api/config'
+import { getAbout, getFlags, getAnnouncement } from '@/api/config'
 import type { OverviewVO, PlatformStatsVO } from '@/types/stats'
 
 const router = useRouter()
@@ -40,10 +40,31 @@ const nickname = computed(
   () => userStore.userInfo?.nickname || userStore.userInfo?.username || '管理员'
 )
 
-const project = {
+/**
+ * 横幅项目名 / 版本号。
+ *
+ * 【为什么不是常量】版本号唯一维护入口在「参数设置 → 基本信息」的 app_version
+ * （sys_config），后端 /system/config/about（登录即可，无需 config:manage）聚合返回。
+ * 此处先给硬编码兜底值，onMounted 异步覆盖——接口失败时横幅不至于空白。
+ * 2026-11-23 之前 version 是写死的 'v0.0.1'，与参数设置页两套账，现改为单源。
+ */
+const project = ref({
   name: '火星财务管理系统',
   description: '面向财务业务的一体化管理平台，覆盖流程审批、账务处理与数据报表。',
   version: 'v0.0.1',
+})
+
+async function loadProjectMeta() {
+  try {
+    const about = await getAbout()
+    project.value = {
+      name: about.systemName || project.value.name,
+      description: project.value.description,
+      version: about.appVersion ? `v${String(about.appVersion).replace(/^v/, '')}` : project.value.version,
+    }
+  } catch {
+    /* 拉不到就保持兜底值，首页横幅不因它报错 */
+  }
 }
 
 /**
@@ -260,6 +281,7 @@ function onMetaClick(m: { label: string; value: string; path?: string }) {
 }
 
 onMounted(() => {
+  loadProjectMeta()
   loadOverview()
   loadTodo()
   loadPlatform()
