@@ -46,12 +46,12 @@ const nickname = computed(
  * 【为什么不是常量】版本号唯一维护入口在「参数设置 → 基本信息」的 app_version
  * （sys_config），后端 /system/config/about（登录即可，无需 config:manage）聚合返回。
  * 此处先给硬编码兜底值，onMounted 异步覆盖——接口失败时横幅不至于空白。
- * 2026-11-23 之前 version 是写死的 'v0.0.1'，与参数设置页两套账，现改为单源。
+ * 兜底值与仓库 CHANGELOG 当前版本保持一致（发布新版时同步 bump）。
  */
 const project = ref({
   name: '火星财务管理系统',
   description: '面向财务业务的一体化管理平台，覆盖流程审批、账务处理与数据报表。',
-  version: 'v0.0.1',
+  version: 'v0.1.0',
 })
 
 async function loadProjectMeta() {

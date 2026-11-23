@@ -18,7 +18,7 @@
               <el-input v-model="basicForm.support_contact" placeholder="邮箱 / 电话" />
             </el-form-item>
             <el-form-item label="应用版本号">
-              <el-input v-model="basicForm.app_version" placeholder="如：0.0.1" />
+              <el-input v-model="basicForm.app_version" placeholder="如：0.1.0" />
             </el-form-item>
             <el-form-item label="系统公告">
               <el-input v-model="basicForm.login_notice" type="textarea" :rows="3" />
