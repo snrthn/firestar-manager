@@ -16,14 +16,17 @@ import { completeTask, rejectTask } from '@/api/approval'
 import { completeShipmentTask, rejectShipmentTask } from '@/api/shipment'
 import { completeReceiptTask, rejectReceiptTask } from '@/api/receipt'
 import { completeInvoiceTask, rejectInvoiceTask } from '@/api/invoice'
+import { completeChangeTask, rejectChangeTask } from '@/api/change'
 import type { ApprovalHistoryVO, TaskInfoVO } from '@/types/approval'
 
 /** 各业务审批流程 key（后端 process_code；待办 enrich 与前端审批动作都按此分发） */
 export const SHIPMENT_PROCESS_CODE = 'shipment_approval'
 export const RECEIPT_PROCESS_CODE = 'receipt_approval'
 export const INVOICE_PROCESS_CODE = 'invoice_approval'
+/** 合同变更审批（V220）：独立流程，审批动作走 /change/task/** */
+export const CHANGE_PROCESS_CODE = 'project_change'
 
-export type ApprovalModule = 'project' | 'shipment' | 'receipt' | 'invoice'
+export type ApprovalModule = 'project' | 'shipment' | 'receipt' | 'invoice' | 'change'
 
 /** 按流程定义 key 分发到对应业务模块（决定走哪套 API） */
 export function approvalModuleOf(
@@ -36,6 +39,8 @@ export function approvalModuleOf(
       return 'receipt'
     case INVOICE_PROCESS_CODE:
       return 'invoice'
+    case CHANGE_PROCESS_CODE:
+      return 'change'
     default:
       return 'project'
   }
@@ -106,12 +111,14 @@ export function useTaskApproval() {
         if (mod === 'shipment') await completeShipmentTask(task.taskId, vars)
         else if (mod === 'receipt') await completeReceiptTask(task.taskId, vars)
         else if (mod === 'invoice') await completeInvoiceTask(task.taskId, vars)
+        else if (mod === 'change') await completeChangeTask(task.taskId, vars)
         else await completeTask(task.taskId, vars)
         ElMessage.success('已通过')
       } else {
         if (mod === 'shipment') await rejectShipmentTask(task.taskId, comment.value.trim())
         else if (mod === 'receipt') await rejectReceiptTask(task.taskId, comment.value.trim())
         else if (mod === 'invoice') await rejectInvoiceTask(task.taskId, comment.value.trim())
+        else if (mod === 'change') await rejectChangeTask(task.taskId, comment.value.trim())
         else await rejectTask(task.taskId, rejectTarget.value, comment.value.trim())
         ElMessage.success('已驳回')
       }

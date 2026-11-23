@@ -10,6 +10,8 @@ import ProjectDetailDialog from '@/views/project/ProjectDetailDialog.vue'
 import ShipmentDetailDialog from '@/views/shipment/ShipmentDetailDialog.vue'
 import ReceiptDetailDialog from '@/views/receipt/ReceiptDetailDialog.vue'
 import InvoiceDetailDialog from '@/views/invoice/InvoiceDetailDialog.vue'
+// 合同变更审批（V220）：独立详情弹窗，bizKey=变更单 ID
+import ChangeDetailDialog from '@/views/project/ChangeDetailDialog.vue'
 import { myTasksPage, myStartedPage, myApprovedHistoryPage } from '@/api/approval'
 import { formatDateTime } from '@/utils/datetime'
 import type { ApprovalHistoryVO, TaskInfoVO } from '@/types/approval'
@@ -159,6 +161,10 @@ const handleTabChange = (name: string) => {
 const projectVisible = ref(false)
 const projectId = ref<number | null>(null)
 
+// 合同变更审批弹窗（V220）
+const changeVisible = ref(false)
+const changeId = ref<number | null>(null)
+
 // 普通详情入口（「我发起的」/ 历史「详情」）：非审批场景，务必清空审批态，
 // 否则会带着上一次失败的审批任务误入审批表单（只读视图变成可操作）
 const openProject = (id: number | null) => {
@@ -227,6 +233,9 @@ const openApproval = (row: TaskInfoVO) => {
   } else if (mod === 'invoice') {
     invoiceId.value = Number(row.bizKey)
     invoiceVisible.value = true
+  } else if (mod === 'change') {
+    changeId.value = Number(row.bizKey)
+    changeVisible.value = true
   } else if (isShipmentTask(row)) {
     shipmentId.value = Number(row.bizKey)
     shipmentVisible.value = true
@@ -497,6 +506,14 @@ onMounted(loadApprovals)
       :approval-task="approvalTask"
       readonly
       @approved="onApproved"
+    />
+    <ChangeDetailDialog
+      v-model:visible="changeVisible"
+      :change-id="changeId"
+      :approval-task="approvalTask"
+      readonly
+      @approved="onApproved"
+      @updated="onApproved(true)"
     />
   </el-card>
 </template>

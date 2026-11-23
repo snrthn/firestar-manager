@@ -20,6 +20,10 @@ import { downloadViaBackend } from '@/utils/fileDownload'
 import { useTaskApproval } from '@/composables/useTaskApproval'
 import { useDictLabels } from '@/composables/useDict'
 import { formatDateTime } from '@/utils/datetime'
+// 合同变更（V220）：立项详情「发起变更」入口 + 变更单历史列表
+import ChangeDialog from './ChangeDialog.vue'
+import { listChangesByProject } from '@/api/change'
+import type { ChangeVO } from '@/types/change'
 
 // 立项详情弹窗（2026-10-23 虎哥：业务操作收进详情，列表操作列只留「编辑 + 详情」）。
 //
@@ -124,7 +128,7 @@ const load = async (id: number) => {
     const [d, tl] = await Promise.all([projectDetail(id), projectTimeline(id)])
     detail.value = d
     timeline.value = tl
-    await loadContractFiles(d)
+    await Promise.all([loadContractFiles(d), loadChanges(id)])
   } catch (e) {
     ElMessage.error((e as Error).message)
     detail.value = null
@@ -198,6 +202,28 @@ const canSign = () =>
  * 后端引擎仍有「发起人身份 + 流程运行中」两道闸，这里只做前端可见性。
  */
 const canWithdraw = () => detail.value?.approvalStatus === 'APPROVING'
+
+// ===== 合同变更（V220）=====
+// 发起入口：仅审批通过（APPROVED）后可用；未签约/已签约都能变更（变更独立流程，不改签约态）
+const changeVisible = ref(false)
+const changes = ref<ChangeVO[]>([])
+const canChange = () => detail.value?.approvalStatus === 'APPROVED'
+
+const loadChanges = async (projectId: number) => {
+  try {
+    changes.value = await listChangesByProject(projectId)
+  } catch {
+    changes.value = []
+  }
+}
+
+/** 变更提交成功：刷新详情金额 + 变更历史，让新金额和历史立即可见 */
+const handleChangeCreated = async () => {
+  if (props.projectId != null) {
+    await Promise.all([load(props.projectId), loadChanges(props.projectId)])
+  }
+  emit('updated')
+}
 
 const handleWithdraw = async () => {
   if (!detail.value) return
@@ -363,6 +389,26 @@ const itemsTotal = computed(() =>
           empty-text="暂无审批记录（未提交审批或流程未开始）"
         />
 
+        <!-- 合同变更历史（V220）：每次金额/明细变更都是一条受控审批记录，可追溯 -->
+        <template v-if="changes.length">
+          <h4 class="block-title">合同变更记录</h4>
+          <el-table :data="changes" border size="small">
+            <el-table-column prop="changeNo" label="变更单号" min-width="150" show-overflow-tooltip />
+            <el-table-column label="金额变化" min-width="180">
+              <template #default="{ row }">
+                {{ formatAmount(row.oldContractAmount) }} → {{ formatAmount(row.newContractAmount ?? row.oldContractAmount) }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="changeReason" label="变更原因" min-width="200" show-overflow-tooltip />
+            <el-table-column label="状态" width="110" align="center">
+              <template #default="{ row }">{{ row.approvalStatusName || row.approvalStatus }}</template>
+            </el-table-column>
+            <el-table-column prop="appliedAt" label="发起时间" width="160">
+              <template #default="{ row }">{{ row.appliedAt ? formatDateTime(row.appliedAt) : '—' }}</template>
+            </el-table-column>
+          </el-table>
+        </template>
+
         <!-- 当前审批（2026-10-24 虎哥：从 footer 横条改为内容区标题分区，带卡片面板，
              审批人一边看单据/进度一边处理，不用在详情窗与审批窗之间来回切；
              提交/取消按钮在 footer，表单面板只放输入控件） -->
@@ -403,6 +449,13 @@ const itemsTotal = computed(() =>
             type="primary"
             @click="emit('sign', detail)"
           >签约</el-button>
+          <el-button
+            v-if="canChange()"
+            v-has-perm="'project:change'"
+            type="warning"
+            plain
+            @click="changeVisible = true"
+          >发起变更</el-button>
         </template>
         <el-button @click="visible = false">关闭</el-button>
       </template>
@@ -411,6 +464,17 @@ const itemsTotal = computed(() =>
 
   <!-- 合同附件预览：复用文件管理模块的预览弹窗（与发票详情同款） -->
   <FilePreviewDialog v-model="previewVisible" :file="previewRow" />
+
+  <!-- 发起合同变更（V220）：独立弹窗，自持 diff 计算与提交 -->
+  <ChangeDialog
+    v-if="detail"
+    v-model:visible="changeVisible"
+    :project-id="detail.id"
+    :project-name="detail.projectName"
+    :current-amount="detail.contractAmount"
+    :items="detail.items || []"
+    @created="handleChangeCreated"
+  />
 </template>
 
 <style scoped>
