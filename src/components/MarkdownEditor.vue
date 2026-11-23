@@ -135,3 +135,18 @@ async function handleUploadImg(files: File[], callback: (urls: UploadImgCallBack
   overflow-x: auto;
 }
 </style>
+
+<style>
+/* ===== 全屏层级修正（2026-11-23 虎哥截图实锤） =====
+ * 上面 .kb-md-editor 的 isolation:isolate 把全屏编辑器（.md-editor-fullscreen，
+ * position:fixed + z-index:10000）关进了本容器的层叠上下文——对外整个子树只按
+ * z-index:auto 参与，被 header.app-header（position:relative + z-index:20）压住，
+ * 表现为全屏后工具栏被顶栏挡住。
+ * 修法：全屏时把本容器抬到全站最高层（isolation 保留，代码块吸顶防逃逸不回退）。
+ * 4000 > header(20) / AI 面板(2100) / AppTabs 固定层(3000)。
+ * 非 scoped：:has 里套深层组件类，scoped 编译会错位。 */
+.kb-md-editor:has(.md-editor-fullscreen) {
+  position: relative;
+  z-index: 4000;
+}
+</style>

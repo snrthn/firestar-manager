@@ -179,3 +179,25 @@
 .el-dialog:not(.is-fullscreen):has(.dialog-scroll) > .el-dialog__body {
   overflow-y: hidden;
 }
+
+/* ===== 业务审核类详情面板（内滚 .detail-scroll / .dialog-scroll，2026-11-23） =====
+ * 750 上限（600 对长详情/审核链太挤）；内滚高度不再用组件里旧的
+ * max-height: calc(100vh - 280px)——弹窗被 750 锁住后 body 实际高度小于它，
+ * body 又是 overflow:hidden，滚到底部内容被裁掉（立项详情截图实锤）。
+ * 改为 body flex 列 + 内滚 flex:1 精确填满 body 剩余空间，任何上限都不裁内容。
+ * 选择器 (0,3,0) 级压过组件 scoped 的 .detail-scroll[data-v] (0,2,0)。 */
+.el-dialog:not(.is-fullscreen):has(.detail-scroll),
+.el-dialog:not(.is-fullscreen):has(.dialog-scroll) {
+  max-height: min(750px, calc(100vh - var(--el-dialog-margin-top, 15vh) - 50px));
+}
+.el-dialog:not(.is-fullscreen):has(.detail-scroll) > .el-dialog__body,
+.el-dialog:not(.is-fullscreen):has(.dialog-scroll) > .el-dialog__body {
+  display: flex;
+  flex-direction: column;
+}
+.el-dialog:not(.is-fullscreen) .detail-scroll,
+.el-dialog:not(.is-fullscreen) .dialog-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}

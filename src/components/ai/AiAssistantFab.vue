@@ -24,7 +24,7 @@
  *
  * 旧组件已备份为同目录 AiAssistantFab.vue.bak。
  */
-import { computed, onBeforeUnmount, onMounted, reactive, ref, type Component } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, type Component } from 'vue'
 import { BubbleList, Welcome, XSender } from 'vue-element-plus-x'
 import AiThinking from './AiThinking.vue'
 import 'vue-element-plus-x/styles/index.css'
@@ -138,6 +138,16 @@ const serverConvs = ref<ConversationSummary[]>([])
 const serverTotal = ref(0)
 const histPage = ref(1)
 const histLoading = ref(false)
+/** 首屏（第一页）加载中：展开面板时为 true，骨架屏替代旧列表渲染。
+ *  与 histLoading 分开的原因：点「加载更多」时 histLoading 也为 true，
+ *  但那会儿不能把已有列表换成骨架屏。 */
+const histFirstLoading = ref(false)
+/** 滚动容器（.ai-hist）：展开时强制回顶，避免上次的滚动位置先可见、
+ *  数据到达后滚动条突跳顶部（2026-11-23 虎哥反馈的视觉跳动） */
+const histBodyRef = ref<HTMLElement | null>(null)
+/** popover 内容可见性：与 @show/@hide 同步。内容树用它做 v-if 销毁——
+ *  面板一关 DOM 全部销毁，再打开重新初始化（虎哥 2026-11-23 定案）。 */
+const histPopVisible = ref(false)
 /** 服务端历史接口不可达 → 降级本地快照（同一浏览器内可回放） */
 const histFailed = ref(false)
 /** 历史会话弹出层实例：点开某条记录后手动收起（与 modePopRef 同款，trigger=click 不会自动关） */
@@ -150,11 +160,18 @@ function closeHistPop() {
 }
 
 async function fetchHistoryPage(page: number) {
+  if (page === 1) histFirstLoading.value = true
   histLoading.value = true
   try {
     const p = await listConversations(page, HIST_PAGE_SIZE)
-    if (page === 1) serverConvs.value = p.records
-    else serverConvs.value = serverConvs.value.concat(p.records)
+    if (page === 1) {
+      serverConvs.value = p.records
+      // 数据替换旧列表后把滚动锚回顶部；骨架屏期间容器无滚动条，
+      // 这里兜的是「骨架屏一闪而过、列表直接挂载」那一帧的残留 scrollTop
+      void nextTick(() => histBodyRef.value?.scrollTo({ top: 0 }))
+    } else {
+      serverConvs.value = serverConvs.value.concat(p.records)
+    }
     serverTotal.value = p.total
     histPage.value = page
     histFailed.value = false
@@ -164,10 +181,13 @@ async function fetchHistoryPage(page: number) {
     loadConversations()
   } finally {
     histLoading.value = false
+    histFirstLoading.value = false
   }
 }
-/** popover 打开时拉第一页（每次打开都刷新，保证新会话及时出现） */
+/** popover 打开时拉第一页（每次打开都刷新，保证新会话及时出现）。
+ *  展开瞬间先渲染骨架屏（旧列表 / 旧滚动位置完全不出现），数据到了从顶部展示。 */
 function onHistShow() {
+  histPopVisible.value = true
   serverConvs.value = []
   serverTotal.value = 0
   histPage.value = 1
@@ -828,18 +848,32 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
                 <el-icon :size="17"><Plus /></el-icon>
               </button>
             </el-tooltip>
-            <el-popover ref="histPopRef" placement="bottom-end" :width="340" trigger="click" popper-class="ai-hist-pop" @show="onHistShow">
+            <el-popover
+              ref="histPopRef"
+              placement="bottom-end"
+              :width="340"
+              trigger="click"
+              popper-class="ai-hist-pop"
+              @show="onHistShow"
+              @hide="histPopVisible = false"
+            >
               <template #reference>
                 <button class="ai-icon-btn" type="button" title="最近会话">
                   <el-icon :size="17"><Clock /></el-icon>
                 </button>
               </template>
-              <div class="ai-hist">
+              <!-- v-if 受控销毁：面板一关整个内容树销毁，再打开全新初始化——
+                   不留旧列表 / 旧滚动位置，展开首屏固定是骨架屏 loading -->
+              <div v-if="histPopVisible" ref="histBodyRef" class="ai-hist">
                 <div class="ai-hist__hd">最近会话</div>
-                <div v-if="histLoading && !serverConvs.length && !histFailed" class="ai-hist__empty">加载中…</div>
+                <!-- 首屏加载：骨架屏替代旧列表渲染（不是追加一行“加载中”文字），
+                     旧列表 / 旧滚动位置在展开瞬间完全不出现，杜绝数据到达后的跳顶 -->
+                <div v-if="histFirstLoading && !histFailed" class="ai-hist__loading">
+                  <el-skeleton animated :rows="5" />
+                </div>
                 <!-- 服务端历史（接口不可达时自动降级本地快照） -->
-                <template v-if="!histFailed">
-                  <div v-if="!histLoading && !serverConvs.length" class="ai-hist__empty">暂无历史会话</div>
+                <template v-else-if="!histFailed">
+                  <div v-if="!serverConvs.length" class="ai-hist__empty">暂无历史会话</div>
                   <button
                     v-for="c in serverConvs"
                     :key="c.id"
@@ -1433,6 +1467,10 @@ const reasoningActive = computed(() => messages.value.some((m) => m.reasoningSta
   color: #c0c4cc;
   font-size: 12px;
   text-align: center;
+}
+/* 首屏骨架屏容器：与空态相同的内边距，占住面板高度避免展开时塌缩 */
+.ai-hist__loading {
+  padding: 16px 4px;
 }
 .ai-hist__item {
   display: flex;
