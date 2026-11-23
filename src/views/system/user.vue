@@ -291,12 +291,21 @@ onMounted(() => {
       <el-table-column label="部门" min-width="140">
         <template #default="{ row }">{{ row.deptName || '—' }}</template>
       </el-table-column>
-      <el-table-column label="角色" min-width="160">
+      <el-table-column label="角色" min-width="220">
         <template #default="{ row }">
+          <!-- 角色 ≥3 个时收起：只展示前 2 个 + 「+N」，hover 气泡列全部（参考成熟后台的标签折叠交互） -->
           <template v-if="row.roleNames.length">
-            <el-tag v-for="name in row.roleNames" :key="name" size="small" style="margin-right: 4px">
+            <el-tag v-for="name in row.roleNames.slice(0, 2)" :key="name" size="small" style="margin-right: 4px">
               {{ name }}
             </el-tag>
+            <el-tooltip v-if="row.roleNames.length > 2" effect="dark" placement="top">
+              <template #content>
+                <div v-for="name in row.roleNames" :key="name">{{ name }}</div>
+              </template>
+              <el-tag size="small" style="cursor: default">
+                +{{ row.roleNames.length - 2 }}
+              </el-tag>
+            </el-tooltip>
           </template>
           <span v-else>—</span>
         </template>

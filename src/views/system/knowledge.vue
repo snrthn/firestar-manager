@@ -32,9 +32,10 @@
  *      服务端在事务内整组重排同父兄弟；上移/下移 = BEFORE/AFTER 相邻兄弟。
  *      ⚠️ node-drop 的 dropType 是 before/after/inner，allow-drop 才是 prev/next/inner
  *      （两套取值不同！），旧实现混用导致「拖到 A 前却排末尾」。
- *   ⑪ 预览统一（§25，撤销 §24 的 A 方案）：编辑器默认双栏预览保留；顶部「预览」tab
- *      改用同一个 MdPreview 渲染器 + 本地 mermaid 实例，8 种图表两端表现一致；
- *      滚动容器仍是本页原生 div，保证 scoped 命中与高度链闭合。
+ *   ⑪ 预览统一（§25→2026-11-23 定案）：以 **md-editor-v3 原生渲染为准**——预览 tab
+ *      与编辑器内置预览同用 MdPreview（MarkdownView.vue 已从 x-markdown-vue 切回，
+ *      虎哥拍板：x-markdown-vue 渲染观感不佳）。安全/图片/图表契约不变（kbSanitize、
+ *      file:<id> JWT 拉图、本地 mermaid 注入）。滚动容器仍是本页原生 div。
  *   ⑫ 状态与保存（§24）：树节点状态点 + header 徽章区分草稿/已发布 + 未保存提示；
  *      编辑器工具栏「保存」接 :onSave → 页面 save()，与顶部「保存草稿」同一逻辑。
  *   ⑬ 顶部删除按钮移除（§25）：删除统一收敛到树节点三点菜单，避免误删当前文档。
@@ -96,13 +97,25 @@ function kbAttachExt(name: string): string {
   return dot < 0 || dot === name.length - 1 ? '' : name.slice(dot + 1).toLowerCase()
 }
 import { validateMarkdown, collectFileRefs, extractHeadings } from '@/utils/markdown'
+import ChunkSkeleton from '@/components/ChunkSkeleton.vue'
 
 // ⚠️ 编辑器与预览都必须异步加载：编辑器把 CodeMirror / 本地 mermaid 实例、
 //    预览把 x-markdown-vue（Shiki）带进异步 chunk，静态引入会把 3MB+ 运行时
 //    塞进 knowledge 首屏。编辑器共享 kbMarkdown 里的 mermaid 实例；预览走
 //    x-markdown-vue（动态 import npm 里的 mermaid，零 CDN 依赖），Vite 各自拆 chunk。
-const MarkdownEditor = defineAsyncComponent(() => import('@/components/MarkdownEditor.vue'))
-const MarkdownView = defineAsyncComponent(() => import('@/components/MarkdownView.vue'))
+const MarkdownEditor = defineAsyncComponent({
+  loader: () => import('@/components/MarkdownEditor.vue'),
+  /* 慢网下 chunk 下载完成前也有骨架（2026-11-23 虎哥反馈生产看不到骨架的根因：
+     之前只处理了组件内初始化态，defineAsyncComponent 无 loadingComponent 时
+     chunk 下载期是纯白板）。delay=200：本机快网不闪骨架。 */
+  loadingComponent: ChunkSkeleton,
+  delay: 200,
+})
+const MarkdownView = defineAsyncComponent({
+  loader: () => import('@/components/MarkdownView.vue'),
+  loadingComponent: ChunkSkeleton,
+  delay: 200,
+})
 
 /** el-tree 实例的最小接口，避免引入 element-plus 深层类型 */
 interface TreeExpose {
@@ -1058,8 +1071,7 @@ async function downloadAtt(a: KbAttachment) {
         <!-- 滚动容器必须是本页原生 div：scoped 样式 100% 命中，flex:1 + min-height:0
              的高度链才闭合。旧写法把 class 传给 MarkdownView → RichView 手动 v-bind
              到跨组件内部节点（Fragment 双根），scoped 与高度链都不稳 → 预览没有滚动条。
-             MarkdownView 内部已换成 x-markdown-vue 渲染器（与 AI 助手同一渲染出口），
-             同样不承载滚动。 -->
+             MarkdownView（MdPreview 渲染器，与编辑器内置预览同源）同样不承载滚动。 -->
         <div v-else class="kb-preview">
           <MarkdownView :content="form.contentMd" />
         </div>

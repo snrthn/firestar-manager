@@ -16,11 +16,13 @@
  * sys_kb_attachment 的 INLINE 关系（新建文档也能补关联）。
  *
  * ✅ 设计文档 §25（撤销 §24 的 A 方案）：编辑器**默认双栏预览必须保留**。
- *    顶部「预览」tab 改为复用同一个渲染器 MdPreview，因此两边对 mermaid 图表
- *    （流程图/时序图/甘特图/类图/状态图/饼图/关系图/旅程图）表现完全一致，
- *    不再是「系统预览一套 markdown-it、默认预览另一套」。
+ *    顶部「预览」tab 也复用同一个渲染器 MdPreview（MarkdownView.vue 已于
+ *    2026-11-23 从 x-markdown-vue 切回，虎哥拍板：原生渲染效果为准，x-markdown-vue
+ *    的代码块/表格渲染观感不佳）。因此编辑器内置预览、页面「预览」tab 两端对
+ *    mermaid 图表（流程图/时序图/甘特图/类图/状态图/饼图/关系图/旅程图）与
+ *    代码块/表格表现完全一致，不再有「原生预览 vs 自定义预览」割裂。
  *    mermaid 运行时由 @/utils/kbMarkdown 注入本地实例（默认 unpkg CDN 不可达），
- *    本组件只需 import 该模块触发 config，并去掉 noMermaid 开关。
+ *    本组件只需 import 该模块触发 config。
  *
  * 工具栏「保存」按钮：md-editor-v3 的 save 只往外抛 onSave，不自带任何保存动作，
  *    不监听就是「点了没反应」。这里转成 save 事件交给页面，与顶部「保存草稿」
