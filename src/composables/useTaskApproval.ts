@@ -23,7 +23,7 @@ import type { ApprovalHistoryVO, TaskInfoVO } from '@/types/approval'
 export const SHIPMENT_PROCESS_CODE = 'shipment_approval'
 export const RECEIPT_PROCESS_CODE = 'receipt_approval'
 export const INVOICE_PROCESS_CODE = 'invoice_approval'
-/** 合同变更审批（V220）：独立流程，审批动作走 /change/task/** */
+/** 项目变更审批（V220）：独立流程，审批动作走 /change/task/** */
 export const CHANGE_PROCESS_CODE = 'project_change'
 
 export type ApprovalModule = 'project' | 'shipment' | 'receipt' | 'invoice' | 'change'

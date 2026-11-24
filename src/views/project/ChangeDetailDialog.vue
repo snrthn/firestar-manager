@@ -9,7 +9,7 @@ import ApprovalActionForm from '@/components/ApprovalActionForm.vue'
 import { useTaskApproval } from '@/composables/useTaskApproval'
 
 /**
- * 合同变更单详情弹窗（V220）：审批中心「待我审批」点变更任务时打开。
+ * 项目变更单详情弹窗（V220）：审批中心「待我审批」点变更任务时打开。
  * 审批模式下内容照旧（变更前后金额 + 明细 diff + 审批进度），footer 换成审批表单，
  * 审批人一边看改了什么一边决定通过/驳回。
  */
@@ -28,8 +28,8 @@ const timeline = ref<ReturnType<typeof changeTimeline> extends Promise<infer T> 
 
 const dialogTitle = () =>
   props.approvalTask
-    ? `审批 - ${props.approvalTask.bizTitle || props.approvalTask.taskName || '合同变更'}`
-    : '合同变更详情'
+    ? `审批 - ${props.approvalTask.bizTitle || props.approvalTask.taskName || '项目变更'}`
+    : '项目变更详情'
 
 const fmt = (v: number | null | undefined) =>
   v == null ? '—' : Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

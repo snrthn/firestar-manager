@@ -20,7 +20,7 @@ import { downloadViaBackend } from '@/utils/fileDownload'
 import { useTaskApproval } from '@/composables/useTaskApproval'
 import { useDictLabels } from '@/composables/useDict'
 import { formatDateTime } from '@/utils/datetime'
-// 合同变更（V220）：立项详情「发起变更」入口 + 变更单历史列表
+// 项目变更（V220）：立项详情「发起变更」入口 + 变更单历史列表
 import ChangeDialog from './ChangeDialog.vue'
 import { listChangesByProject } from '@/api/change'
 import type { ChangeVO } from '@/types/change'
@@ -203,7 +203,7 @@ const canSign = () =>
  */
 const canWithdraw = () => detail.value?.approvalStatus === 'APPROVING'
 
-// ===== 合同变更（V220）=====
+// ===== 项目变更（V220）=====
 // 发起入口：仅审批通过（APPROVED）后可用；未签约/已签约都能变更（变更独立流程，不改签约态）
 const changeVisible = ref(false)
 const changes = ref<ChangeVO[]>([])
@@ -389,9 +389,9 @@ const itemsTotal = computed(() =>
           empty-text="暂无审批记录（未提交审批或流程未开始）"
         />
 
-        <!-- 合同变更历史（V220）：每次金额/明细变更都是一条受控审批记录，可追溯 -->
+        <!-- 项目变更历史（V220）：每次金额/明细变更都是一条受控审批记录，可追溯 -->
         <template v-if="changes.length">
-          <h4 class="block-title">合同变更记录</h4>
+          <h4 class="block-title">项目变更记录</h4>
           <el-table :data="changes" border size="small">
             <el-table-column prop="changeNo" label="变更单号" min-width="150" show-overflow-tooltip />
             <el-table-column label="金额变化" min-width="180">
@@ -465,7 +465,7 @@ const itemsTotal = computed(() =>
   <!-- 合同附件预览：复用文件管理模块的预览弹窗（与发票详情同款） -->
   <FilePreviewDialog v-model="previewVisible" :file="previewRow" />
 
-  <!-- 发起合同变更（V220）：独立弹窗，自持 diff 计算与提交 -->
+  <!-- 发起项目变更（V220）：独立弹窗，自持 diff 计算与提交 -->
   <ChangeDialog
     v-if="detail"
     v-model:visible="changeVisible"

@@ -1,4 +1,4 @@
-// 合同变更模块类型（与后端 com.firestar.dto.ChangeVO / ChangeCreateReq 对齐，V220）
+// 项目变更模块类型（与后端 com.firestar.dto.ChangeVO / ChangeCreateReq 对齐，V220）
 import type { TimelineNodeVO } from './project'
 
 /** 变更明细 diff 行请求 */

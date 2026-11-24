@@ -7,7 +7,7 @@ import type { ChangeItemReq } from '@/types/change'
 import type { ItemVO } from '@/types/shipment'
 
 /**
- * 合同变更弹窗（V220）：立项详情「发起变更」入口。
+ * 项目变更弹窗（V220）：立项详情「发起变更」入口。
  *
  * 设计：保留手填合同金额的弹性，但把「改金额 / 增减明细」收进一条受控审批动作。
  * 明细编辑采用「目标态」交互——用户直接改数量/单价/删行/加行，提交时前端对比原始明细
@@ -162,6 +162,12 @@ const handleSubmit = async () => {
       ElMessage.warning(`「${r.itemName}」数量必须大于 0`)
       return
     }
+    // 窗口 B（本行 shippedQty>0 即已发货）数量不得低于已发量，与后端 applyChange 同口径，
+    // 前移到提交时拦截，避免审批走完才在应用阶段失败
+    if (!r.isNew && r.shippedQty > 0 && Number(r.quantity) < r.shippedQty) {
+      ElMessage.warning(`「${r.itemName}」数量不得小于已发数量 ${r.shippedQty} 件`)
+      return
+    }
     if (r.unitPrice == null || Number(r.unitPrice) <= 0) {
       ElMessage.warning(`「${r.itemName}」单价必须大于 0`)
       return
@@ -196,7 +202,7 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <el-dialog v-model="visible" :title="`发起合同变更 - ${projectName}`" width="1000px" top="6vh">
+  <el-dialog v-model="visible" :title="`发起项目变更 - ${projectName}`" width="1000px" top="6vh">
     <div class="change-scroll">
       <el-alert
         type="info"

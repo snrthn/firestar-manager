@@ -3,7 +3,7 @@ import type { ApiResult } from '@/types/auth'
 import type { ChangeCreateReq, ChangeVO } from '@/types/change'
 import type { TimelineNodeVO } from '@/types/project'
 
-// 合同变更接口（后端 /api/change/**）
+// 项目变更接口（后端 /api/change/**）
 
 /** 发起变更（创建即发起 project_change 两级审批） */
 export function createChange(projectId: number, data: ChangeCreateReq) {

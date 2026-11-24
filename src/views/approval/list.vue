@@ -10,7 +10,7 @@ import ProjectDetailDialog from '@/views/project/ProjectDetailDialog.vue'
 import ShipmentDetailDialog from '@/views/shipment/ShipmentDetailDialog.vue'
 import ReceiptDetailDialog from '@/views/receipt/ReceiptDetailDialog.vue'
 import InvoiceDetailDialog from '@/views/invoice/InvoiceDetailDialog.vue'
-// 合同变更审批（V220）：独立详情弹窗，bizKey=变更单 ID
+// 项目变更审批（V220）：独立详情弹窗，bizKey=变更单 ID
 import ChangeDetailDialog from '@/views/project/ChangeDetailDialog.vue'
 import { myTasksPage, myStartedPage, myApprovedHistoryPage } from '@/api/approval'
 import { formatDateTime } from '@/utils/datetime'
@@ -161,7 +161,7 @@ const handleTabChange = (name: string) => {
 const projectVisible = ref(false)
 const projectId = ref<number | null>(null)
 
-// 合同变更审批弹窗（V220）
+// 项目变更审批弹窗（V220）
 const changeVisible = ref(false)
 const changeId = ref<number | null>(null)
 
